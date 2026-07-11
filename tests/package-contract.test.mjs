@@ -15,6 +15,7 @@ test('publishes stable package entry points', () => {
   assert.ok(packageJson.exports['./adapters/docusaurus']);
   assert.equal(packageJson.peerDependencies.react, '>=18 <20');
   assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
+  assert.equal(packageJson.dependencies.motion, '^12.23.24');
 });
 
 test('keeps annotation and table visuals borderless', () => {
@@ -49,6 +50,10 @@ test('exports an editable status property with host-owned persistence', async ()
   assert.match(statusEditor, /toggleWhenBinary/);
   assert.match(statusEditor, /onCreate/);
   assert.match(statusEditor, /onChange/);
+  assert.match(statusEditor, /LazyMotion/);
+  assert.match(statusEditor, /AnimatePresence/);
   assert.match(statusFieldEditor, /onOptionsChange/);
   assert.match(statusFieldEditor, /usedValues/);
+  assert.match(statusFieldEditor, /LazyMotion/);
+  assert.doesNotMatch(styles, /\.de-status-popover\s*\{[^}]*\bborder\s*:/s);
 });

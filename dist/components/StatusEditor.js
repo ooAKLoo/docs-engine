@@ -1,6 +1,7 @@
 'use client';
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { createPortal } from 'react-dom';
+import { AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, } from 'react';
 import { joinClassNames } from '../classnames.js';
 export function StatusEditor({ value, options, editable = false, allowCreate = false, toggleWhenBinary = false, onChange, onCreate, toneForValue, label = '状态', placeholder = '未设置', onError, className, ...props }) {
@@ -17,6 +18,7 @@ export function StatusEditor({ value, options, editable = false, allowCreate = f
     const rootRef = useRef(null);
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
+    const prefersReducedMotion = useReducedMotion();
     useEffect(() => {
         setOptimisticValue(value);
     }, [value]);
@@ -43,6 +45,7 @@ export function StatusEditor({ value, options, editable = false, allowCreate = f
             top: opensUp ? rect.top - estimatedHeight - 8 : rect.bottom + 8,
             left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 208) - 12),
             minWidth: Math.max(rect.width, 208),
+            transformOrigin: opensUp ? 'bottom left' : 'top left',
             zIndex: 80,
         });
     }, [canCreate, mergedOptions.length]);
@@ -145,11 +148,11 @@ export function StatusEditor({ value, options, editable = false, allowCreate = f
                         return;
                     }
                     setOpen((current) => !current);
-                }, children: _jsx("span", { children: displayValue }) }), mounted && open && menuStyle
-                ? createPortal(_jsxs("div", { ref: menuRef, id: `de-status-menu-${instanceId}`, className: "de-status-popover", role: "listbox", "aria-label": `${label}选项`, style: menuStyle, children: [_jsx(StatusMenuOption, { label: placeholder, tone: "neutral", selected: !normalizedValue, onSelect: () => void commit('', 'select') }), mergedOptions.map((option) => (_jsx(StatusMenuOption, { label: option.value, tone: resolveStatusTone(option.value, mergedOptions, toneForValue), selected: option.value === normalizedValue, onSelect: () => void commit(option.value, 'select') }, option.value))), canCreate ? (creating ? (_jsxs("form", { className: "de-status-create-form", onSubmit: (event) => {
-                                event.preventDefault();
-                                void createState();
-                            }, children: [_jsx("input", { autoFocus: true, value: draft, maxLength: 80, placeholder: "\u8F93\u5165\u65B0\u72B6\u6001", "aria-label": "\u65B0\u72B6\u6001\u540D\u79F0", onChange: (event) => setDraft(event.target.value) }), _jsx("button", { type: "submit", disabled: saving || !draft.trim(), children: "\u6DFB\u52A0" })] })) : (_jsxs("button", { type: "button", className: "de-status-create-button", onClick: () => setCreating(true), children: [_jsx("span", { "aria-hidden": "true", children: "\uFF0B" }), " \u65B0\u589E\u72B6\u6001"] }))) : null, error ? _jsx("p", { className: "de-status-error", role: "status", children: error }) : null] }), document.body)
+                }, children: _jsx("span", { children: displayValue }) }), mounted && menuStyle
+                ? createPortal(_jsx(LazyMotion, { features: domAnimation, strict: true, children: _jsx(AnimatePresence, { children: open ? (_jsxs(m.div, { ref: menuRef, id: `de-status-menu-${instanceId}`, className: "de-status-popover", role: "listbox", "aria-label": `${label}选项`, style: menuStyle, initial: prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }, animate: { opacity: 1, scale: 1 }, exit: prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.985 }, transition: prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34, mass: 0.52 }, children: [_jsx(StatusMenuOption, { label: placeholder, tone: "neutral", selected: !normalizedValue, onSelect: () => void commit('', 'select') }), mergedOptions.map((option) => (_jsx(StatusMenuOption, { label: option.value, tone: resolveStatusTone(option.value, mergedOptions, toneForValue), selected: option.value === normalizedValue, onSelect: () => void commit(option.value, 'select') }, option.value))), canCreate ? (creating ? (_jsxs("form", { className: "de-status-create-form", onSubmit: (event) => {
+                                        event.preventDefault();
+                                        void createState();
+                                    }, children: [_jsx("input", { autoFocus: true, value: draft, maxLength: 80, placeholder: "\u8F93\u5165\u65B0\u72B6\u6001", "aria-label": "\u65B0\u72B6\u6001\u540D\u79F0", onChange: (event) => setDraft(event.target.value) }), _jsx("button", { type: "submit", disabled: saving || !draft.trim(), children: "\u6DFB\u52A0" })] })) : (_jsxs("button", { type: "button", className: "de-status-create-button", onClick: () => setCreating(true), children: [_jsx("span", { "aria-hidden": "true", children: "\uFF0B" }), " \u65B0\u589E\u72B6\u6001"] }))) : null, error ? _jsx("p", { className: "de-status-error", role: "status", children: error }) : null] }, `de-status-menu-${instanceId}`)) : null }) }), document.body)
                 : null] }));
 }
 function StatusMenuOption({ label, tone, selected, onSelect, }) {

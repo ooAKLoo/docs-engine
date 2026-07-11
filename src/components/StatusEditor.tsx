@@ -1,6 +1,7 @@
 'use client';
 
 import {createPortal} from 'react-dom';
+import {AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion} from 'motion/react';
 import {
   useCallback,
   useEffect,
@@ -76,6 +77,7 @@ export function StatusEditor({
   const rootRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     setOptimisticValue(value);
@@ -109,6 +111,7 @@ export function StatusEditor({
       top: opensUp ? rect.top - estimatedHeight - 8 : rect.bottom + 8,
       left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 208) - 12),
       minWidth: Math.max(rect.width, 208),
+      transformOrigin: opensUp ? 'bottom left' : 'top left',
       zIndex: 80,
     });
   }, [canCreate, mergedOptions.length]);
@@ -241,58 +244,69 @@ export function StatusEditor({
       >
         <span>{displayValue}</span>
       </button>
-      {mounted && open && menuStyle
+      {mounted && menuStyle
         ? createPortal(
-            <div
-              ref={menuRef}
-              id={`de-status-menu-${instanceId}`}
-              className="de-status-popover"
-              role="listbox"
-              aria-label={`${label}选项`}
-              style={menuStyle}
-            >
-              <StatusMenuOption
-                label={placeholder}
-                tone="neutral"
-                selected={!normalizedValue}
-                onSelect={() => void commit('', 'select')}
-              />
-              {mergedOptions.map((option) => (
-                <StatusMenuOption
-                  key={option.value}
-                  label={option.value}
-                  tone={resolveStatusTone(option.value, mergedOptions, toneForValue)}
-                  selected={option.value === normalizedValue}
-                  onSelect={() => void commit(option.value, 'select')}
-                />
-              ))}
-              {canCreate ? (
-                creating ? (
-                  <form
-                    className="de-status-create-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void createState();
-                    }}
+            <LazyMotion features={domAnimation} strict>
+              <AnimatePresence>
+                {open ? (
+                  <m.div
+                  ref={menuRef}
+                  key={`de-status-menu-${instanceId}`}
+                  id={`de-status-menu-${instanceId}`}
+                  className="de-status-popover"
+                  role="listbox"
+                  aria-label={`${label}选项`}
+                  style={menuStyle}
+                  initial={prefersReducedMotion ? {opacity: 0} : {opacity: 0, scale: 0.98}}
+                  animate={{opacity: 1, scale: 1}}
+                  exit={prefersReducedMotion ? {opacity: 0} : {opacity: 0, scale: 0.985}}
+                  transition={prefersReducedMotion ? {duration: 0} : {type: 'spring', stiffness: 420, damping: 34, mass: 0.52}}
                   >
-                    <input
-                      autoFocus
-                      value={draft}
-                      maxLength={80}
-                      placeholder="输入新状态"
-                      aria-label="新状态名称"
-                      onChange={(event) => setDraft(event.target.value)}
+                  <StatusMenuOption
+                    label={placeholder}
+                    tone="neutral"
+                    selected={!normalizedValue}
+                    onSelect={() => void commit('', 'select')}
+                  />
+                  {mergedOptions.map((option) => (
+                    <StatusMenuOption
+                      key={option.value}
+                      label={option.value}
+                      tone={resolveStatusTone(option.value, mergedOptions, toneForValue)}
+                      selected={option.value === normalizedValue}
+                      onSelect={() => void commit(option.value, 'select')}
                     />
-                    <button type="submit" disabled={saving || !draft.trim()}>添加</button>
-                  </form>
-                ) : (
-                  <button type="button" className="de-status-create-button" onClick={() => setCreating(true)}>
-                    <span aria-hidden="true">＋</span> 新增状态
-                  </button>
-                )
-              ) : null}
-              {error ? <p className="de-status-error" role="status">{error}</p> : null}
-            </div>,
+                  ))}
+                  {canCreate ? (
+                    creating ? (
+                      <form
+                        className="de-status-create-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void createState();
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          value={draft}
+                          maxLength={80}
+                          placeholder="输入新状态"
+                          aria-label="新状态名称"
+                          onChange={(event) => setDraft(event.target.value)}
+                        />
+                        <button type="submit" disabled={saving || !draft.trim()}>添加</button>
+                      </form>
+                    ) : (
+                      <button type="button" className="de-status-create-button" onClick={() => setCreating(true)}>
+                        <span aria-hidden="true">＋</span> 新增状态
+                      </button>
+                    )
+                  ) : null}
+                  {error ? <p className="de-status-error" role="status">{error}</p> : null}
+                  </m.div>
+                ) : null}
+              </AnimatePresence>
+            </LazyMotion>,
             document.body,
           )
         : null}

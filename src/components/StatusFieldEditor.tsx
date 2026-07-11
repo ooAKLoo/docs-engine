@@ -1,6 +1,7 @@
 'use client';
 
 import {createPortal} from 'react-dom';
+import {AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion} from 'motion/react';
 import {
   useCallback,
   useEffect,
@@ -47,6 +48,7 @@ export function StatusFieldEditor({
   const rootRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
   const normalizedOptions = useMemo(() => normalizeOptions(optimisticOptions, toneForValue), [optimisticOptions, toneForValue]);
   const used = useMemo(() => new Set(usedValues.map((value) => value.trim()).filter(Boolean)), [usedValues]);
   const canEdit = editable && typeof onOptionsChange === 'function';
@@ -70,6 +72,7 @@ export function StatusFieldEditor({
       top: opensUp ? rect.top - estimatedHeight - 8 : rect.bottom + 8,
       left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 230) - 12),
       minWidth: Math.max(rect.width, 230),
+      transformOrigin: opensUp ? 'bottom left' : 'top left',
       zIndex: 80,
     });
   }, [normalizedOptions.length]);
@@ -156,54 +159,65 @@ export function StatusFieldEditor({
       >
         <span>{label}</span><span className="de-status-chevron" aria-hidden="true">⌄</span>
       </button>
-      {mounted && open && menuStyle
+      {mounted && menuStyle
         ? createPortal(
-            <div
-              ref={menuRef}
-              id={`de-status-field-menu-${instanceId}`}
-              className="de-status-popover de-status-field-popover"
-              role="dialog"
-              aria-label={`${label}字段值`}
-              style={menuStyle}
-            >
-              <p className="de-status-field-caption">字段值</p>
-              {normalizedOptions.map((option) => {
-                const tone = toneForValue?.(option.value, normalizedOptions) ?? option.tone ?? 'neutral';
-                const isUsed = used.has(option.value);
-                return (
-                  <div className="de-status-field-option" key={option.value}>
-                    <span className="de-badge" data-kind="status" data-value={tone}>{option.value}</span>
-                    <button
-                      type="button"
-                      className="de-status-option-remove"
-                      aria-label={`删除状态：${option.value}`}
-                      title={isUsed ? '该状态仍被列表使用，不能删除' : '删除状态'}
-                      disabled={saving || isUsed}
-                      onClick={() => void removeOption(option.value)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-              <form
-                className="de-status-create-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void addOption();
-                }}
-              >
-                <input
-                  value={draft}
-                  maxLength={80}
-                  placeholder="新增状态"
-                  aria-label="新增状态"
-                  onChange={(event) => setDraft(event.target.value)}
-                />
-                <button type="submit" disabled={saving || !draft.trim()}>添加</button>
-              </form>
-              {error ? <p className="de-status-error" role="status">{error}</p> : null}
-            </div>,
+            <LazyMotion features={domAnimation} strict>
+              <AnimatePresence>
+                {open ? (
+                  <m.div
+                  ref={menuRef}
+                  key={`de-status-field-menu-${instanceId}`}
+                  id={`de-status-field-menu-${instanceId}`}
+                  className="de-status-popover de-status-field-popover"
+                  role="dialog"
+                  aria-label={`${label}字段值`}
+                  style={menuStyle}
+                  initial={prefersReducedMotion ? {opacity: 0} : {opacity: 0, scale: 0.98}}
+                  animate={{opacity: 1, scale: 1}}
+                  exit={prefersReducedMotion ? {opacity: 0} : {opacity: 0, scale: 0.985}}
+                  transition={prefersReducedMotion ? {duration: 0} : {type: 'spring', stiffness: 420, damping: 34, mass: 0.52}}
+                  >
+                  <p className="de-status-field-caption">字段值</p>
+                  {normalizedOptions.map((option) => {
+                    const tone = toneForValue?.(option.value, normalizedOptions) ?? option.tone ?? 'neutral';
+                    const isUsed = used.has(option.value);
+                    return (
+                      <div className="de-status-field-option" key={option.value}>
+                        <span className="de-badge" data-kind="status" data-value={tone}>{option.value}</span>
+                        <button
+                          type="button"
+                          className="de-status-option-remove"
+                          aria-label={`删除状态：${option.value}`}
+                          title={isUsed ? '该状态仍被列表使用，不能删除' : '删除状态'}
+                          disabled={saving || isUsed}
+                          onClick={() => void removeOption(option.value)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <form
+                    className="de-status-create-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void addOption();
+                    }}
+                  >
+                    <input
+                      value={draft}
+                      maxLength={80}
+                      placeholder="新增状态"
+                      aria-label="新增状态"
+                      onChange={(event) => setDraft(event.target.value)}
+                    />
+                    <button type="submit" disabled={saving || !draft.trim()}>添加</button>
+                  </form>
+                  {error ? <p className="de-status-error" role="status">{error}</p> : null}
+                  </m.div>
+                ) : null}
+              </AnimatePresence>
+            </LazyMotion>,
             document.body,
           )
         : null}

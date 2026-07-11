@@ -1,6 +1,7 @@
 'use client';
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { createPortal } from 'react-dom';
+import { AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, } from 'react';
 import { joinClassNames } from '../classnames.js';
 export function StatusFieldEditor({ label, options, editable = false, usedValues = [], toneForValue, onOptionsChange, onError, className, ...props }) {
@@ -15,6 +16,7 @@ export function StatusFieldEditor({ label, options, editable = false, usedValues
     const rootRef = useRef(null);
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
+    const prefersReducedMotion = useReducedMotion();
     const normalizedOptions = useMemo(() => normalizeOptions(optimisticOptions, toneForValue), [optimisticOptions, toneForValue]);
     const used = useMemo(() => new Set(usedValues.map((value) => value.trim()).filter(Boolean)), [usedValues]);
     const canEdit = editable && typeof onOptionsChange === 'function';
@@ -36,6 +38,7 @@ export function StatusFieldEditor({ label, options, editable = false, usedValues
             top: opensUp ? rect.top - estimatedHeight - 8 : rect.bottom + 8,
             left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 230) - 12),
             minWidth: Math.max(rect.width, 230),
+            transformOrigin: opensUp ? 'bottom left' : 'top left',
             zIndex: 80,
         });
     }, [normalizedOptions.length]);
@@ -107,15 +110,15 @@ export function StatusFieldEditor({ label, options, editable = false, usedValues
     if (!canEdit) {
         return _jsx("span", { className: joinClassNames('de-status-field-label', className), ...props, children: label });
     }
-    return (_jsxs("span", { ref: rootRef, className: joinClassNames('de-status-field-editor', className), ...props, children: [_jsxs("button", { ref: buttonRef, type: "button", className: "de-status-field-trigger", "aria-label": `管理${label}字段值`, "aria-haspopup": "dialog", "aria-expanded": open, "aria-controls": `de-status-field-menu-${instanceId}`, disabled: saving, onClick: () => setOpen((current) => !current), children: [_jsx("span", { children: label }), _jsx("span", { className: "de-status-chevron", "aria-hidden": "true", children: "\u2304" })] }), mounted && open && menuStyle
-                ? createPortal(_jsxs("div", { ref: menuRef, id: `de-status-field-menu-${instanceId}`, className: "de-status-popover de-status-field-popover", role: "dialog", "aria-label": `${label}字段值`, style: menuStyle, children: [_jsx("p", { className: "de-status-field-caption", children: "\u5B57\u6BB5\u503C" }), normalizedOptions.map((option) => {
-                            const tone = toneForValue?.(option.value, normalizedOptions) ?? option.tone ?? 'neutral';
-                            const isUsed = used.has(option.value);
-                            return (_jsxs("div", { className: "de-status-field-option", children: [_jsx("span", { className: "de-badge", "data-kind": "status", "data-value": tone, children: option.value }), _jsx("button", { type: "button", className: "de-status-option-remove", "aria-label": `删除状态：${option.value}`, title: isUsed ? '该状态仍被列表使用，不能删除' : '删除状态', disabled: saving || isUsed, onClick: () => void removeOption(option.value), children: "\u00D7" })] }, option.value));
-                        }), _jsxs("form", { className: "de-status-create-form", onSubmit: (event) => {
-                                event.preventDefault();
-                                void addOption();
-                            }, children: [_jsx("input", { value: draft, maxLength: 80, placeholder: "\u65B0\u589E\u72B6\u6001", "aria-label": "\u65B0\u589E\u72B6\u6001", onChange: (event) => setDraft(event.target.value) }), _jsx("button", { type: "submit", disabled: saving || !draft.trim(), children: "\u6DFB\u52A0" })] }), error ? _jsx("p", { className: "de-status-error", role: "status", children: error }) : null] }), document.body)
+    return (_jsxs("span", { ref: rootRef, className: joinClassNames('de-status-field-editor', className), ...props, children: [_jsxs("button", { ref: buttonRef, type: "button", className: "de-status-field-trigger", "aria-label": `管理${label}字段值`, "aria-haspopup": "dialog", "aria-expanded": open, "aria-controls": `de-status-field-menu-${instanceId}`, disabled: saving, onClick: () => setOpen((current) => !current), children: [_jsx("span", { children: label }), _jsx("span", { className: "de-status-chevron", "aria-hidden": "true", children: "\u2304" })] }), mounted && menuStyle
+                ? createPortal(_jsx(LazyMotion, { features: domAnimation, strict: true, children: _jsx(AnimatePresence, { children: open ? (_jsxs(m.div, { ref: menuRef, id: `de-status-field-menu-${instanceId}`, className: "de-status-popover de-status-field-popover", role: "dialog", "aria-label": `${label}字段值`, style: menuStyle, initial: prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }, animate: { opacity: 1, scale: 1 }, exit: prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.985 }, transition: prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34, mass: 0.52 }, children: [_jsx("p", { className: "de-status-field-caption", children: "\u5B57\u6BB5\u503C" }), normalizedOptions.map((option) => {
+                                    const tone = toneForValue?.(option.value, normalizedOptions) ?? option.tone ?? 'neutral';
+                                    const isUsed = used.has(option.value);
+                                    return (_jsxs("div", { className: "de-status-field-option", children: [_jsx("span", { className: "de-badge", "data-kind": "status", "data-value": tone, children: option.value }), _jsx("button", { type: "button", className: "de-status-option-remove", "aria-label": `删除状态：${option.value}`, title: isUsed ? '该状态仍被列表使用，不能删除' : '删除状态', disabled: saving || isUsed, onClick: () => void removeOption(option.value), children: "\u00D7" })] }, option.value));
+                                }), _jsxs("form", { className: "de-status-create-form", onSubmit: (event) => {
+                                        event.preventDefault();
+                                        void addOption();
+                                    }, children: [_jsx("input", { value: draft, maxLength: 80, placeholder: "\u65B0\u589E\u72B6\u6001", "aria-label": "\u65B0\u589E\u72B6\u6001", onChange: (event) => setDraft(event.target.value) }), _jsx("button", { type: "submit", disabled: saving || !draft.trim(), children: "\u6DFB\u52A0" })] }), error ? _jsx("p", { className: "de-status-error", role: "status", children: error }) : null] }, `de-status-field-menu-${instanceId}`)) : null }) }), document.body)
                 : null] }));
 }
 function normalizeOptions(options, toneForValue) {
