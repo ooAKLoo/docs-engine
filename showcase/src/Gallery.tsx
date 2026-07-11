@@ -40,6 +40,7 @@ export function Gallery() {
       </header>
 
       <nav className="showcase-nav" aria-label="样式目录">
+        <a href="#typography">基础排版</a>
         <a href="#summary">摘要与判断</a>
         <a href="#callout">Callout</a>
         <a href="#badge">状态与优先级</a>
@@ -50,8 +51,27 @@ export function Gallery() {
       </nav>
 
       <main>
+        <section className="showcase-section" id="typography">
+          <h2>一、基础排版</h2>
+          <h3>正文、强调与链接</h3>
+          <p>
+            文档正文用于承载完整论述，支持<strong>加粗重点</strong>、<em>补充语气</em>、
+            <code>inline code</code> 与 <a href="#table">页内链接</a>。
+          </p>
+          <h3>列表与引用</h3>
+          <ul>
+            <li>无序列表用于并列信息。</li>
+            <li>每一项只表达一个清晰结论。</li>
+          </ul>
+          <ol>
+            <li>有序列表用于步骤或优先顺序。</li>
+            <li>复杂流程优先改用 Mermaid。</li>
+          </ol>
+          <blockquote>引用只用于来源原话或需要保留原始措辞的内容。</blockquote>
+        </section>
+
         <section className="showcase-section" id="summary">
-          <h2>一、摘要与关键判断</h2>
+          <h2>二、摘要与关键判断</h2>
           <SummaryPanel>
             <h2>整体结论</h2>
             <p>SummaryPanel 用于文档级摘要；标题、正文和背景都由共享引擎维护。</p>
@@ -63,14 +83,14 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="callout">
-          <h2>二、Callout</h2>
+          <h2>三、Callout</h2>
           <Callout variant="brand">品牌型 Callout 用于需要适度强调的补充信息。</Callout>
           <Callout variant="info">信息型 Callout 用于背景、口径或阅读提示。</Callout>
           <Callout variant="note">备注型 Callout 用于次要说明。</Callout>
         </section>
 
         <section className="showcase-section" id="badge">
-          <h2>三、状态与优先级</h2>
+          <h2>四、状态与优先级</h2>
           <p>状态与优先级是 Table 中的独立属性，统一采用低饱和、无边框语义标签。</p>
           <Table>
             <thead>
@@ -94,7 +114,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="table">
-          <h2>四、Table</h2>
+          <h2>五、Table</h2>
           <p>所有 Table 统一透明背景、无外框、无纵线、无阴影，只保留横向分隔线。</p>
           <Table>
             <thead>
@@ -121,7 +141,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="transition">
-          <h2>五、转换关系</h2>
+          <h2>六、转换关系</h2>
           <Transition>
             <TransitionCard>
               <TransitionLabel>原方案 · 竞争拥挤</TransitionLabel>
@@ -138,7 +158,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="check-grid">
-          <h2>六、检查项网格</h2>
+          <h2>七、检查项网格</h2>
           <RiskGrid>
             <RiskItem>内容必须是可判断的风险、约束或验收条件。</RiskItem>
             <RiskItem>使用中性灰背景，不增加边框和阴影。</RiskItem>
@@ -148,10 +168,26 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="diagram">
-          <h2>七、图表</h2>
-          <p>DiagramFrame 提供统一宽度与留白，Mermaid 使用共享主题配置。</p>
+          <h2>八、图表</h2>
+          <h3>Mermaid 流程图</h3>
+          <p>
+            Mermaid 用于工程流程、状态机和时序关系。下面的节点分别使用起点、处理、判断、存储和终点语义形状，颜色只编码节点角色。
+          </p>
           <DiagramFrame>
             <MermaidExample />
+          </DiagramFrame>
+          <p>
+            这张图的重点是展示共享 Mermaid 主题、语义形状、圆角连线、低饱和节点与反馈回路；节点文案保持简短，详细判断仍写在正文中。
+          </p>
+          <h3>DiagramFrame 图片容器</h3>
+          <p>
+            DiagramFrame 用于响应式展示独立 SVG 或 PNG 图表。画布占正文宽度 100%，内部内容随容器等比缩放。
+          </p>
+          <DiagramFrame>
+            <img
+              src="/assets/market-validation-path.svg"
+              alt="市场验证路径图，用于检查独立 SVG 在 DiagramFrame 中的响应式显示"
+            />
           </DiagramFrame>
         </section>
       </main>
