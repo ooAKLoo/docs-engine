@@ -138,14 +138,14 @@ export function StatusEditor({ value, options, editable = false, allowCreate = f
     if (!canEdit) {
         return (_jsx("span", { className: joinClassNames('de-badge', className), "data-kind": "status", "data-value": tone, title: title, ...props, children: displayValue }));
     }
-    return (_jsxs("span", { ref: rootRef, className: joinClassNames('de-status-editor', className), title: title, ...props, children: [_jsxs("button", { ref: buttonRef, type: "button", className: "de-badge de-status-trigger", "data-kind": "status", "data-value": tone, "aria-label": label, "aria-haspopup": canToggle ? undefined : 'listbox', "aria-expanded": open, "aria-controls": `de-status-menu-${instanceId}`, disabled: saving, onClick: () => {
+    return (_jsxs("span", { ref: rootRef, className: joinClassNames('de-status-editor', className), title: title, ...props, children: [_jsx("button", { ref: buttonRef, type: "button", className: "de-badge de-status-trigger", "data-kind": "status", "data-value": tone, "aria-label": label, "aria-haspopup": canToggle ? undefined : 'listbox', "aria-expanded": open, "aria-controls": `de-status-menu-${instanceId}`, disabled: saving, onClick: () => {
                     if (canToggle) {
                         const next = mergedOptions.find((option) => option.value !== normalizedValue)?.value ?? mergedOptions[0]?.value ?? '';
                         void commit(next, 'select');
                         return;
                     }
                     setOpen((current) => !current);
-                }, children: [_jsx("span", { children: displayValue }), _jsx("span", { className: "de-status-chevron", "aria-hidden": "true", children: "\u2304" })] }), mounted && open && menuStyle
+                }, children: _jsx("span", { children: displayValue }) }), mounted && open && menuStyle
                 ? createPortal(_jsxs("div", { ref: menuRef, id: `de-status-menu-${instanceId}`, className: "de-status-popover", role: "listbox", "aria-label": `${label}选项`, style: menuStyle, children: [_jsx(StatusMenuOption, { label: placeholder, tone: "neutral", selected: !normalizedValue, onSelect: () => void commit('', 'select') }), mergedOptions.map((option) => (_jsx(StatusMenuOption, { label: option.value, tone: resolveStatusTone(option.value, mergedOptions, toneForValue), selected: option.value === normalizedValue, onSelect: () => void commit(option.value, 'select') }, option.value))), canCreate ? (creating ? (_jsxs("form", { className: "de-status-create-form", onSubmit: (event) => {
                                 event.preventDefault();
                                 void createState();

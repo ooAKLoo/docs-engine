@@ -240,7 +240,6 @@ export function StatusEditor({
         }}
       >
         <span>{displayValue}</span>
-        <span className="de-status-chevron" aria-hidden="true">⌄</span>
       </button>
       {mounted && open && menuStyle
         ? createPortal(
