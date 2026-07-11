@@ -28,20 +28,26 @@ pnpm showcase
 
 ### 可编辑状态属性
 
-`StatusEditor` 负责状态选择、新增状态、键盘交互和失败回滚；宿主通过回调决定如何写回自己的 Markdown、数据库或 API。
+`StatusFieldEditor` 放在表头，负责字段值的新增与删除；`StatusEditor` 只放在单元格中选择已有值。宿主通过回调决定如何写回自己的 Markdown、数据库或 API。
 
 ```tsx
-<StatusEditor
-  value={status}
+<StatusFieldEditor
+  label="状态"
   options={[{value: '待开始', tone: 'todo'}, {value: '已完成', tone: 'done'}]}
   editable
-  allowCreate
+  onOptionsChange={(nextOptions) => saveStatusOptions(nextOptions)}
+/>
+
+<StatusEditor
+  value={status}
+  options={statusOptions}
+  editable
+  toggleWhenBinary
   onChange={(next) => saveStatus(next)}
-  onCreate={(next) => registerStatusOption(next)}
 />
 ```
 
-`onCreate` 可选；没有独立状态字典的宿主可仅在 `onChange` 中把新状态写入当前单元格，再从整列值中派生后续选项。
+二值字段开启 `toggleWhenBinary` 后，单击单元格即在两个值之间切换；字段值管理始终从表头进入。
 
 ## 本地联调
 
@@ -50,7 +56,7 @@ pnpm showcase
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.3.0"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.4.0"
   }
 }
 ```

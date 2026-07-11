@@ -16,6 +16,8 @@ export type StatusEditorProps = Omit<HTMLAttributes<HTMLSpanElement>, 'onChange'
     editable?: boolean;
     /** Enable the “新增状态” action. The host can persist a state registry via onCreate. */
     allowCreate?: boolean;
+    /** With exactly two configured states, click the cell to switch directly instead of opening the menu. */
+    toggleWhenBinary?: boolean;
     /** Persist the new value. The editor rolls back its optimistic display when this rejects. */
     onChange?: (value: string, meta: StatusEditorChangeMeta) => void | Promise<void>;
     /** Optional host hook for registering a newly created state before assigning it to this row. */
@@ -29,5 +31,5 @@ export type StatusEditorProps = Omit<HTMLAttributes<HTMLSpanElement>, 'onChange'
     /** Receives a persistence or validation error after the UI has been restored. */
     onError?: (error: unknown) => void;
 };
-export declare function StatusEditor({ value, options, editable, allowCreate, onChange, onCreate, toneForValue, label, placeholder, onError, className, ...props }: StatusEditorProps): import("react/jsx-runtime").JSX.Element;
+export declare function StatusEditor({ value, options, editable, allowCreate, toggleWhenBinary, onChange, onCreate, toneForValue, label, placeholder, onError, className, ...props }: StatusEditorProps): import("react/jsx-runtime").JSX.Element;
 //# sourceMappingURL=StatusEditor.d.ts.map

@@ -11,6 +11,7 @@ export {
   type StatusEditorProps,
   type StatusOption,
 } from './components/StatusEditor.js';
+export {StatusFieldEditor, type StatusFieldEditorProps} from './components/StatusFieldEditor.js';
 export {SummaryPanel, type SummaryPanelProps} from './components/SummaryPanel.js';
 export {Table, type TableProps} from './components/Table.js';
 export {TableScroll, type TableScrollProps} from './components/TableScroll.js';

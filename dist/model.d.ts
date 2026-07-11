@@ -39,6 +39,7 @@ export type DocBlock = {
     type: 'table';
     headers: string[];
     rows: string[][];
+    statusOptions?: string[];
 };
 export type HeadingLink = {
     id: string;

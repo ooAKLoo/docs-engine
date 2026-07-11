@@ -3,7 +3,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, } from 'react';
 import { joinClassNames } from '../classnames.js';
-export function StatusEditor({ value, options, editable = false, allowCreate = false, onChange, onCreate, toneForValue, label = '状态', placeholder = '未设置', onError, className, ...props }) {
+export function StatusEditor({ value, options, editable = false, allowCreate = false, toggleWhenBinary = false, onChange, onCreate, toneForValue, label = '状态', placeholder = '未设置', onError, className, ...props }) {
     const instanceId = useId().replace(/[^a-zA-Z0-9]/g, '');
     const [optimisticValue, setOptimisticValue] = useState(value);
     const [createdOptions, setCreatedOptions] = useState([]);
@@ -26,6 +26,7 @@ export function StatusEditor({ value, options, editable = false, allowCreate = f
     const mergedOptions = useMemo(() => mergeStatusOptions([...options, ...createdOptions], optimisticValue, toneForValue), [createdOptions, optimisticValue, options, toneForValue]);
     const canEdit = editable && typeof onChange === 'function';
     const canCreate = canEdit && allowCreate;
+    const canToggle = canEdit && toggleWhenBinary && mergedOptions.length === 2;
     const normalizedValue = optimisticValue.trim();
     const displayValue = normalizedValue || placeholder;
     const tone = resolveStatusTone(normalizedValue, mergedOptions, toneForValue);
@@ -137,7 +138,14 @@ export function StatusEditor({ value, options, editable = false, allowCreate = f
     if (!canEdit) {
         return (_jsx("span", { className: joinClassNames('de-badge', className), "data-kind": "status", "data-value": tone, title: title, ...props, children: displayValue }));
     }
-    return (_jsxs("span", { ref: rootRef, className: joinClassNames('de-status-editor', className), title: title, ...props, children: [_jsxs("button", { ref: buttonRef, type: "button", className: "de-badge de-status-trigger", "data-kind": "status", "data-value": tone, "aria-label": label, "aria-haspopup": "listbox", "aria-expanded": open, "aria-controls": `de-status-menu-${instanceId}`, disabled: saving, onClick: () => setOpen((current) => !current), children: [_jsx("span", { children: displayValue }), _jsx("span", { className: "de-status-chevron", "aria-hidden": "true", children: "\u2304" })] }), mounted && open && menuStyle
+    return (_jsxs("span", { ref: rootRef, className: joinClassNames('de-status-editor', className), title: title, ...props, children: [_jsxs("button", { ref: buttonRef, type: "button", className: "de-badge de-status-trigger", "data-kind": "status", "data-value": tone, "aria-label": label, "aria-haspopup": canToggle ? undefined : 'listbox', "aria-expanded": open, "aria-controls": `de-status-menu-${instanceId}`, disabled: saving, onClick: () => {
+                    if (canToggle) {
+                        const next = mergedOptions.find((option) => option.value !== normalizedValue)?.value ?? mergedOptions[0]?.value ?? '';
+                        void commit(next, 'select');
+                        return;
+                    }
+                    setOpen((current) => !current);
+                }, children: [_jsx("span", { children: displayValue }), _jsx("span", { className: "de-status-chevron", "aria-hidden": "true", children: "\u2304" })] }), mounted && open && menuStyle
                 ? createPortal(_jsxs("div", { ref: menuRef, id: `de-status-menu-${instanceId}`, className: "de-status-popover", role: "listbox", "aria-label": `${label}选项`, style: menuStyle, children: [_jsx(StatusMenuOption, { label: placeholder, tone: "neutral", selected: !normalizedValue, onSelect: () => void commit('', 'select') }), mergedOptions.map((option) => (_jsx(StatusMenuOption, { label: option.value, tone: resolveStatusTone(option.value, mergedOptions, toneForValue), selected: option.value === normalizedValue, onSelect: () => void commit(option.value, 'select') }, option.value))), canCreate ? (creating ? (_jsxs("form", { className: "de-status-create-form", onSubmit: (event) => {
                                 event.preventDefault();
                                 void createState();

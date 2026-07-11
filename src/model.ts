@@ -8,7 +8,7 @@ export type DocBlock =
   | {type: 'image'; src: string; alt: string; caption?: string}
   | {type: 'imageGrid'; images: Array<{src: string; alt: string; caption?: string}>}
   | {type: 'callout'; variant: CalloutVariant; title: string; body: string[]}
-  | {type: 'table'; headers: string[]; rows: string[][]};
+  | {type: 'table'; headers: string[]; rows: string[][]; statusOptions?: string[]};
 
 export type HeadingLink = {
   id: string;

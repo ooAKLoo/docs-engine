@@ -42,8 +42,13 @@ test('uses the borderless shared Mermaid surface', () => {
 test('exports an editable status property with host-owned persistence', async () => {
   const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
   const statusEditor = await readFile(new URL('../src/components/StatusEditor.tsx', import.meta.url), 'utf8');
+  const statusFieldEditor = await readFile(new URL('../src/components/StatusFieldEditor.tsx', import.meta.url), 'utf8');
   assert.match(index, /StatusEditor/);
+  assert.match(index, /StatusFieldEditor/);
   assert.match(statusEditor, /allowCreate/);
+  assert.match(statusEditor, /toggleWhenBinary/);
   assert.match(statusEditor, /onCreate/);
   assert.match(statusEditor, /onChange/);
+  assert.match(statusFieldEditor, /onOptionsChange/);
+  assert.match(statusFieldEditor, /usedValues/);
 });

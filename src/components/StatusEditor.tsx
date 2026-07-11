@@ -32,6 +32,8 @@ export type StatusEditorProps = Omit<HTMLAttributes<HTMLSpanElement>, 'onChange'
   editable?: boolean;
   /** Enable the “新增状态” action. The host can persist a state registry via onCreate. */
   allowCreate?: boolean;
+  /** With exactly two configured states, click the cell to switch directly instead of opening the menu. */
+  toggleWhenBinary?: boolean;
   /** Persist the new value. The editor rolls back its optimistic display when this rejects. */
   onChange?: (value: string, meta: StatusEditorChangeMeta) => void | Promise<void>;
   /** Optional host hook for registering a newly created state before assigning it to this row. */
@@ -51,6 +53,7 @@ export function StatusEditor({
   options,
   editable = false,
   allowCreate = false,
+  toggleWhenBinary = false,
   onChange,
   onCreate,
   toneForValue,
@@ -88,6 +91,7 @@ export function StatusEditor({
   );
   const canEdit = editable && typeof onChange === 'function';
   const canCreate = canEdit && allowCreate;
+  const canToggle = canEdit && toggleWhenBinary && mergedOptions.length === 2;
   const normalizedValue = optimisticValue.trim();
   const displayValue = normalizedValue || placeholder;
   const tone = resolveStatusTone(normalizedValue, mergedOptions, toneForValue);
@@ -222,11 +226,18 @@ export function StatusEditor({
         data-kind="status"
         data-value={tone}
         aria-label={label}
-        aria-haspopup="listbox"
+        aria-haspopup={canToggle ? undefined : 'listbox'}
         aria-expanded={open}
         aria-controls={`de-status-menu-${instanceId}`}
         disabled={saving}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          if (canToggle) {
+            const next = mergedOptions.find((option) => option.value !== normalizedValue)?.value ?? mergedOptions[0]?.value ?? '';
+            void commit(next, 'select');
+            return;
+          }
+          setOpen((current) => !current);
+        }}
       >
         <span>{displayValue}</span>
         <span className="de-status-chevron" aria-hidden="true">⌄</span>

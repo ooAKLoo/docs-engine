@@ -10,6 +10,7 @@ import {
   RiskItem,
   Status,
   StatusEditor,
+  StatusFieldEditor,
   type StatusOption,
   SummaryPanel,
   Table,
@@ -119,7 +120,7 @@ export function Gallery() {
             </tbody>
           </Table>
           <h3>可编辑状态属性</h3>
-          <p>点击状态可切换已有状态；“新增状态”会先调用宿主注册逻辑，再写回当前单元格。</p>
+          <p>状态值在表头统一管理；列表单元格只从字段值中选择。字段只有两个值时，单击单元格即可来回切换。</p>
           <EditableStatusExample />
         </section>
 
@@ -212,11 +213,37 @@ function EditableStatusExample() {
     {value: '进行中', tone: 'progress' as const},
     {value: '已完成', tone: 'done' as const},
   ]);
+  const [binaryStatus, setBinaryStatus] = useState('未验证');
+  const [binaryOptions, setBinaryOptions] = useState<StatusOption[]>([
+    {value: '未验证', tone: 'todo'},
+    {value: '已验证', tone: 'done'},
+  ]);
 
   return (
     <Table>
       <thead>
-        <tr><th>属性</th><th>当前值</th><th>交互说明</th></tr>
+        <tr>
+          <th>属性</th>
+          <th>
+            <StatusFieldEditor
+              label="状态"
+              options={options}
+              usedValues={[status]}
+              editable
+              onOptionsChange={setOptions}
+            />
+          </th>
+          <th>
+            <StatusFieldEditor
+              label="二值状态"
+              options={binaryOptions}
+              usedValues={[binaryStatus]}
+              editable
+              onOptionsChange={setBinaryOptions}
+            />
+          </th>
+          <th>交互说明</th>
+        </tr>
       </thead>
       <tbody>
         <tr>
@@ -226,17 +253,21 @@ function EditableStatusExample() {
               value={status}
               options={options}
               editable
-              allowCreate
               label="示例状态"
-              onCreate={(value) => {
-                const option = {value, tone: 'neutral' as const};
-                setOptions((current) => [...current, option]);
-                return option;
-              }}
               onChange={(next) => setStatus(next)}
             />
           </td>
-          <td>创建后的状态会作为可选项保留，并由宿主决定如何持久化。</td>
+          <td>
+            <StatusEditor
+              value={binaryStatus}
+              options={binaryOptions}
+              editable
+              toggleWhenBinary
+              label="示例二值状态"
+              onChange={(next) => setBinaryStatus(next)}
+            />
+          </td>
+          <td>点击表头管理字段值；二值单元格不打开下拉，直接切换。</td>
         </tr>
       </tbody>
     </Table>
