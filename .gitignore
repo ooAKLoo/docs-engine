@@ -1,4 +1,5 @@
 node_modules/
 .artifacts/
+showcase/dist/
 *.tgz
 .DS_Store

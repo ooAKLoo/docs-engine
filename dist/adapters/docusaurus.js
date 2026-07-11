@@ -5,6 +5,7 @@ import { Priority } from '../components/Priority.js';
 import { RiskGrid, RiskItem } from '../components/RiskGrid.js';
 import { Status } from '../components/Status.js';
 import { SummaryPanel } from '../components/SummaryPanel.js';
+import { Table } from '../components/Table.js';
 import { TableScroll } from '../components/TableScroll.js';
 import { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, } from '../components/Transition.js';
 export const docusaurusMdxComponents = {
@@ -16,6 +17,7 @@ export const docusaurusMdxComponents = {
     RiskItem,
     Status,
     SummaryPanel,
+    table: Table,
     TableScroll,
     Transition,
     TransitionArrow,

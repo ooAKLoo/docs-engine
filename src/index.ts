@@ -6,6 +6,7 @@ export {Priority, type PriorityLevel, type PriorityProps} from './components/Pri
 export {RiskGrid, RiskItem, type RiskGridProps, type RiskItemProps} from './components/RiskGrid.js';
 export {Status, type StatusProps, type StatusTone} from './components/Status.js';
 export {SummaryPanel, type SummaryPanelProps} from './components/SummaryPanel.js';
+export {Table, type TableProps} from './components/Table.js';
 export {TableScroll, type TableScrollProps} from './components/TableScroll.js';
 export {
   Transition,

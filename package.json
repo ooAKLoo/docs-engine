@@ -1,6 +1,6 @@
 {
   "name": "@ooakloo/docs-engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "description": "Shared document semantics, React primitives and visual system for ooAKLoo projects.",
@@ -42,15 +42,22 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test tests/*.test.mjs",
-    "check": "pnpm typecheck && pnpm build && pnpm test"
+    "check": "pnpm typecheck && pnpm build && pnpm test",
+    "showcase": "vite showcase --host 127.0.0.1 --port 3200",
+    "showcase:typecheck": "tsc -p tsconfig.showcase.json --noEmit",
+    "showcase:build": "vite build showcase"
   },
   "peerDependencies": {
     "react": ">=18 <20"
   },
   "devDependencies": {
-    "@types/react": "19.2.14",
+    "@types/react": "18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "mermaid": "^11.16.0",
     "react": "18.3.1",
-    "typescript": "5.6.3"
+    "react-dom": "18.3.1",
+    "typescript": "5.6.3",
+    "vite": "^6.4.1"
   },
   "engines": {
     "node": ">=20"

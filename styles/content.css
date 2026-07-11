@@ -23,74 +23,13 @@
   transform: translateY(-50%);
 }
 
-:where(.de-prose) table {
-  display: table;
-  width: 100%;
-  min-width: var(--doc-table-min-width, 640px);
-  max-width: 100%;
-  border: 0;
-  border-spacing: 0;
-  border-collapse: collapse;
-  background: transparent;
-  box-shadow: none;
-  font-size: 0.875rem;
+.de-table-shell {
+  position: relative;
+  min-width: 0;
   margin: 0.25rem 0 1rem;
 }
 
-:where(.de-prose) thead,
-:where(.de-prose) tr,
-:where(.de-prose) tbody tr:nth-child(even) {
-  border: 0;
-  background: transparent;
-}
-
-:where(.de-prose) th,
-:where(.de-prose) td {
-  border: 0;
-  border-bottom: 1px solid var(--de-line);
-  padding: 0.75rem 0;
-  text-align: left;
-  vertical-align: middle;
-}
-
-:where(.de-prose) th {
-  color: var(--de-ink);
-  font-weight: 700;
-  line-height: 1.45;
-  white-space: nowrap;
-}
-
-:where(.de-prose) td {
-  color: var(--de-ink-soft);
-  font-weight: 400;
-  line-height: 1.58;
-}
-
-:where(.de-prose) :is(th, td):not(:last-child) {
-  padding-right: 2.5rem;
-}
-
-:where(.de-prose) :is(th, td).numeric-cell {
-  padding-right: 0;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-:where(.de-prose) td.status-cell {
-  min-width: 116px;
-  vertical-align: middle;
-}
-
-:where(.de-prose) thead tr:last-child th {
-  border-bottom-color: var(--de-line-strong);
-}
-
-:where(.de-prose) table code {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-:where(.de-prose) :is(.de-table-scroll, .table-wrap) {
+.de-table-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   border: 0;
@@ -103,17 +42,94 @@
   scrollbar-width: thin;
 }
 
-:where(.de-prose) :is(.de-table-scroll, .table-wrap)::-webkit-scrollbar {
+.de-table-scroll::-webkit-scrollbar {
   height: 8px;
 }
 
-:where(.de-prose) :is(.de-table-scroll, .table-wrap)::-webkit-scrollbar-track {
+.de-table-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-:where(.de-prose) :is(.de-table-scroll, .table-wrap)::-webkit-scrollbar-thumb {
+.de-table-scroll::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: #c8d1df;
+}
+
+.de-table-shell > .de-table-scroll > .de-table {
+  display: table;
+  width: 100%;
+  min-width: var(--de-table-min-width, var(--doc-table-min-width, 640px));
+  max-width: 100%;
+  border: 0;
+  border-spacing: 0;
+  border-collapse: collapse;
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.de-table-shell .de-table thead,
+.de-table-shell .de-table tr,
+.de-table-shell .de-table tr:nth-child(even) {
+  border: 0;
+  background: transparent;
+}
+
+.de-table-shell .de-table thead tr {
+  border: 0;
+}
+
+.de-table-shell .de-table th,
+.de-table-shell .de-table td {
+  border: 0;
+  border-bottom: 1px solid var(--de-line);
+  padding: 0.75rem 0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.de-table-shell .de-table th {
+  background: transparent;
+  color: var(--de-ink);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.de-table-shell .de-table td {
+  background: transparent;
+  color: var(--de-ink-soft);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.58;
+}
+
+.de-table-shell .de-table :is(th, td):not(:last-child) {
+  padding-right: 2.5rem;
+}
+
+.de-table-shell .de-table :is(th, td).numeric-cell,
+.de-table-shell .de-table :is(th, td).de-table-cell--numeric {
+  padding-right: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.de-table-shell .de-table td.status-cell,
+.de-table-shell .de-table td.de-table-cell--status {
+  min-width: 116px;
+  vertical-align: middle;
+}
+
+.de-table-shell .de-table thead tr:last-child th {
+  border-bottom-color: var(--de-line-strong);
+}
+
+.de-table-shell .de-table code {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 :where(.de-prose) .de-callout {
@@ -340,6 +356,25 @@
 }
 
 @media (max-width: 760px) {
+  .de-table-shell .de-table {
+    table-layout: auto;
+  }
+
+  .de-table-shell .de-table th,
+  .de-table-shell .de-table td {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+    overflow-wrap: anywhere;
+  }
+
+  .de-table-shell .de-table :is(th, td):not(:last-child) {
+    padding-right: 1.5rem;
+  }
+
+  .de-table-shell .de-table th {
+    white-space: normal;
+  }
+
   :where(.de-prose) .de-summary-panel {
     padding: 1.5rem;
   }
