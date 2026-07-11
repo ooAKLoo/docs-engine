@@ -1,0 +1,1 @@
+{"version":3,"file":"TableScroll.d.ts","sourceRoot":"","sources":["../../src/components/TableScroll.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAC,cAAc,EAAC,MAAM,OAAO,CAAC;AAG1C,MAAM,MAAM,gBAAgB,GAAG,cAAc,CAAC,cAAc,CAAC,CAAC;AAE9D,wBAAgB,WAAW,CAAC,EAAC,SAAS,EAAE,GAAG,KAAK,EAAC,EAAE,gBAAgB,2CAElE"}
