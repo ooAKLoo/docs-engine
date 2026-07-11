@@ -9,6 +9,8 @@ import {
   RiskGrid,
   RiskItem,
   Status,
+  StatusEditor,
+  type StatusOption,
   SummaryPanel,
   Table,
   Transition,
@@ -26,7 +28,12 @@ const mermaidSource = `flowchart LR
     decision -- 是 --> store[(沉淀结论)]
     store --> done([进入下一阶段])
     decision -- 否 --> improve[优化产品]
-    improve --> collect`;
+    improve --> collect
+    class start,collect deBlue
+    class decision dePurple
+    class store deTeal
+    class done deGreen
+    class improve deOrange`;
 
 export function Gallery() {
   return (
@@ -111,6 +118,9 @@ export function Gallery() {
               <tr><td>优先级</td><td><code>p2</code></td><td><Priority level="p2">P2</Priority></td><td>可延后处理</td></tr>
             </tbody>
           </Table>
+          <h3>可编辑状态属性</h3>
+          <p>点击状态可切换已有状态；“新增状态”会先调用宿主注册逻辑，再写回当前单元格。</p>
+          <EditableStatusExample />
         </section>
 
         <section className="showcase-section" id="table">
@@ -195,6 +205,44 @@ export function Gallery() {
   );
 }
 
+function EditableStatusExample() {
+  const [status, setStatus] = useState('进行中');
+  const [options, setOptions] = useState<StatusOption[]>([
+    {value: '待开始', tone: 'todo' as const},
+    {value: '进行中', tone: 'progress' as const},
+    {value: '已完成', tone: 'done' as const},
+  ]);
+
+  return (
+    <Table>
+      <thead>
+        <tr><th>属性</th><th>当前值</th><th>交互说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>状态</td>
+          <td>
+            <StatusEditor
+              value={status}
+              options={options}
+              editable
+              allowCreate
+              label="示例状态"
+              onCreate={(value) => {
+                const option = {value, tone: 'neutral' as const};
+                setOptions((current) => [...current, option]);
+                return option;
+              }}
+              onChange={(next) => setStatus(next)}
+            />
+          </td>
+          <td>创建后的状态会作为可选项保留，并由宿主决定如何持久化。</td>
+        </tr>
+      </tbody>
+    </Table>
+  );
+}
+
 function MermaidExample() {
   const reactId = useId();
   const [svg, setSvg] = useState('');
@@ -218,5 +266,5 @@ function MermaidExample() {
     };
   }, [reactId]);
 
-  return <div className="showcase-mermaid" aria-label="市场验证流程图" dangerouslySetInnerHTML={{__html: svg}} />;
+  return <div className="de-mermaid" aria-label="市场验证流程图" dangerouslySetInnerHTML={{__html: svg}} />;
 }

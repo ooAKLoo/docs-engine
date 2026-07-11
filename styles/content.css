@@ -217,6 +217,16 @@
   color: #5f5e5b;
 }
 
+:where(.de-prose) .de-badge[data-value='warning'] {
+  background: rgba(245, 158, 11, 0.16);
+  color: #a15c00;
+}
+
+:where(.de-prose) .de-badge[data-value='danger'] {
+  background: rgba(235, 87, 87, 0.14);
+  color: #b42318;
+}
+
 :where(.de-prose) .de-badge[data-value='p0'] {
   background: rgba(235, 87, 87, 0.14);
   color: #b42318;
@@ -230,6 +240,188 @@
 :where(.de-prose) .de-badge[data-value='p2'] {
   background: rgba(120, 119, 116, 0.14);
   color: #5f5e5b;
+}
+
+:where(.de-prose) .de-status-editor {
+  display: inline-flex;
+  width: max-content;
+  vertical-align: middle;
+}
+
+:where(.de-prose) .de-status-trigger {
+  gap: 4px;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+:where(.de-prose) .de-status-trigger:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+:where(.de-prose) .de-status-trigger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+  outline: 0;
+}
+
+:where(.de-prose) .de-status-chevron {
+  display: inline-block;
+  margin-top: -0.18em;
+  font-size: 0.92em;
+  line-height: 1;
+  opacity: 0.72;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+:where(.de-prose) .de-status-trigger[aria-expanded='true'] .de-status-chevron {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+.de-status-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid rgba(208, 213, 221, 0.82);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 36px rgba(16, 24, 40, 0.12);
+  padding: 6px;
+}
+
+.de-status-menu-option,
+.de-status-create-button {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #101828;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.de-status-menu-option:hover,
+.de-status-menu-option:focus-visible,
+.de-status-create-button:hover,
+.de-status-create-button:focus-visible {
+  background: #f3f6fb;
+  outline: 0;
+}
+
+.de-status-menu-option[aria-selected='true'] {
+  background: #f7faff;
+}
+
+.de-status-popover .de-badge {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.25;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.de-status-popover .de-badge[data-value='neutral'],
+.de-status-popover .de-badge[data-value='todo'] {
+  background: rgba(120, 119, 116, 0.14);
+  color: #5f5e5b;
+}
+
+.de-status-popover .de-badge[data-value='done'] {
+  background: rgba(45, 153, 100, 0.14);
+  color: #18794e;
+}
+
+.de-status-popover .de-badge[data-value='progress'] {
+  background: rgba(35, 131, 226, 0.14);
+  color: #0b6e99;
+}
+
+.de-status-popover .de-badge[data-value='warning'] {
+  background: rgba(245, 158, 11, 0.16);
+  color: #a15c00;
+}
+
+.de-status-popover .de-badge[data-value='danger'] {
+  background: rgba(235, 87, 87, 0.14);
+  color: #b42318;
+}
+
+.de-status-option-check {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.de-status-create-button {
+  justify-content: flex-start;
+  color: #2563eb;
+  font-weight: 650;
+}
+
+.de-status-create-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 4px 2px;
+}
+
+.de-status-create-form input {
+  min-width: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 7px;
+  background: #fff;
+  color: #101828;
+  font: inherit;
+  padding: 7px 8px;
+}
+
+.de-status-create-form input:focus-visible {
+  border-color: #2563eb;
+  outline: 0;
+}
+
+.de-status-create-form button {
+  border: 0;
+  border-radius: 7px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  padding: 0 10px;
+}
+
+.de-status-create-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.de-status-error {
+  margin: 2px 4px;
+  color: #b42318;
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 :where(.de-prose) .de-check-grid {
@@ -328,6 +520,128 @@
   width: 100%;
   height: auto;
   margin: 0;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  overflow-x: auto;
+  margin: 1rem 0 1.7rem;
+  padding: clamp(1rem, 2.4vw, 1.75rem);
+  border: 0;
+  border-radius: 18px;
+  background-color: #f7f8fa;
+  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.3) 1.15px, transparent 1.2px);
+  background-position: 0 0;
+  background-size: 22px 22px;
+  box-shadow: none;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) > svg {
+  display: block;
+  width: 100%;
+  max-width: 920px;
+  height: auto;
+  margin: 0 auto;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node rect,
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node .basic.label-container {
+  rx: 12px !important;
+  ry: 12px !important;
+  stroke: none !important;
+  filter: none !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node path {
+  stroke: none !important;
+  filter: none !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node polygon {
+  stroke: #eee7ff !important;
+  stroke-width: 8px !important;
+  stroke-linejoin: round !important;
+  paint-order: stroke fill !important;
+  filter: none !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .cluster rect {
+  rx: 16px !important;
+  ry: 16px !important;
+  stroke: none !important;
+  filter: none !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .flowchart-link {
+  stroke: #a8a0ff !important;
+  stroke-width: 1.8px !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) marker path,
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .arrowMarkerPath {
+  fill: #a8a0ff !important;
+  stroke: #a8a0ff !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.edgeLabel, .labelBkg) {
+  background: #f8fafc !important;
+  fill: #f8fafc !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) {
+  color: #3f3f73 !important;
+  font-weight: 650;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-blue, .deBlue, .lula-blue, .lulaBlue) :is(rect, path, polygon) {
+  fill: #e9edff !important;
+  stroke: #e9edff !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-purple, .dePurple, .lula-purple, .lulaPurple) :is(rect, path, polygon) {
+  fill: #eee7ff !important;
+  stroke: #eee7ff !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-teal, .deTeal, .lula-teal, .lulaTeal) :is(rect, path, polygon) {
+  fill: #e5f8f7 !important;
+  stroke: #e5f8f7 !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-green, .deGreen, .lula-green, .lulaGreen) :is(rect, path, polygon) {
+  fill: #e9f7ed !important;
+  stroke: #e9f7ed !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-orange, .deOrange, .lula-orange, .lulaOrange) :is(rect, path, polygon) {
+  fill: #fff0e4 !important;
+  stroke: #fff0e4 !important;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-neutral, .deNeutral, .lula-neutral, .lulaNeutral) :is(rect, path, polygon) {
+  fill: #f8fafc !important;
+  stroke: #f8fafc !important;
+}
+
+[data-theme='dark'] :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container),
+:where(.de-prose)[data-theme='dark'] :is(.de-mermaid, .docusaurus-mermaid-container) {
+  background-color: #111827;
+  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.22) 1.15px, transparent 1.2px);
+}
+
+[data-theme='dark'] :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.edgeLabel, .labelBkg),
+:where(.de-prose)[data-theme='dark'] :is(.de-mermaid, .docusaurus-mermaid-container) :is(.edgeLabel, .labelBkg) {
+  background: #111827 !important;
+  fill: #111827 !important;
+}
+
+[data-theme='dark'] :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel),
+:where(.de-prose)[data-theme='dark'] :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) {
+  color: #e2e8f0 !important;
 }
 
 :where(.de-prose) .callout.annotation {

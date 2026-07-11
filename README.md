@@ -26,6 +26,23 @@ pnpm showcase
 - oVita 保留 Next.js、Markdown 文件读取、业务 DocBlock、状态编辑和写回 API。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
+### 可编辑状态属性
+
+`StatusEditor` 负责状态选择、新增状态、键盘交互和失败回滚；宿主通过回调决定如何写回自己的 Markdown、数据库或 API。
+
+```tsx
+<StatusEditor
+  value={status}
+  options={[{value: '待开始', tone: 'todo'}, {value: '已完成', tone: 'done'}]}
+  editable
+  allowCreate
+  onChange={(next) => saveStatus(next)}
+  onCreate={(next) => registerStatusOption(next)}
+/>
+```
+
+`onCreate` 可选；没有独立状态字典的宿主可仅在 `onChange` 中把新状态写入当前单元格，再从整列值中派生后续选项。
+
 ## 本地联调
 
 两个宿主在独立仓库发布前可使用 `file:` 依赖；正式使用时必须固定 Git tag 对应的提交或不可变包版本，不能追踪可变的 `latest`。公开仓库统一通过 HTTPS tarball 安装，避免 CI 和部署服务器依赖 SSH 凭证。
@@ -33,7 +50,7 @@ pnpm showcase
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.2.0"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.3.0"
   }
 }
 ```

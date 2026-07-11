@@ -41,7 +41,7 @@ export const mermaidThemeConfig = {
     dark: 'dark',
   },
   options: {
-    look: 'neo',
+    look: 'classic',
     htmlLabels: true,
     fontFamily:
       'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',

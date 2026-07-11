@@ -124,25 +124,6 @@ body {
   padding: 0.12em 0.34em;
 }
 
-.showcase-mermaid {
-  min-height: 280px;
-  display: grid;
-  place-items: center;
-  overflow-x: auto;
-  border-radius: 18px;
-  background-color: #f7f8fa;
-  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.3) 1.15px, transparent 1.2px);
-  background-size: 22px 22px;
-  padding: 24px;
-}
-
-.showcase-mermaid svg {
-  display: block;
-  width: 100%;
-  max-width: 920px;
-  height: auto;
-}
-
 @media (max-width: 720px) {
   .showcase-page {
     width: min(100% - 28px, 1120px);

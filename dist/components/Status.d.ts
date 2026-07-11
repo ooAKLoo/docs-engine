@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from 'react';
-export type StatusTone = 'done' | 'progress' | 'todo' | 'neutral';
+export type StatusTone = 'done' | 'progress' | 'todo' | 'neutral' | 'warning' | 'danger';
 export type StatusProps = HTMLAttributes<HTMLSpanElement> & {
     tone?: StatusTone;
 };

@@ -1,6 +1,6 @@
 {
   "name": "@ooakloo/docs-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "type": "module",
   "description": "Shared document semantics, React primitives and visual system for ooAKLoo projects.",
@@ -48,7 +48,8 @@
     "showcase:build": "vite build showcase"
   },
   "peerDependencies": {
-    "react": ">=18 <20"
+    "react": ">=18 <20",
+    "react-dom": ">=18 <20"
   },
   "devDependencies": {
     "@types/react": "18.3.28",

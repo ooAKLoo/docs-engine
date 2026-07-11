@@ -14,6 +14,7 @@ test('publishes stable package entry points', () => {
   assert.equal(packageJson.exports['./styles.css'], './styles/index.css');
   assert.ok(packageJson.exports['./adapters/docusaurus']);
   assert.equal(packageJson.peerDependencies.react, '>=18 <20');
+  assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
 });
 
 test('keeps annotation and table visuals borderless', () => {
@@ -29,4 +30,20 @@ test('keeps annotation and table visuals borderless', () => {
 
 test('wraps markdown tables with the shared table component', () => {
   assert.match(docusaurusAdapter, /table:\s*Table/);
+});
+
+test('uses the borderless shared Mermaid surface', () => {
+  assert.match(styles, /\.de-mermaid/);
+  assert.match(styles, /\.docusaurus-mermaid-container/);
+  assert.match(docusaurusAdapter, /look:\s*'classic'/);
+  assert.doesNotMatch(docusaurusAdapter, /look:\s*'neo'/);
+});
+
+test('exports an editable status property with host-owned persistence', async () => {
+  const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
+  const statusEditor = await readFile(new URL('../src/components/StatusEditor.tsx', import.meta.url), 'utf8');
+  assert.match(index, /StatusEditor/);
+  assert.match(statusEditor, /allowCreate/);
+  assert.match(statusEditor, /onCreate/);
+  assert.match(statusEditor, /onChange/);
 });

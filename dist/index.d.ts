@@ -5,6 +5,7 @@ export { DocumentContent, type DocumentContentProps } from './components/Documen
 export { Priority, type PriorityLevel, type PriorityProps } from './components/Priority.js';
 export { RiskGrid, RiskItem, type RiskGridProps, type RiskItemProps } from './components/RiskGrid.js';
 export { Status, type StatusProps, type StatusTone } from './components/Status.js';
+export { StatusEditor, type StatusEditorChangeMeta, type StatusEditorProps, type StatusOption, } from './components/StatusEditor.js';
 export { SummaryPanel, type SummaryPanelProps } from './components/SummaryPanel.js';
 export { Table, type TableProps } from './components/Table.js';
 export { TableScroll, type TableScrollProps } from './components/TableScroll.js';

@@ -32,7 +32,7 @@ export declare const mermaidThemeConfig: {
         readonly dark: "dark";
     };
     readonly options: {
-        readonly look: "neo";
+        readonly look: "classic";
         readonly htmlLabels: true;
         readonly fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif";
         readonly flowchart: {
