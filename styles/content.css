@@ -296,17 +296,24 @@
 }
 
 :where(.de-prose) .de-status-chevron {
-  display: inline-block;
-  margin-top: 0;
-  position: relative;
-  top: -1px;
-  font-size: 0.92em;
-  line-height: 1;
+  display: block;
+  width: 0.52em;
+  height: 0.52em;
+  flex: none;
+  overflow: visible;
   opacity: 0.72;
   transition: transform 160ms ease, opacity 160ms ease;
 }
 
-:where(.de-prose) .de-status-trigger[aria-expanded='true'] .de-status-chevron {
+:where(.de-prose) .de-status-chevron path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+:where(.de-prose) .de-status-field-trigger[aria-expanded='true'] .de-status-chevron {
   opacity: 1;
   transform: rotate(180deg);
 }

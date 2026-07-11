@@ -55,5 +55,7 @@ test('exports an editable status property with host-owned persistence', async ()
   assert.match(statusFieldEditor, /onOptionsChange/);
   assert.match(statusFieldEditor, /usedValues/);
   assert.match(statusFieldEditor, /LazyMotion/);
+  assert.match(statusFieldEditor, /viewBox="0 0 12 12"/);
+  assert.doesNotMatch(statusFieldEditor, /⌄/);
   assert.doesNotMatch(styles, /\.de-status-popover\s*\{[^}]*\bborder\s*:/s);
 });

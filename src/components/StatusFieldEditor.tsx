@@ -157,7 +157,15 @@ export function StatusFieldEditor({
         disabled={saving}
         onClick={() => setOpen((current) => !current)}
       >
-        <span>{label}</span><span className="de-status-chevron" aria-hidden="true">⌄</span>
+        <span>{label}</span>
+        <svg
+          className="de-status-chevron"
+          viewBox="0 0 12 12"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M2.5 4.25 6 7.75l3.5-3.5" />
+        </svg>
       </button>
       {mounted && menuStyle
         ? createPortal(
