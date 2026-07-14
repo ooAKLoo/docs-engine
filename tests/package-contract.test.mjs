@@ -40,6 +40,15 @@ test('uses the borderless shared Mermaid surface', () => {
   assert.doesNotMatch(docusaurusAdapter, /look:\s*'neo'/);
 });
 
+test('normalizes Mermaid labels without clipping descenders or covering edge lines', () => {
+  assert.match(styles, /--de-mermaid-edge-label-offset-y:\s*-0\.72rem/);
+  assert.match(styles, /\.label foreignObject/);
+  assert.match(styles, /overflow:\s*visible/);
+  assert.match(styles, /:is\(\.nodeLabel, \.edgeLabel\) p\s*\{[^}]*margin:\s*0 !important/s);
+  assert.match(styles, /\.edgeLabels > \.edgeLabel \.label > foreignObject/);
+  assert.match(styles, /transform:\s*translateY\(var\(--de-mermaid-edge-label-offset-y\)\)/);
+});
+
 test('exports an editable status property with host-owned persistence', async () => {
   const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
   const statusEditor = await readFile(new URL('../src/components/StatusEditor.tsx', import.meta.url), 'utf8');

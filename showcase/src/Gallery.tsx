@@ -24,17 +24,14 @@ import {
 import {mermaidThemeConfig} from '../../src/adapters/docusaurus.js';
 
 const mermaidSource = `flowchart LR
-    start([开始验证]) --> collect[采集真实数据]
-    collect --> decision{达到门槛？}
-    decision -- 是 --> store[(沉淀结论)]
-    store --> done([进入下一阶段])
-    decision -- 否 --> improve[优化产品]
-    improve --> collect
-    class start,collect deBlue
-    class decision dePurple
-    class store deTeal
-    class done deGreen
-    class improve deOrange`;
+    child([孩子说话]) -->|音频| asr[ASR<br/>语音转文字]
+    asr -->|识别文本| agent[LLM / Agent<br/>理解与生成]
+    agent -->|回复文本| tts[TTS<br/>文字转语音]
+    tts -->|音频流| toy([玩具说话])
+    class child,toy deTeal
+    class asr deBlue
+    class agent dePurple
+    class tts deOrange`;
 
 export function Gallery() {
   return (
@@ -182,13 +179,13 @@ export function Gallery() {
           <h2>八、图表</h2>
           <h3>Mermaid 流程图</h3>
           <p>
-            Mermaid 用于工程流程、状态机和时序关系。下面的节点分别使用起点、处理、判断、存储和终点语义形状，颜色只编码节点角色。
+            Mermaid 用于工程流程、状态机和时序关系。下面的语音链路同时用于检查多行节点文案、英文下行字母和边标签的位置，颜色只编码节点角色。
           </p>
           <DiagramFrame>
             <MermaidExample />
           </DiagramFrame>
           <p>
-            这张图的重点是展示共享 Mermaid 主题、语义形状、圆角连线、低饱和节点与反馈回路；节点文案保持简短，详细判断仍写在正文中。
+            这张图的重点是展示共享 Mermaid 主题、完整文字基线、统一位于连线上方的边标签、圆角连线与低饱和节点；节点文案保持简短，详细判断仍写在正文中。
           </p>
           <h3>DiagramFrame 图片容器</h3>
           <p>
@@ -297,5 +294,5 @@ function MermaidExample() {
     };
   }, [reactId]);
 
-  return <div className="de-mermaid" aria-label="市场验证流程图" dangerouslySetInnerHTML={{__html: svg}} />;
+  return <div className="de-mermaid" aria-label="ASR 到 LLM 再到 TTS 的语音链路图" dangerouslySetInnerHTML={{__html: svg}} />;
 }

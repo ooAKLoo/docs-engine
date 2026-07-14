@@ -26,6 +26,16 @@ pnpm showcase
 - oVita 保留 Next.js、Markdown 文件读取、业务 DocBlock、状态编辑和写回 API。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
+### Mermaid 标签兼容
+
+共享样式会重置 Mermaid `foreignObject` 内部继承自宿主的段落 margin 和行高，避免 `Agent` 等包含下行字母的文案被裁切；流程图边标签默认统一显示在连线上方。个别图需要恢复 Mermaid 的居中标签时，可以在图表容器上覆盖：
+
+```css
+.my-mermaid {
+  --de-mermaid-edge-label-offset-y: 0px;
+}
+```
+
 ### 可编辑状态属性
 
 `StatusFieldEditor` 放在表头，负责字段值的新增与删除；`StatusEditor` 只放在单元格中选择已有值。宿主通过回调决定如何写回自己的 Markdown、数据库或 API。
@@ -56,7 +66,7 @@ pnpm showcase
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.5.1"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.5.2"
   }
 }
 ```

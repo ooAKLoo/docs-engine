@@ -607,6 +607,7 @@
 }
 
 :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) {
+  --de-mermaid-edge-label-offset-y: -0.72rem;
   display: grid;
   min-height: 240px;
   place-items: center;
@@ -679,6 +680,37 @@
 :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) {
   color: #3f3f73 !important;
   font-weight: 650;
+  line-height: 1.42;
+}
+
+/*
+ * Mermaid 的 HTML label 会把 Markdown 文案包进 foreignObject / p。
+ * 宿主站点的段落 margin、紧行高或 foreignObject 裁切会导致 g、y 等
+ * 下行字母只显示上半部分，也会让不同节点的垂直居中位置不一致。
+ */
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .label foreignObject,
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .label foreignObject > div {
+  overflow: visible;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) p {
+  margin: 0 !important;
+  line-height: inherit;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) span.nodeLabel {
+  display: inline-block;
+  padding: 0.08em 0.16em 0.18em;
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .edgeLabels > .edgeLabel .label > foreignObject {
+  transform: translateY(var(--de-mermaid-edge-label-offset-y));
+}
+
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) span.edgeLabel {
+  display: inline-block;
+  padding: 0.12em 0.38em 0.18em;
+  white-space: nowrap;
 }
 
 :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-blue, .deBlue, .lula-blue, .lulaBlue) :is(rect, path, polygon) {
