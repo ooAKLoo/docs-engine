@@ -67,7 +67,7 @@ pnpm showcase
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.5.2"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.5.3"
   }
 }
 ```
