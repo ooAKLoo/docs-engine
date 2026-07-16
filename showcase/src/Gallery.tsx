@@ -6,6 +6,7 @@ import {
   DiagramFrame,
   DocumentContent,
   Priority,
+  ResourceLink,
   RiskGrid,
   RiskItem,
   Status,
@@ -146,6 +147,25 @@ export function Gallery() {
               </tbody>
             </Table>
           </div>
+          <h3>资源链接</h3>
+          <p>资源链接统一使用浅灰色 Link2 图标，并保持图标和地址同行；窄屏由表格容器横向滚动。</p>
+          <Table>
+            <thead>
+              <tr><th>入口</th><th>链接</th><th>用途</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>日志 / 记录入口</td>
+                <td><ResourceLink href="http://115.190.136.178:8080/logs" /></td>
+                <td>查看运行记录和交互记录</td>
+              </tr>
+              <tr>
+                <td>产品体验 / 前端入口</td>
+                <td><ResourceLink href="http://115.190.136.178:8081/" /></td>
+                <td>体验当前产品页面</td>
+              </tr>
+            </tbody>
+          </Table>
         </section>
 
         <section className="showcase-section" id="transition">

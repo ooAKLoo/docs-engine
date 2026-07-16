@@ -12,6 +12,7 @@
   --de-accent: #0f766e;
   --de-annotation-line: #d6d6d6;
   --de-risk-background: #f2f2f2;
+  --de-resource-link-icon: #98a2b3;
   --de-shadow: none;
 }
 
@@ -30,4 +31,5 @@
   --de-accent: #5eead4;
   --de-annotation-line: #475569;
   --de-risk-background: #172033;
+  --de-resource-link-icon: #7f8ba0;
 }

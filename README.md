@@ -16,6 +16,7 @@ pnpm showcase
 
 - `styles/tokens.css`：颜色、排版与组件 token。
 - `styles/content.css`：Annotation、Callout、Table、SummaryPanel、Status、Priority、RiskGrid、转换比较与图表容器。
+- `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
 - React 作为 peer dependency，同时兼容 React 18 与 React 19。

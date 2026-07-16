@@ -3,6 +3,7 @@ export { Callout, type CalloutProps } from './components/Callout.js';
 export { DiagramFrame, type DiagramFrameProps } from './components/DiagramFrame.js';
 export { DocumentContent, type DocumentContentProps } from './components/DocumentContent.js';
 export { Priority, type PriorityLevel, type PriorityProps } from './components/Priority.js';
+export { ResourceLink, type ResourceLinkProps } from './components/ResourceLink.js';
 export { RiskGrid, RiskItem, type RiskGridProps, type RiskItemProps } from './components/RiskGrid.js';
 export { Status, type StatusProps, type StatusTone } from './components/Status.js';
 export { StatusEditor, type StatusEditorChangeMeta, type StatusEditorProps, type StatusOption, } from './components/StatusEditor.js';

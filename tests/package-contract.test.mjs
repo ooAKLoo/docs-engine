@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles/content.css', import.meta.url), 'utf8');
 const docusaurusAdapter = await readFile(
   new URL('../src/adapters/docusaurus.ts', import.meta.url),
@@ -16,6 +17,7 @@ test('publishes stable package entry points', () => {
   assert.equal(packageJson.peerDependencies.react, '>=18 <20');
   assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
   assert.equal(packageJson.dependencies.motion, '^12.23.24');
+  assert.equal(packageJson.dependencies['lucide-react'], '^1.24.0');
 });
 
 test('keeps annotation and table visuals borderless', () => {
@@ -31,6 +33,16 @@ test('keeps annotation and table visuals borderless', () => {
 
 test('wraps markdown tables with the shared table component', () => {
   assert.match(docusaurusAdapter, /table:\s*Table/);
+});
+
+test('exports a no-wrap resource link with the shared Link2 icon', async () => {
+  const resourceLink = await readFile(new URL('../src/components/ResourceLink.tsx', import.meta.url), 'utf8');
+  assert.match(index, /ResourceLink/);
+  assert.match(docusaurusAdapter, /ResourceLink/);
+  assert.match(resourceLink, /Link2/);
+  assert.match(styles, /\.de-resource-link/);
+  assert.match(styles, /white-space:\s*nowrap/);
+  assert.match(styles, /--de-resource-link-icon/);
 });
 
 test('uses the borderless shared Mermaid surface', () => {
@@ -50,7 +62,6 @@ test('normalizes Mermaid labels without clipping descenders or covering edge lin
 });
 
 test('exports an editable status property with host-owned persistence', async () => {
-  const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
   const statusEditor = await readFile(new URL('../src/components/StatusEditor.tsx', import.meta.url), 'utf8');
   const statusFieldEditor = await readFile(new URL('../src/components/StatusFieldEditor.tsx', import.meta.url), 'utf8');
   assert.match(index, /StatusEditor/);

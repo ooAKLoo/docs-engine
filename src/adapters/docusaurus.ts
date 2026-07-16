@@ -2,6 +2,7 @@ import {Annotation} from '../components/Annotation.js';
 import {Callout} from '../components/Callout.js';
 import {DiagramFrame} from '../components/DiagramFrame.js';
 import {Priority} from '../components/Priority.js';
+import {ResourceLink} from '../components/ResourceLink.js';
 import {RiskGrid, RiskItem} from '../components/RiskGrid.js';
 import {Status} from '../components/Status.js';
 import {SummaryPanel} from '../components/SummaryPanel.js';
@@ -21,6 +22,7 @@ export const docusaurusMdxComponents = {
   Callout,
   DiagramFrame,
   Priority,
+  ResourceLink,
   RiskGrid,
   RiskItem,
   Status,
