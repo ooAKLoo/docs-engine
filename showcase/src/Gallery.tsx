@@ -213,7 +213,7 @@ export function Gallery() {
           </p>
           <DiagramFrame>
             <img
-              src="/assets/market-validation-path.svg"
+              src={`${import.meta.env.BASE_URL}assets/market-validation-path.svg`}
               alt="市场验证路径图，用于检查独立 SVG 在 DiagramFrame 中的响应式显示"
             />
           </DiagramFrame>

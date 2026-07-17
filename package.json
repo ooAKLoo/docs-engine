@@ -45,7 +45,7 @@
     "check": "pnpm typecheck && pnpm build && pnpm test",
     "showcase": "vite showcase --host 127.0.0.1 --port 3200",
     "showcase:typecheck": "tsc -p tsconfig.showcase.json --noEmit",
-    "showcase:build": "vite build showcase"
+    "showcase:build": "vite build showcase --base=./"
   },
   "peerDependencies": {
     "react": ">=18 <20",
