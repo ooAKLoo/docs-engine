@@ -29,15 +29,22 @@ pnpm showcase
 - oVita 保留 Next.js、Markdown 文件读取、业务 DocBlock、状态编辑和写回 API。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
-### Mermaid 标签兼容
+### Mermaid 标签渲染
 
-共享样式会重置 Mermaid `foreignObject` 内部继承自宿主的段落 margin 和行高，避免 `Agent` 等包含下行字母的文案被裁切；流程图边标签默认统一显示在连线上方。个别图需要恢复 Mermaid 的居中标签时，可以在图表容器上覆盖：
+共享配置统一使用原生 SVG 文本标签，不使用固定宽度的 `foreignObject`。中英文混排、多行标签与字体回退均由 Mermaid 在 SVG 布局阶段完成测量，宿主样式不再在渲染后改变标签字重或补偿宽度。
 
-```css
-.my-mermaid {
-  --de-mermaid-edge-label-offset-y: 0px;
-}
+### 图表放大查看
+
+`DiagramFrame` 默认提供共享的全屏查看能力。单击图表或右上角放大按钮即可打开查看器；查看器支持缩放、恢复 100%、Esc、遮罩和关闭按钮退出，并统一处理页面滚动锁定与键盘焦点。宿主只需传入可访问标题，不需要重复实现弹层：
+
+```tsx
+<DiagramFrame aria-label="用户旅程图">
+  <div className="de-mermaid" dangerouslySetInnerHTML={{__html: svg}} />
+  <figcaption>用户旅程图</figcaption>
+</DiagramFrame>
 ```
+
+已有独立交互的图表可以显式设置 `zoomable={false}`。
 
 ### 可编辑状态属性
 
@@ -69,7 +76,7 @@ pnpm showcase
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.5.3"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.5.5"
   }
 }
 ```

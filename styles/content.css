@@ -620,6 +620,55 @@
 }
 
 :where(.de-prose) .de-diagram {
+  position: relative;
+  width: 100%;
+  margin: 1rem 0 1.7rem;
+}
+
+:where(.de-prose) .de-diagram[data-zoomable='true'] > :is(.de-mermaid, .docusaurus-mermaid-container, img, svg) {
+  cursor: zoom-in;
+}
+
+.de-diagram-expand {
+  position: absolute;
+  z-index: 2;
+  top: 0.8rem;
+  right: 0.8rem;
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--de-line-strong) 82%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--de-surface) 90%, transparent);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  color: var(--de-ink-soft);
+  cursor: zoom-in;
+  opacity: 0.78;
+  transition: opacity 150ms ease, transform 150ms ease, background-color 150ms ease;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.de-diagram[data-zoomable='true']:hover > .de-diagram-expand,
+.de-diagram-expand:hover,
+.de-diagram-expand:focus-visible {
+  opacity: 1;
+}
+
+.de-diagram-expand:hover {
+  background: var(--de-surface);
+  transform: translateY(-1px);
+}
+
+.de-diagram-expand:focus-visible,
+.de-diagram-viewer-toolbar button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--de-brand) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.de-diagram-placeholder {
   width: 100%;
   margin: 1rem 0 1.7rem;
 }
@@ -632,7 +681,6 @@
 }
 
 :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) {
-  --de-mermaid-edge-label-offset-y: -0.72rem;
   display: grid;
   min-height: 240px;
   place-items: center;
@@ -654,6 +702,203 @@
   max-width: 920px;
   height: auto;
   margin: 0 auto;
+}
+
+.de-diagram-viewer-overlay {
+  position: fixed;
+  z-index: 2147483000;
+  inset: 0;
+  display: grid;
+  padding: clamp(0.5rem, 1.8vw, 1.5rem);
+  background: rgba(15, 23, 42, 0.62);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  animation: de-diagram-viewer-fade-in 160ms ease-out;
+}
+
+.de-diagram-viewer-dialog {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--de-line-strong) 84%, transparent);
+  border-radius: clamp(14px, 1.4vw, 22px);
+  background: var(--de-surface);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.32);
+}
+
+.de-diagram-viewer-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.85rem 0.75rem 1.1rem;
+  border-bottom: 1px solid var(--de-line);
+  background: var(--de-surface);
+}
+
+.de-diagram-viewer-title {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--de-ink);
+  font-size: 0.95rem;
+  font-weight: 720;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.de-diagram-viewer-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.de-diagram-viewer-toolbar button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--de-ink-soft);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.de-diagram-viewer-toolbar button:hover:not(:disabled) {
+  background: var(--de-surface-soft);
+  color: var(--de-ink);
+}
+
+.de-diagram-viewer-toolbar button:disabled {
+  cursor: default;
+  opacity: 0.34;
+}
+
+.de-diagram-viewer-zoom {
+  min-width: 3.1rem;
+  color: var(--de-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.de-diagram-viewer-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 0.2rem;
+  background: var(--de-line-strong);
+}
+
+.de-diagram-viewer-canvas {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--de-surface-soft);
+}
+
+.de-diagram-viewer-stage {
+  box-sizing: border-box;
+  display: grid;
+  min-width: 100%;
+  min-height: 100%;
+  align-items: center;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  transition: width 180ms ease;
+}
+
+:where(.de-prose) .de-diagram-viewer-figure {
+  width: 100%;
+  margin: 0;
+}
+
+:where(.de-prose) .de-diagram-viewer-figure :is(.de-mermaid, .docusaurus-mermaid-container) {
+  min-height: 100%;
+  margin: 0;
+  overflow: visible;
+  background-color: var(--de-surface);
+}
+
+:where(.de-prose) .de-diagram-viewer-figure :is(.de-mermaid, .docusaurus-mermaid-container) > svg,
+:where(.de-prose) .de-diagram-viewer-figure > svg,
+:where(.de-prose) .de-diagram-viewer-figure > img {
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+
+:where(.de-prose) .de-diagram-viewer-figure figcaption {
+  margin-top: 0.75rem;
+  color: var(--de-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@keyframes de-diagram-viewer-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .de-diagram-viewer-overlay {
+    padding: 0;
+  }
+
+  .de-diagram-viewer-dialog {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .de-diagram-viewer-header {
+    gap: 0.5rem;
+    padding: 0.65rem 0.6rem 0.65rem 0.85rem;
+  }
+
+  .de-diagram-viewer-title {
+    font-size: 0.86rem;
+  }
+
+  .de-diagram-viewer-toolbar {
+    gap: 0.15rem;
+  }
+
+  .de-diagram-viewer-toolbar button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .de-diagram-viewer-zoom,
+  .de-diagram-viewer-divider {
+    display: none;
+  }
+
+  .de-diagram-expand {
+    top: 0.55rem;
+    right: 0.55rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .de-diagram-expand,
+  .de-diagram-viewer-stage,
+  .de-diagram-viewer-overlay {
+    transition: none;
+    animation: none;
+  }
 }
 
 :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node rect,
@@ -702,40 +947,9 @@
   fill: #f8fafc !important;
 }
 
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) {
+:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.node .label, .edgeLabel) {
   color: #3f3f73 !important;
-  font-weight: 650;
-  line-height: 1.42;
-}
-
-/*
- * Mermaid 的 HTML label 会把 Markdown 文案包进 foreignObject / p。
- * 宿主站点的段落 margin、紧行高或 foreignObject 裁切会导致 g、y 等
- * 下行字母只显示上半部分，也会让不同节点的垂直居中位置不一致。
- */
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .label foreignObject,
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .label foreignObject > div {
-  overflow: visible;
-}
-
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) p {
-  margin: 0 !important;
-  line-height: inherit;
-}
-
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) span.nodeLabel {
-  display: inline-block;
-  padding: 0.08em 0.16em 0.18em;
-}
-
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .edgeLabels > .edgeLabel .label > foreignObject {
-  transform: translateY(var(--de-mermaid-edge-label-offset-y));
-}
-
-:where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) span.edgeLabel {
-  display: inline-block;
-  padding: 0.12em 0.38em 0.18em;
-  white-space: nowrap;
+  fill: #3f3f73 !important;
 }
 
 :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) .node:is(.de-blue, .deBlue, .lula-blue, .lulaBlue) :is(rect, path, polygon) {
@@ -780,9 +994,10 @@
   fill: #111827 !important;
 }
 
-[data-theme='dark'] :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel),
-:where(.de-prose)[data-theme='dark'] :is(.de-mermaid, .docusaurus-mermaid-container) :is(.nodeLabel, .edgeLabel) {
+[data-theme='dark'] :where(.de-prose) :is(.de-mermaid, .docusaurus-mermaid-container) :is(.node .label, .edgeLabel),
+:where(.de-prose)[data-theme='dark'] :is(.de-mermaid, .docusaurus-mermaid-container) :is(.node .label, .edgeLabel) {
   color: #e2e8f0 !important;
+  fill: #e2e8f0 !important;
 }
 
 :where(.de-prose) .callout.annotation {

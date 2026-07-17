@@ -35,7 +35,7 @@ export declare const mermaidThemeConfig: {
     };
     readonly options: {
         readonly look: "classic";
-        readonly htmlLabels: true;
+        readonly htmlLabels: false;
         readonly fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif";
         readonly flowchart: {
             readonly curve: "rounded";
@@ -56,6 +56,7 @@ export declare const mermaidThemeConfig: {
             readonly clusterBorder: "transparent";
             readonly edgeLabelBackground: "#F8FAFC";
             readonly fontSize: "14px";
+            readonly fontWeight: 650;
         };
     };
 };

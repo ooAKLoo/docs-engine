@@ -34,6 +34,15 @@ const mermaidSource = `flowchart LR
     class agent dePurple
     class tts deOrange`;
 
+const mixedLabelMermaidSource = `flowchart LR
+    phone[智能手机普及] --> gps[GPS 普及]
+    gps --> payment[移动支付普及]
+    payment --> city[城市出行效率低]
+    city --> uber[Uber 必然出现]
+    class phone,gps,payment deBlue
+    class city deOrange
+    class uber deGreen`;
+
 export function Gallery() {
   return (
     <DocumentContent className="showcase-page">
@@ -201,12 +210,17 @@ export function Gallery() {
           <p>
             Mermaid 用于工程流程、状态机和时序关系。下面的语音链路同时用于检查多行节点文案、英文下行字母和边标签的位置，颜色只编码节点角色。
           </p>
-          <DiagramFrame>
-            <MermaidExample />
+          <DiagramFrame aria-label="ASR 到 LLM 再到 TTS 的语音链路图">
+            <MermaidExample source={mermaidSource} ariaLabel="ASR 到 LLM 再到 TTS 的语音链路图" />
           </DiagramFrame>
           <p>
-            这张图的重点是展示共享 Mermaid 主题、完整文字基线、统一位于连线上方的边标签、圆角连线与低饱和节点；节点文案保持简短，详细判断仍写在正文中。
+            这张图的重点是展示共享 Mermaid 主题、完整文字基线、清晰的边标签、圆角连线与低饱和节点；单击图表或右上角按钮可以打开全屏查看器。
           </p>
+          <h3>中英文混排节点</h3>
+          <p>这张图用于回归检查“GPS 普及”等中英文混排标签，所有文字必须完整显示。</p>
+          <DiagramFrame aria-label="中英文混排节点回归图">
+            <MermaidExample source={mixedLabelMermaidSource} ariaLabel="中英文混排节点回归图" />
+          </DiagramFrame>
           <h3>DiagramFrame 图片容器</h3>
           <p>
             DiagramFrame 用于响应式展示独立 SVG 或 PNG 图表。画布占正文宽度 100%，内部内容随容器等比缩放。
@@ -291,7 +305,7 @@ function EditableStatusExample() {
   );
 }
 
-function MermaidExample() {
+function MermaidExample({source, ariaLabel}: {source: string; ariaLabel: string}) {
   const reactId = useId();
   const [svg, setSvg] = useState('');
 
@@ -305,14 +319,14 @@ function MermaidExample() {
       ...mermaidThemeConfig.options,
     });
 
-    void mermaid.render(renderId, mermaidSource).then((result) => {
+    void mermaid.render(renderId, source).then((result) => {
       if (!cancelled) setSvg(result.svg);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [reactId]);
+  }, [reactId, source]);
 
-  return <div className="de-mermaid" aria-label="ASR 到 LLM 再到 TTS 的语音链路图" dangerouslySetInnerHTML={{__html: svg}} />;
+  return <div className="de-mermaid" aria-label={ariaLabel} dangerouslySetInnerHTML={{__html: svg}} />;
 }

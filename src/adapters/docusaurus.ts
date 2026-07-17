@@ -44,7 +44,7 @@ export const mermaidThemeConfig = {
   },
   options: {
     look: 'classic',
-    htmlLabels: true,
+    htmlLabels: false,
     fontFamily:
       'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
     flowchart: {
@@ -66,6 +66,7 @@ export const mermaidThemeConfig = {
       clusterBorder: 'transparent',
       edgeLabelBackground: '#F8FAFC',
       fontSize: '14px',
+      fontWeight: 650,
     },
   },
 } as const;
