@@ -1,6 +1,6 @@
 export { Annotation } from './components/Annotation.js';
 export { Callout } from './components/Callout.js';
-export { DiagramFrame } from './components/DiagramFrame.js';
+export { DiagramFrame, } from './components/DiagramFrame.js';
 export { DocumentContent } from './components/DocumentContent.js';
 export { Priority } from './components/Priority.js';
 export { ResourceLink } from './components/ResourceLink.js';
@@ -11,5 +11,6 @@ export { StatusFieldEditor } from './components/StatusFieldEditor.js';
 export { SummaryPanel } from './components/SummaryPanel.js';
 export { Table } from './components/Table.js';
 export { TableScroll } from './components/TableScroll.js';
+export { Timeline, } from './components/Timeline.js';
 export { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, } from './components/Transition.js';
 //# sourceMappingURL=index.js.map

@@ -8,6 +8,7 @@ import { Status } from '../components/Status.js';
 import { SummaryPanel } from '../components/SummaryPanel.js';
 import { Table } from '../components/Table.js';
 import { TableScroll } from '../components/TableScroll.js';
+import { Timeline } from '../components/Timeline.js';
 import { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle } from '../components/Transition.js';
 export declare const docusaurusMdxComponents: {
     Annotation: typeof Annotation;
@@ -21,6 +22,7 @@ export declare const docusaurusMdxComponents: {
     SummaryPanel: typeof SummaryPanel;
     table: typeof Table;
     TableScroll: typeof TableScroll;
+    Timeline: typeof Timeline;
     Transition: typeof Transition;
     TransitionArrow: typeof TransitionArrow;
     TransitionCard: typeof TransitionCard;

@@ -9,6 +9,7 @@ const docusaurusAdapter = await readFile(
   new URL('../src/adapters/docusaurus.ts', import.meta.url),
   'utf8',
 );
+const model = await readFile(new URL('../src/model.ts', import.meta.url), 'utf8');
 
 test('publishes stable package entry points', () => {
   assert.ok(packageJson.exports['.']);
@@ -18,6 +19,7 @@ test('publishes stable package entry points', () => {
   assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
   assert.equal(packageJson.dependencies.motion, '^12.23.24');
   assert.equal(packageJson.dependencies['lucide-react'], '^1.24.0');
+  assert.equal(packageJson.dependencies.mermaid, '^11.16.0');
 });
 
 test('keeps annotation and table visuals borderless', () => {
@@ -57,14 +59,123 @@ test('provides a shared accessible full-screen diagram viewer', async () => {
     new URL('../src/components/DiagramFrame.tsx', import.meta.url),
     'utf8',
   );
+  const mermaidFlowchart = await readFile(
+    new URL('../src/components/MermaidFlowchart.tsx', import.meta.url),
+    'utf8',
+  );
   assert.match(diagramFrame, /createPortal/);
   assert.match(diagramFrame, /aria-modal="true"/);
   assert.match(diagramFrame, /event\.key === 'Escape'/);
   assert.match(diagramFrame, /zoomable\?: boolean/);
-  assert.match(diagramFrame, /放大查看/);
-  assert.match(styles, /\.de-diagram-expand/);
+  assert.match(diagramFrame, /editable\?: boolean/);
+  assert.match(diagramFrame, /boardLayout\?: DiagramBoardLayout/);
+  assert.match(diagramFrame, /onDiagramChange/);
+  assert.match(diagramFrame, /onDiagramMediaChange/);
+  assert.match(diagramFrame, /mediaTransform\?: Partial<DiagramMediaTransform>/);
+  assert.match(diagramFrame, /onDiagramStructureChange/);
+  assert.match(diagramFrame, /LazyMotion/);
+  assert.match(diagramFrame, /addEventListener\('wheel', handleWheel, \{passive: false\}\)/);
+  assert.match(diagramFrame, /addEventListener\('wheel', handleInlineWheel, \{passive: false\}\)/);
+  assert.doesNotMatch(diagramFrame, /onWheel=\{handleWheel\}/);
+  assert.match(diagramFrame, /event\.button === 2/);
+  assert.match(diagramFrame, /type MarqueeSession/);
+  assert.match(diagramFrame, /rectanglesIntersect/);
+  assert.match(diagramFrame, /de-diagram-selection-marquee/);
+  assert.match(diagramFrame, /selectedNodeIds/);
+  assert.match(diagramFrame, /event\.key\.toLowerCase\(\) === 'h'/);
+  assert.match(diagramFrame, /mermaidSource\?: string/);
+  assert.match(diagramFrame, /openViewer\(canEdit \? 'edit' : 'view'\)/);
+  assert.match(diagramFrame, /打开画板/);
+  assert.match(mermaidFlowchart, /import\('mermaid'\)/);
+  assert.match(mermaidFlowchart, /getDiagramFromText/);
+  assert.match(mermaidFlowchart, /onPointerMove/);
+  assert.match(mermaidFlowchart, /onDoubleClick/);
+  assert.match(mermaidFlowchart, /routeEdge/);
+  assert.match(mermaidFlowchart, /orthogonalPath/);
+  assert.match(mermaidFlowchart, /sourceGap = 10/);
+  assert.match(mermaidFlowchart, /targetGap = 14/);
+  assert.match(mermaidFlowchart, /routeGraphEdges/);
+  assert.match(mermaidFlowchart, /appendBoardElements/);
+  assert.match(mermaidFlowchart, /findObstacleAvoidingRoute/);
+  assert.match(mermaidFlowchart, /portGroups/);
+  assert.match(mermaidFlowchart, /sourceOffset = 0/);
+  assert.match(mermaidFlowchart, /targetOffset = 0/);
+  assert.match(mermaidFlowchart, /arrowPoints/);
+  assert.match(mermaidFlowchart, / A \$\{format\(radius\)\}/);
+  assert.match(mermaidFlowchart, /snapNodePosition/);
+  assert.match(mermaidFlowchart, /positionsStart/);
+  assert.match(mermaidFlowchart, /selectedNodeIds/);
+  assert.match(mermaidFlowchart, /translateEdgeRoutePatch/);
+  assert.match(mermaidFlowchart, /beginConnection/);
+  assert.match(mermaidFlowchart, /onConnectionDrop/);
+  assert.match(mermaidFlowchart, /onEdgeRouteChange/);
+  assert.match(mermaidFlowchart, /getRouteSegmentHandles/);
+  assert.match(mermaidFlowchart, /moveRouteSegment/);
+  assert.match(mermaidFlowchart, /resolveNodeBadge/);
+  assert.match(mermaidFlowchart, /roundedDiamondPath/);
+  assert.match(mermaidFlowchart, /isFeedbackEdge/);
+  assert.match(mermaidFlowchart, /resolveInitialEdgePatches/);
+  assert.match(mermaidFlowchart, /isDirectFacingRoute/);
+  assert.match(mermaidFlowchart, /de-board-flowchart__port/);
+  assert.doesNotMatch(mermaidFlowchart, /cubicPoint/);
+  assert.doesNotMatch(mermaidFlowchart, /markerEnd/);
+  assert.match(styles, /\.de-diagram-inline-toolbar/);
+  assert.match(styles, /\.de-diagram-inline-stage/);
+  assert.match(styles, /\.de-diagram-media-item/);
+  assert.match(styles, /\.de-diagram-media-scale-handle/);
+  assert.doesNotMatch(styles, /\.de-diagram-inline-canvas[^}]*\.de-board-flowchart[^}]*min-height/s);
   assert.match(styles, /\.de-diagram-viewer-overlay/);
+  assert.match(styles, /\.de-diagram-board-brand/);
+  assert.match(styles, /\.de-diagram-board-zoom/);
   assert.match(styles, /\.de-diagram-viewer-stage/);
+  assert.match(styles, /\.de-diagram-node-editor/);
+  assert.match(styles, /\.de-diagram-shape-picker/);
+  assert.match(styles, /\.de-diagram-selection-marquee/);
+  assert.match(styles, /\.de-board-flowchart__port-dot/);
+  assert.match(styles, /\.de-board-flowchart__connection-preview/);
+  assert.match(styles, /\.de-board-flowchart__guides/);
+  assert.match(styles, /\.de-board-flowchart__edge-path/);
+  assert.match(styles, /\.de-board-flowchart__edge-handle/);
+  assert.match(styles, /\.de-board-flowchart__node-badge/);
+  assert.match(styles, /\.de-board-flowchart__edge\[data-feedback='true'\]/);
+  assert.match(styles, /\.de-board-flowchart__edge-label\[data-bare='true'\]/);
+  assert.match(styles, /overflow:\s*visible !important/);
+  assert.match(styles, /touch-action:\s*none/);
+  assert.match(index, /DiagramStructureChange/);
+  assert.match(index, /DiagramMediaChange/);
+  assert.match(index, /DiagramMediaTransform/);
+  assert.match(index, /DiagramEdgeRoutePatch/);
+  assert.match(index, /DiagramBoardLayout/);
+});
+
+test('exports an interactive host-controlled timeline', async () => {
+  const timeline = await readFile(
+    new URL('../src/components/Timeline.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(index, /Timeline/);
+  assert.match(model, /type TimelineItem/);
+  assert.match(model, /type: 'timeline'/);
+  assert.match(docusaurusAdapter, /Timeline/);
+  assert.match(timeline, /LazyMotion/);
+  assert.match(timeline, /domMax/);
+  assert.match(timeline, /onPan=/);
+  assert.match(timeline, /resolveTimelineInteraction/);
+  assert.match(timeline, /createTimelineNotesLayout/);
+  assert.match(timeline, /stackHeights/);
+  assert.match(timeline, /onItemsChange/);
+  assert.match(timeline, /onItemCreate/);
+  assert.match(timeline, /onItemDelete/);
+  assert.match(timeline, /onDoubleClick=\{createItem\}/);
+  assert.match(timeline, /event\.key === 'Delete'/);
+  assert.match(timeline, /aria-pressed=\{activeScale === scaleOption\}/);
+  assert.match(timeline, /时间尺度/);
+  assert.match(timeline, /aria-keyshortcuts/);
+  assert.match(styles, /\.de-timeline__bar/);
+  assert.match(styles, /\.de-timeline__snap-guide/);
+  assert.doesNotMatch(styles, /\.de-timeline__bar-delete/);
+  assert.match(styles, /--de-timeline-grid/);
+  assert.match(styles, /touch-action:\s*none/);
 });
 
 test('uses native SVG Mermaid labels with layout typography defined before measurement', () => {

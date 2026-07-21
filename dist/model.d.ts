@@ -1,4 +1,15 @@
 export type CalloutVariant = 'brand' | 'info' | 'note' | 'annotation';
+export type TimelineScale = 'day' | 'week' | 'month';
+export type TimelineItem = {
+    id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    row?: number;
+    notes?: string[];
+    meta?: string;
+    locked?: boolean;
+};
 export type DocBlock = {
     type: 'heading';
     level: 1 | 2 | 3;
@@ -40,6 +51,13 @@ export type DocBlock = {
     headers: string[];
     rows: string[][];
     statusOptions?: string[];
+} | {
+    type: 'timeline';
+    startDate: string;
+    endDate: string;
+    items: TimelineItem[];
+    title?: string;
+    eyebrow?: string;
 };
 export type HeadingLink = {
     id: string;

@@ -8,6 +8,7 @@ import {Status} from '../components/Status.js';
 import {SummaryPanel} from '../components/SummaryPanel.js';
 import {Table} from '../components/Table.js';
 import {TableScroll} from '../components/TableScroll.js';
+import {Timeline} from '../components/Timeline.js';
 import {
   Transition,
   TransitionArrow,
@@ -29,6 +30,7 @@ export const docusaurusMdxComponents = {
   SummaryPanel,
   table: Table,
   TableScroll,
+  Timeline,
   Transition,
   TransitionArrow,
   TransitionCard,

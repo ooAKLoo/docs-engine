@@ -13,6 +13,10 @@
   --de-annotation-line: #d6d6d6;
   --de-risk-background: #f2f2f2;
   --de-resource-link-icon: #98a2b3;
+  --de-timeline-bar: #202020;
+  --de-timeline-bar-ink: #ffffff;
+  --de-timeline-grid: #e6e7e9;
+  --de-timeline-grid-strong: #d5d7da;
   --de-shadow: none;
 }
 
@@ -32,4 +36,8 @@
   --de-annotation-line: #475569;
   --de-risk-background: #172033;
   --de-resource-link-icon: #7f8ba0;
+  --de-timeline-bar: #f4f4f5;
+  --de-timeline-bar-ink: #171717;
+  --de-timeline-grid: #2b3548;
+  --de-timeline-grid-strong: #3a465c;
 }

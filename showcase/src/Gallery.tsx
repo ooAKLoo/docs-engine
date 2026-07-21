@@ -1,5 +1,4 @@
-import {useEffect, useId, useState, type CSSProperties} from 'react';
-import mermaid from 'mermaid';
+import {useState, type CSSProperties} from 'react';
 import {
   Annotation,
   Callout,
@@ -12,9 +11,12 @@ import {
   Status,
   StatusEditor,
   StatusFieldEditor,
+  type DiagramBoardLayout,
   type StatusOption,
   SummaryPanel,
   Table,
+  Timeline,
+  type TimelineItem,
   Transition,
   TransitionArrow,
   TransitionCard,
@@ -22,7 +24,6 @@ import {
   TransitionLabel,
   TransitionTitle,
 } from '../../src/index.js';
-import {mermaidThemeConfig} from '../../src/adapters/docusaurus.js';
 
 const mermaidSource = `flowchart LR
     child([孩子说话]) -->|音频| asr[ASR<br/>语音转文字]
@@ -43,6 +44,152 @@ const mixedLabelMermaidSource = `flowchart LR
     class city deOrange
     class uber deGreen`;
 
+const unifiedBoardMermaidSource = `flowchart LR
+    product([首批产品<br/>完成交付准备]) --> koc[7 名 KOC 测试<br/>真实家庭使用]
+    koc --> retention{7 日留存达标？}
+    retention -->|通过| early[约 70 名付费早鸟<br/>验证真实购买意愿]
+    retention -->|未达标| optimize[优化产品体验<br/>功能、内容或外观]
+    early --> payment{付费信号成立？}
+    payment -->|通过| kol[KOL 推广<br/>场景化内容]
+    payment -->|未成立| adjust[调整商业方案<br/>定位、价格和场景]
+    kol --> production([大货生产<br/>铺设销售渠道])
+    optimize -.优化后复测.-> koc
+    adjust -.调整后复测.-> early
+    class product,koc deBlue
+    class retention,payment dePurple
+    class early deTeal
+    class optimize,adjust deOrange
+    class kol,production deGreen
+    class product,koc,early,kol,production,optimize,adjust deBoardDetail
+    class early,optimize,adjust deBoardWide
+    class retention deBoardGateOne
+    class payment deBoardGateTwo`;
+
+// The old SVG was designed, not auto-laid-out. Keep Mermaid as the semantic source,
+// then give the native Board the same authored starting geometry and return routes.
+const unifiedBoardLayout = {
+  width: 1280,
+  height: 470,
+  nodes: {
+    product: {position: {x: 104.31, y: 168.02}, width: 145.5, height: 77.6},
+    koc: {position: {x: 301.22, y: 168.02}, width: 174.6, height: 87.3},
+    retention: {position: {x: 519.47, y: 168.02}, width: 197.88, height: 135.8},
+    early: {position: {x: 747.42, y: 168.02}, width: 194, height: 87.3},
+    payment: {position: {x: 975.37, y: 168.02}, width: 197.88, height: 135.8},
+    kol: {position: {x: 1174.22, y: 168.02}, width: 128.04, height: 81.48},
+    optimize: {position: {x: 519.47, y: 330.01}, width: 203.7, height: 79.54},
+    adjust: {position: {x: 975.37, y: 330.01}, width: 203.7, height: 79.54},
+    production: {position: {x: 1174.22, y: 331.95}, width: 135.8, height: 75.66},
+  },
+  edges: [
+    {
+      sourceId: 'retention',
+      targetId: 'early',
+      label: '通过',
+    },
+    {
+      sourceId: 'retention',
+      targetId: 'optimize',
+      label: '未达标',
+      sourceSide: 'bottom',
+      targetSide: 'top',
+    },
+    {
+      sourceId: 'payment',
+      targetId: 'kol',
+      label: '通过',
+    },
+    {
+      sourceId: 'payment',
+      targetId: 'adjust',
+      label: '未成立',
+      sourceSide: 'bottom',
+      targetSide: 'top',
+    },
+    {
+      sourceId: 'kol',
+      targetId: 'production',
+      sourceSide: 'bottom',
+      targetSide: 'top',
+    },
+    {
+      sourceId: 'optimize',
+      targetId: 'koc',
+      label: '优化后复测',
+      bareLabel: true,
+      labelAlign: 'start',
+      labelPosition: {x: 383.67, y: 431.68},
+      points: [
+        {x: 519.47, y: 379.78},
+        {x: 519.47, y: 418.28},
+        {x: 301.22, y: 418.28},
+        {x: 301.22, y: 225.67},
+      ],
+      sourceSide: 'bottom',
+      targetSide: 'bottom',
+    },
+    {
+      sourceId: 'adjust',
+      targetId: 'early',
+      label: '调整后复测',
+      bareLabel: true,
+      labelAlign: 'start',
+      labelPosition: {x: 825.02, y: 431.68},
+      points: [
+        {x: 975.37, y: 379.78},
+        {x: 975.37, y: 418.28},
+        {x: 747.42, y: 418.28},
+        {x: 747.42, y: 225.67},
+      ],
+      sourceSide: 'bottom',
+      targetSide: 'bottom',
+    },
+  ],
+} satisfies DiagramBoardLayout;
+
+const initialTimelineItems: TimelineItem[] = [
+  {
+    id: 'research',
+    title: 'Research and discovery',
+    startDate: '2025-12-20',
+    endDate: '2025-12-30',
+    row: 0,
+    notes: ['Hypothesis', 'User research', 'Competitive analysis', 'Interview questions', 'Survey questions'],
+  },
+  {
+    id: 'define',
+    title: 'Define',
+    startDate: '2025-12-30',
+    endDate: '2026-01-09',
+    row: 1,
+    notes: ['Interview', 'Survey', 'Persona card'],
+  },
+  {
+    id: 'ideate',
+    title: 'Ideate',
+    startDate: '2026-01-09',
+    endDate: '2026-01-20',
+    row: 2,
+    notes: ['Info architecture', 'User flow'],
+  },
+  {
+    id: 'design',
+    title: 'Design',
+    startDate: '2026-01-20',
+    endDate: '2026-02-12',
+    row: 3,
+    notes: ['Low wireframe', 'High wireframe', 'Prototype', 'Usability testing'],
+  },
+  {
+    id: 'test',
+    title: 'Test',
+    startDate: '2026-01-31',
+    endDate: '2026-02-12',
+    row: 4,
+    notes: ['UI', 'Case study'],
+  },
+];
+
 export function Gallery() {
   return (
     <DocumentContent className="showcase-page">
@@ -62,6 +209,7 @@ export function Gallery() {
         <a href="#table">Table</a>
         <a href="#transition">转换关系</a>
         <a href="#check-grid">检查网格</a>
+        <a href="#timeline">交互时间轴</a>
         <a href="#diagram">图表</a>
       </nav>
 
@@ -204,36 +352,62 @@ export function Gallery() {
           </RiskGrid>
         </section>
 
+        <section className="showcase-section" id="timeline">
+          <h2>八、交互时间轴</h2>
+          <p>
+            Timeline 复刻阶段式项目视图：拖动阶段条或两端时会实时变化，并自动吸附到日期刻度和其他阶段边界；双击轨道空白处新增，单击阶段选中后按 Del 删除。
+          </p>
+          <InteractiveTimelineExample />
+        </section>
+
         <section className="showcase-section" id="diagram">
-          <h2>八、图表</h2>
+          <h2>九、图表</h2>
           <h3>Mermaid 流程图</h3>
           <p>
             Mermaid 用于工程流程、状态机和时序关系。下面的语音链路同时用于检查多行节点文案、英文下行字母和边标签的位置，颜色只编码节点角色。
           </p>
-          <DiagramFrame aria-label="ASR 到 LLM 再到 TTS 的语音链路图">
-            <MermaidExample source={mermaidSource} ariaLabel="ASR 到 LLM 再到 TTS 的语音链路图" />
-          </DiagramFrame>
+          <DiagramFrame
+            editable
+            mermaidSource={mermaidSource}
+            aria-label="ASR 到 LLM 再到 TTS 的语音链路图"
+          />
           <p>
-            这张图的重点是展示共享 Mermaid 主题、完整文字基线、清晰的边标签、圆角连线与低饱和节点；单击图表或右上角按钮可以打开全屏查看器。
+            正文预览按图形内容和安全留白自适应高度；鼠标停在正文图表内即可滚轮平移，按住 ⌘ / Ctrl + 滚轮以指针为中心缩放；单击图表会直接进入无边画板。全屏选择工具下，从空白处拖动可框选多个节点，再拖动任一已选节点即可整组移动；Space + 左键、右键或手型工具用于平移。节点支持保持原样式的双击编辑。hover 节点会显示四向连接点，可拖到已有节点建立连线，或拖到空白处选择新图形；新增连线不会推动既有节点，同侧锚点共享起点。选中连线后可拖动两个中段控制点，手工调整圆角正交路径。
           </p>
           <h3>中英文混排节点</h3>
           <p>这张图用于回归检查“GPS 普及”等中英文混排标签，所有文字必须完整显示。</p>
-          <DiagramFrame aria-label="中英文混排节点回归图">
-            <MermaidExample source={mixedLabelMermaidSource} ariaLabel="中英文混排节点回归图" />
-          </DiagramFrame>
-          <h3>DiagramFrame 图片容器</h3>
+          <DiagramFrame
+            editable
+            mermaidSource={mixedLabelMermaidSource}
+            aria-label="中英文混排节点回归图"
+          />
+          <h3>统一画板对象</h3>
           <p>
-            DiagramFrame 用于响应式展示独立 SVG 或 PNG 图表。画布占正文宽度 100%，内部内容随容器等比缩放。
+            这张图保留原市场验证图的内容、分支和配色，但不再使用独立 SVG 图片。它由原生 Board 节点与连线构成：正文内可滚轮平移、⌘ / Ctrl + 滚轮缩放；打开画板后可选中、拖动、双击原地编辑，并从锚点创建或调整连线。
           </p>
-          <DiagramFrame>
-            <img
-              src={`${import.meta.env.BASE_URL}assets/market-validation-path.svg`}
-              alt="市场验证路径图，用于检查独立 SVG 在 DiagramFrame 中的响应式显示"
-            />
-          </DiagramFrame>
+          <DiagramFrame
+            boardLayout={unifiedBoardLayout}
+            editable
+            mermaidSource={unifiedBoardMermaidSource}
+            aria-label="用户反馈到实验决策的统一画板"
+          />
         </section>
       </main>
     </DocumentContent>
+  );
+}
+
+function InteractiveTimelineExample() {
+  const [items, setItems] = useState<TimelineItem[]>(initialTimelineItems);
+
+  return (
+    <Timeline
+      startDate="2025-12-20"
+      endDate="2026-02-12"
+      items={items}
+      editable
+      onItemsChange={setItems}
+    />
   );
 }
 
@@ -303,30 +477,4 @@ function EditableStatusExample() {
       </tbody>
     </Table>
   );
-}
-
-function MermaidExample({source, ariaLabel}: {source: string; ariaLabel: string}) {
-  const reactId = useId();
-  const [svg, setSvg] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    const renderId = `docs-engine-${reactId.replace(/[^a-zA-Z0-9]/g, '')}`;
-
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'base',
-      ...mermaidThemeConfig.options,
-    });
-
-    void mermaid.render(renderId, source).then((result) => {
-      if (!cancelled) setSvg(result.svg);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [reactId, source]);
-
-  return <div className="de-mermaid" aria-label={ariaLabel} dangerouslySetInnerHTML={{__html: svg}} />;
 }
