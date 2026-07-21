@@ -1,5 +1,6 @@
 export { Annotation } from './components/Annotation.js';
 export { Callout } from './components/Callout.js';
+export { CodeBlock } from './components/CodeBlock.js';
 export { DiagramFrame, } from './components/DiagramFrame.js';
 export { DocumentContent } from './components/DocumentContent.js';
 export { Priority } from './components/Priority.js';

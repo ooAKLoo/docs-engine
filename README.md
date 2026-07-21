@@ -23,6 +23,14 @@ pnpm showcase
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
 - React 作为 peer dependency，同时兼容 React 18 与 React 19。
 
+### 飞书高亮块色系
+
+`Callout` 支持飞书高亮块一致的 `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`neutral` 七组浅色填充，并按本项目视觉规范统一取消描边。兼容别名 `brand`、`info`、`note` 分别映射为紫色、蓝色和中性灰，不影响已有调用。
+
+### ChatGPT 风格代码块
+
+`CodeBlock` 提供深色代码阅读区、语言标签、复制反馈和横向滚动；Docusaurus 适配器会将 Markdown `pre` 自动映射为该组件，普通行内 `code` 使用低对比中性底色。
+
 ## 宿主边界
 
 - Lula 保留 Docusaurus、MDX、目录、Mermaid 配置和内容构建脚本。
@@ -134,7 +142,7 @@ const [items, setItems] = useState<TimelineItem[]>([
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.6.0"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.6.1"
   }
 }
 ```

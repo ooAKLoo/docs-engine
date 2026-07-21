@@ -1,5 +1,6 @@
 export {Annotation, type AnnotationProps} from './components/Annotation.js';
 export {Callout, type CalloutProps} from './components/Callout.js';
+export {CodeBlock, type CodeBlockProps} from './components/CodeBlock.js';
 export {
   DiagramFrame,
   type DiagramBoardMode,

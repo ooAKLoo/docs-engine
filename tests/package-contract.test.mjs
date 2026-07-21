@@ -5,6 +5,7 @@ import test from 'node:test';
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles/content.css', import.meta.url), 'utf8');
+const tokens = await readFile(new URL('../styles/tokens.css', import.meta.url), 'utf8');
 const docusaurusAdapter = await readFile(
   new URL('../src/adapters/docusaurus.ts', import.meta.url),
   'utf8',
@@ -31,6 +32,36 @@ test('keeps annotation and table visuals borderless', () => {
   assert.match(styles, /border-bottom:\s*1px solid var\(--de-line\)/);
   assert.doesNotMatch(styles, /border-right:/);
   assert.doesNotMatch(styles, /:where\(\.de-prose\) table/);
+});
+
+test('matches the Feishu callout color families', () => {
+  for (const tone of ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'neutral']) {
+    assert.match(model, new RegExp(`\\| '${tone}'`));
+    assert.match(tokens, new RegExp(`--de-callout-${tone}-background`));
+  }
+  assert.doesNotMatch(tokens, /--de-callout-[a-z]+-border/);
+  assert.match(styles, /\.de-callout\s*\{[^}]*border:\s*0;/s);
+  assert.match(tokens, /--de-callout-blue-background:\s*#f0f4ff/);
+  assert.match(tokens, /--de-callout-purple-background:\s*#f6f1fe/);
+  assert.match(tokens, /--de-callout-neutral-background:\s*#f8f9fa/);
+  assert.match(styles, /\.de-callout:is\(\[data-variant='blue'\], \[data-variant='info'\]\)/);
+  assert.match(styles, /\.de-callout:is\(\[data-variant='purple'\], \[data-variant='brand'\]\)/);
+  assert.match(styles, /\.de-callout:is\(\[data-variant='neutral'\], \[data-variant='note'\]\)/);
+});
+
+test('exports a ChatGPT-style code block with language and copy controls', async () => {
+  const codeBlock = await readFile(
+    new URL('../src/components/CodeBlock.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(index, /CodeBlock/);
+  assert.match(docusaurusAdapter, /pre:\s*CodeBlock/);
+  assert.match(codeBlock, /de-code-block__toolbar/);
+  assert.match(codeBlock, /navigator\.clipboard/);
+  assert.match(codeBlock, /copyLabel = '复制代码'/);
+  assert.match(styles, /\.de-code-block__pre/);
+  assert.match(styles, /--de-code-background/);
+  assert.match(styles, /:not\(pre\) > code/);
 });
 
 test('wraps markdown tables with the shared table component', () => {

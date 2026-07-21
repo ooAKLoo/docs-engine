@@ -1,5 +1,6 @@
 import {Annotation} from '../components/Annotation.js';
 import {Callout} from '../components/Callout.js';
+import {CodeBlock} from '../components/CodeBlock.js';
 import {DiagramFrame} from '../components/DiagramFrame.js';
 import {Priority} from '../components/Priority.js';
 import {ResourceLink} from '../components/ResourceLink.js';
@@ -21,6 +22,7 @@ import {
 export const docusaurusMdxComponents = {
   Annotation,
   Callout,
+  CodeBlock,
   DiagramFrame,
   Priority,
   ResourceLink,
@@ -28,6 +30,7 @@ export const docusaurusMdxComponents = {
   RiskItem,
   Status,
   SummaryPanel,
+  pre: CodeBlock,
   table: Table,
   TableScroll,
   Timeline,

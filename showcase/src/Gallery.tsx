@@ -2,6 +2,7 @@ import {useState, type CSSProperties} from 'react';
 import {
   Annotation,
   Callout,
+  CodeBlock,
   DiagramFrame,
   DocumentContent,
   Priority,
@@ -231,6 +232,12 @@ export function Gallery() {
             <li>复杂流程优先改用 Mermaid。</li>
           </ol>
           <blockquote>引用只用于来源原话或需要保留原始措辞的内容。</blockquote>
+          <h3>代码块</h3>
+          <p>代码块沿用 ChatGPT 的深色阅读区、语言标签和复制操作。</p>
+          <CodeBlock
+            code={`export function greet(name: string) {\n  return \`Hello, \${name}!\`;\n}`}
+            language="typescript"
+          />
         </section>
 
         <section className="showcase-section" id="summary">
@@ -247,9 +254,14 @@ export function Gallery() {
 
         <section className="showcase-section" id="callout">
           <h2>三、Callout</h2>
-          <Callout variant="brand">品牌型 Callout 用于需要适度强调的补充信息。</Callout>
-          <Callout variant="info">信息型 Callout 用于背景、口径或阅读提示。</Callout>
-          <Callout variant="note">备注型 Callout 用于次要说明。</Callout>
+          <p>颜色使用飞书高亮块的浅色填充，不显示描边，正文保持统一深色。</p>
+          <Callout variant="red">红色 Callout 用于错误、阻塞或必须立即关注的信息。</Callout>
+          <Callout variant="orange">橙色 Callout 用于风险、截止时间或操作提醒。</Callout>
+          <Callout variant="yellow">黄色 Callout 用于提示、建议和容易遗漏的细节。</Callout>
+          <Callout variant="green">绿色 Callout 用于成功结果、已验证结论和推荐方案。</Callout>
+          <Callout variant="blue">蓝色 Callout 用于背景信息、口径和阅读说明。</Callout>
+          <Callout variant="purple">紫色 Callout 用于品牌信息或需要适度强调的补充内容。</Callout>
+          <Callout variant="neutral">灰色 Callout 用于普通备注和次要说明。</Callout>
         </section>
 
         <section className="showcase-section" id="badge">

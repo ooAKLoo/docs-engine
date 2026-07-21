@@ -1,5 +1,6 @@
 import { Annotation } from '../components/Annotation.js';
 import { Callout } from '../components/Callout.js';
+import { CodeBlock } from '../components/CodeBlock.js';
 import { DiagramFrame } from '../components/DiagramFrame.js';
 import { Priority } from '../components/Priority.js';
 import { ResourceLink } from '../components/ResourceLink.js';
@@ -13,6 +14,7 @@ import { Transition, TransitionArrow, TransitionCard, TransitionCopy, Transition
 export declare const docusaurusMdxComponents: {
     Annotation: typeof Annotation;
     Callout: typeof Callout;
+    CodeBlock: typeof CodeBlock;
     DiagramFrame: typeof DiagramFrame;
     Priority: typeof Priority;
     ResourceLink: typeof ResourceLink;
@@ -20,6 +22,7 @@ export declare const docusaurusMdxComponents: {
     RiskItem: typeof RiskItem;
     Status: typeof Status;
     SummaryPanel: typeof SummaryPanel;
+    pre: typeof CodeBlock;
     table: typeof Table;
     TableScroll: typeof TableScroll;
     Timeline: typeof Timeline;

@@ -157,17 +157,153 @@
   outline-offset: 3px;
 }
 
-:where(.de-prose) .de-callout {
-  margin: 8px 0;
-  padding: 20px 24px;
+:where(.de-prose) .de-code-block {
+  overflow: hidden;
+  margin: 1rem 0;
   border: 0;
   border-radius: 8px;
-  background: var(--de-surface-soft);
-  color: var(--de-ink-soft);
+  background: var(--de-code-background);
+  color: var(--de-code-ink);
 }
 
-:where(.de-prose) .de-callout[data-variant='brand'] {
-  background: var(--de-brand-soft);
+:where(.de-prose) .de-code-block__toolbar {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 12px 0 16px;
+  background: var(--de-code-toolbar-background);
+  color: var(--de-code-muted);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+:where(.de-prose) .de-code-block__language {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.de-prose) .de-code-block__copy {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+:where(.de-prose) .de-code-block__copy:hover {
+  color: var(--de-code-ink);
+}
+
+:where(.de-prose) .de-code-block__copy:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--de-code-ink) 56%, transparent);
+  outline-offset: 1px;
+}
+
+:where(.de-prose) .de-code-block__pre,
+:where(.de-prose) > pre {
+  overflow: auto;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--de-code-background);
+  color: var(--de-code-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  tab-size: 2;
+  text-align: left;
+  white-space: pre;
+  scrollbar-color: #666 transparent;
+  scrollbar-width: thin;
+}
+
+:where(.de-prose) .de-code-block__pre:focus-visible,
+:where(.de-prose) > pre:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--de-code-ink) 42%, transparent);
+  outline-offset: -2px;
+}
+
+:where(.de-prose) .de-code-block__pre code,
+:where(.de-prose) > pre code {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-shadow: none;
+  white-space: inherit;
+}
+
+:where(.de-prose) :not(pre) > code {
+  padding: 0.16em 0.34em;
+  border: 0;
+  border-radius: 5px;
+  background: var(--de-inline-code-background);
+  color: var(--de-inline-code-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.875em;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+:where(.de-prose) .de-callout {
+  box-sizing: border-box;
+  margin: 8px 0;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--de-callout-neutral-background);
+  color: var(--de-ink);
+  line-height: 1.65;
+}
+
+:where(.de-prose) .de-callout > :first-child {
+  margin-top: 0;
+}
+
+:where(.de-prose) .de-callout > :last-child {
+  margin-bottom: 0;
+}
+
+:where(.de-prose) .de-callout[data-variant='red'] {
+  background: var(--de-callout-red-background);
+}
+
+:where(.de-prose) .de-callout[data-variant='orange'] {
+  background: var(--de-callout-orange-background);
+}
+
+:where(.de-prose) .de-callout[data-variant='yellow'] {
+  background: var(--de-callout-yellow-background);
+}
+
+:where(.de-prose) .de-callout[data-variant='green'] {
+  background: var(--de-callout-green-background);
+}
+
+:where(.de-prose) .de-callout:is([data-variant='blue'], [data-variant='info']) {
+  background: var(--de-callout-blue-background);
+}
+
+:where(.de-prose) .de-callout:is([data-variant='purple'], [data-variant='brand']) {
+  background: var(--de-callout-purple-background);
+}
+
+:where(.de-prose) .de-callout:is([data-variant='neutral'], [data-variant='note']) {
+  background: var(--de-callout-neutral-background);
 }
 
 :where(.de-prose) .de-summary-panel {

@@ -1,4 +1,15 @@
-export type CalloutVariant = 'brand' | 'info' | 'note' | 'annotation';
+export type CalloutVariant =
+  | 'brand'
+  | 'info'
+  | 'note'
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'blue'
+  | 'purple'
+  | 'neutral'
+  | 'annotation';
 
 export type TimelineScale = 'day' | 'week' | 'month';
 
