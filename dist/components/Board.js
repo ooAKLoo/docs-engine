@@ -5,7 +5,9 @@ import { AnimatePresence, domMax, LazyMotion, m, useReducedMotion } from 'motion
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { joinClassNames } from '../classnames.js';
-import { MermaidBoard, } from './MermaidBoard.js';
+import { BoardCanvas, } from './BoardCanvas.js';
+import { applyBoardOperation } from './BoardModel.js';
+import { importMermaid } from './MermaidImporter.js';
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
@@ -17,8 +19,9 @@ const QUICK_SHAPES = [
     { label: '菱形', shape: 'diamond' },
 ];
 let boardElementSequence = 0;
-export function DiagramFrame({ className, children, boardLayout, editable = false, grid = false, initialMode, mermaidSource, mediaTransform: mediaTransformValue, zoomable = true, viewerTitle, onClick, onDoubleClick, onKeyDown, onDiagramChange, onDiagramMediaChange, onDiagramStructureChange, ...props }) {
-    const canEdit = editable;
+export function Board({ className, children, document: controlledDocument, defaultDocument, importSource, editable, grid = false, initialMode, mediaTransform: mediaTransformValue, zoomable = true, viewerTitle, onClick, onDoubleClick, onKeyDown, onDocumentChange, onMediaChange, ...props }) {
+    const hasBoardInput = Boolean(controlledDocument || defaultDocument || importSource);
+    const canEdit = editable ?? hasBoardInput;
     const dialogId = useId();
     const inlineFigureRef = useRef(null);
     const inlineCanvasRef = useRef(null);
@@ -29,10 +32,6 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
     const triggerRef = useRef(null);
     const editorInputRef = useRef(null);
     const mediaItemRef = useRef(null);
-    const nodePatchesRef = useRef(new Map());
-    const edgePatchesRef = useRef(new Map());
-    const createdNodesRef = useRef([]);
-    const createdEdgesRef = useRef([]);
     const viewportRef = useRef({ x: 0, y: 0, scale: 1 });
     const inlineViewportRef = useRef({ x: 0, y: 0, scale: 1 });
     const panSessionRef = useRef(null);
@@ -52,7 +51,8 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
     const [inlineViewport, setInlineViewport] = useState(inlineViewportRef.current);
     const [boardMode, setBoardMode] = useState(canEdit && initialMode !== 'view' ? 'edit' : 'view');
     const [boardTool, setBoardToolState] = useState(canEdit ? 'select' : 'hand');
-    const [diagramRevision, setDiagramRevision] = useState(0);
+    const [internalDocument, setInternalDocument] = useState(defaultDocument);
+    const [importError, setImportError] = useState('');
     const [selectedNodeIds, setSelectedNodeIds] = useState([]);
     const [selectedEdgeId, setSelectedEdgeId] = useState(null);
     const [marqueeRect, setMarqueeRect] = useState(null);
@@ -63,7 +63,49 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
     const [helpOpen, setHelpOpen] = useState(false);
     const [editor, setEditor] = useState(null);
     const [shapePicker, setShapePicker] = useState(null);
+    const boardDocument = controlledDocument ?? internalDocument;
+    const documentRef = useRef(boardDocument);
+    const onDocumentChangeRef = useRef(onDocumentChange);
     const accessibleTitle = viewerTitle ?? (typeof props['aria-label'] === 'string' ? props['aria-label'] : '图表预览');
+    useEffect(() => {
+        onDocumentChangeRef.current = onDocumentChange;
+    }, [onDocumentChange]);
+    useEffect(() => {
+        if (controlledDocument)
+            documentRef.current = controlledDocument;
+    }, [controlledDocument]);
+    useEffect(() => {
+        if (controlledDocument || !importSource)
+            return;
+        let cancelled = false;
+        setImportError('');
+        void importMermaid(importSource.source, { layout: importSource.layout })
+            .then((nextDocument) => {
+            if (cancelled)
+                return;
+            documentRef.current = nextDocument;
+            setInternalDocument(nextDocument);
+            onDocumentChangeRef.current?.({ document: nextDocument, reason: 'import' });
+        })
+            .catch((error) => {
+            if (!cancelled) {
+                setImportError(error instanceof Error ? error.message : '无法导入这张图表');
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [controlledDocument, importSource?.layout, importSource?.source]);
+    const mutateDocument = useCallback((operation, meta) => {
+        const current = documentRef.current;
+        if (!current)
+            return;
+        const next = applyBoardOperation(current, operation);
+        documentRef.current = next;
+        if (!controlledDocument)
+            setInternalDocument(next);
+        onDocumentChange?.({ ...meta, document: next, operation });
+    }, [controlledDocument, onDocumentChange]);
     const updateViewport = useCallback((update) => {
         setViewport((current) => {
             const next = typeof update === 'function' ? update(current) : update;
@@ -112,7 +154,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
         const stage = stageRef.current;
         if (!canvas || !stage)
             return null;
-        const diagramElements = Array.from(stage.querySelectorAll('svg .de-mermaid-board__node, svg .de-mermaid-board__edge-label, svg .node, svg .edgeLabel'));
+        const diagramElements = Array.from(stage.querySelectorAll('svg .de-board__node, svg .de-board__edge-label, svg .node, svg .edgeLabel'));
         const candidates = diagramElements.length > 0
             ? diagramElements
             : Array.from(stage.querySelectorAll('.de-diagram-media-item, img, svg'));
@@ -254,19 +296,23 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
     }, []);
     const handleConnect = useCallback((request) => {
         const edge = { ...request, id: createBoardElementId('edge') };
-        createdEdgesRef.current = [...createdEdgesRef.current, edge];
-        setDiagramRevision((current) => current + 1);
-        onDiagramStructureChange?.({ edge, reason: 'create-edge' });
-    }, [onDiagramStructureChange]);
+        const boardEdge = {
+            ...edge,
+            arrow: true,
+            label: '',
+            manual: true,
+            stroke: 'normal',
+        };
+        mutateDocument({ edge: boardEdge, type: 'create-edge' }, { edgeId: edge.id, reason: 'create-edge' });
+    }, [mutateDocument]);
     const handleEdgeRouteChange = useCallback((change) => {
-        edgePatchesRef.current.set(change.edgeId, change.route);
-        setDiagramRevision((current) => current + 1);
-        onDiagramStructureChange?.({
+        mutateDocument({
             edgeId: change.edgeId,
-            reason: 'update-edge-route',
-            route: change.route,
-        });
-    }, [onDiagramStructureChange]);
+            labelPosition: change.route.label,
+            points: change.route.points,
+            type: 'update-edge-route',
+        }, { edgeId: change.edgeId, reason: 'edge-route' });
+    }, [mutateDocument]);
     const handleConnectionDrop = useCallback((request) => {
         const canvas = canvasRef.current;
         if (!canvas)
@@ -298,16 +344,20 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
             targetId: node.id,
             targetSide: shapePicker.targetSide,
         };
-        createdNodesRef.current = [...createdNodesRef.current, node];
-        createdEdgesRef.current = [...createdEdgesRef.current, edge];
-        nodePatchesRef.current.set(node.id, { position: node.position });
+        const boardNode = { ...node, classes: [] };
+        const boardEdge = {
+            ...edge,
+            arrow: true,
+            label: '',
+            manual: true,
+            stroke: 'normal',
+        };
+        mutateDocument({ edge: boardEdge, node: boardNode, type: 'create-node-and-edge' }, { edgeId: edge.id, nodeId: node.id, reason: 'create-node-and-edge' });
         setSelectedNodeIds([node.id]);
         setSelectedEdgeId(null);
         setMediaSelected(false);
         setShapePicker(null);
-        setDiagramRevision((current) => current + 1);
-        onDiagramStructureChange?.({ edge, node, reason: 'create-node-and-edge' });
-    }, [onDiagramStructureChange, shapePicker]);
+    }, [mutateDocument, shapePicker]);
     const commitEditor = useCallback(() => {
         if (!editor)
             return;
@@ -316,31 +366,20 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
             setEditor(null);
             return;
         }
-        const previous = nodePatchesRef.current.get(editor.nodeId);
-        const position = previous?.position ?? editor.position;
-        nodePatchesRef.current.set(editor.nodeId, { ...previous, label });
-        setDiagramRevision((current) => current + 1);
-        onDiagramChange?.({
-            nodeId: editor.nodeId,
-            label,
-            position,
-            reason: 'label',
-        });
+        mutateDocument({ label, nodeId: editor.nodeId, type: 'update-node-label' }, { nodeId: editor.nodeId, reason: 'node-label' });
         setEditor(null);
-    }, [editor, onDiagramChange]);
+    }, [editor, mutateDocument]);
     const cancelEditor = useCallback(() => {
         setEditor(null);
     }, []);
     const handleDiagramNodeChange = useCallback((change) => {
-        const previous = nodePatchesRef.current.get(change.nodeId);
-        nodePatchesRef.current.set(change.nodeId, {
-            ...previous,
-            ...(change.reason === 'label' ? { label: change.label } : null),
-            ...(change.reason === 'position' ? { position: change.position } : null),
+        mutateDocument(change.reason === 'label'
+            ? { label: change.label, nodeId: change.nodeId, type: 'update-node-label' }
+            : { nodeId: change.nodeId, position: change.position, type: 'update-node-position' }, {
+            nodeId: change.nodeId,
+            reason: change.reason === 'label' ? 'node-label' : 'node-position',
         });
-        setDiagramRevision((current) => current + 1);
-        onDiagramChange?.(change);
-    }, [onDiagramChange]);
+    }, [mutateDocument]);
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -572,7 +611,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
         const canStartMarquee = event.button === 0 &&
             canEdit &&
             boardMode === 'edit' &&
-            Boolean(mermaidSource) &&
+            Boolean(boardDocument) &&
             boardToolRef.current === 'select' &&
             !spacePressedRef.current &&
             !interactiveElement;
@@ -608,7 +647,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
             (event.button === 0 &&
                 (boardToolRef.current === 'hand' ||
                     spacePressedRef.current ||
-                    (!mermaidSource && !interactiveElement)));
+                    (!boardDocument && !interactiveElement)));
         if (!shouldPan)
             return;
         event.preventDefault();
@@ -720,7 +759,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
         }
         mediaDragRef.current = null;
         const transform = mediaTransformRef.current;
-        onDiagramMediaChange?.({
+        onMediaChange?.({
             position: { x: transform.x, y: transform.y },
             reason: session.mode === 'move' ? 'position' : 'scale',
             scale: transform.scale,
@@ -741,7 +780,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
                             openViewer(canEdit ? 'edit' : 'view');
                         }, children: _jsx(Maximize2, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 }) })] })) : null, _jsx("div", { ref: inlineCanvasRef, className: "de-diagram-inline-canvas", children: _jsx("div", { className: "de-diagram-inline-stage", style: {
                         transform: `translate3d(${inlineViewport.x}px, ${inlineViewport.y}px, 0) scale(${inlineViewport.scale})`,
-                    }, children: mermaidSource ? (_jsx(MermaidBoard, { accessibleLabel: accessibleTitle, boardLayout: boardLayout, createdEdges: createdEdgesRef.current, createdNodes: createdNodesRef.current, edgePatches: edgePatchesRef.current, editable: false, fitPatchedBounds: true, panActive: false, patches: nodePatchesRef.current, revision: diagramRevision, source: mermaidSource })) : (children) }) })] }));
+                    }, children: boardDocument ? (_jsx(BoardCanvas, { accessibleLabel: accessibleTitle, document: boardDocument, editable: false, fitContent: true, panActive: false })) : importSource ? (_jsx(BoardLoadState, { error: importError })) : (children) }) })] }));
     const canvasStyle = {
         '--de-diagram-grid-size': `${22 * viewport.scale}px`,
         '--de-diagram-grid-x': `${viewport.x}px`,
@@ -752,16 +791,16 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
                                                                 setBoardMode('edit');
                                                                 setBoardTool('select');
                                                                 setModeMenuOpen(false);
-                                                            }, children: [_jsx(PenLine, { "aria-hidden": "true", size: 17 }), _jsxs("span", { children: [_jsx("strong", { children: "\u7F16\u8F91" }), _jsx("small", { children: mermaidSource ? '拖动节点并修改文字' : '拖动并缩放图形' })] })] }), _jsxs("button", { type: "button", role: "menuitemradio", "aria-checked": boardMode === 'view', onClick: () => {
+                                                            }, children: [_jsx(PenLine, { "aria-hidden": "true", size: 17 }), _jsxs("span", { children: [_jsx("strong", { children: "\u7F16\u8F91" }), _jsx("small", { children: boardDocument ? '拖动节点并修改文字' : '拖动并缩放图形' })] })] }), _jsxs("button", { type: "button", role: "menuitemradio", "aria-checked": boardMode === 'view', onClick: () => {
                                                                 setBoardMode('view');
                                                                 setBoardTool('hand');
                                                                 setModeMenuOpen(false);
                                                             }, children: [_jsx(Eye, { "aria-hidden": "true", size: 17 }), _jsxs("span", { children: [_jsx("strong", { children: "\u6D4F\u89C8" }), _jsx("small", { children: "\u4EC5\u7F29\u653E\u548C\u5E73\u79FB\u753B\u5E03" })] })] })] })) : null })] }), _jsxs("nav", { className: "de-diagram-board-tools de-diagram-board-float", "aria-label": "\u753B\u677F\u5DE5\u5177", children: [editModeActive ? (_jsx("button", { type: "button", "aria-label": "\u9009\u62E9\u5DE5\u5177", "aria-pressed": boardTool === 'select', title: "\u9009\u62E9", onClick: () => setBoardTool('select'), children: _jsx(MousePointer2, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })) : null, _jsx("button", { type: "button", "aria-label": "\u624B\u578B\u79FB\u52A8\u5DE5\u5177", "aria-keyshortcuts": "H", "aria-pressed": boardTool === 'hand', title: "\u79FB\u52A8\u753B\u5E03\uFF08H\uFF09", onClick: () => setBoardTool(boardTool === 'hand' ? 'select' : 'hand'), children: _jsx(Hand, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })] }), _jsxs(m.div, { ref: canvasRef, className: "de-diagram-viewer-canvas", "data-grid": grid ? 'true' : undefined, "data-pan-active": canvasPanActive ? 'true' : undefined, "data-panning": isPanning ? 'true' : undefined, "data-selecting": marqueeRect ? 'true' : undefined, style: canvasStyle, onContextMenu: (event) => event.preventDefault(), onPointerDown: handleCanvasPointerDown, onPointerMove: handleCanvasPointerMove, onPointerUp: finishCanvasInteraction, onPointerCancel: (event) => finishCanvasInteraction(event, true), children: [_jsxs("div", { ref: stageRef, className: "de-diagram-viewer-stage", style: {
                                                     transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`,
-                                                }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: mermaidSource ? (_jsx(MermaidBoard, { accessibleLabel: accessibleTitle, boardLayout: boardLayout, createdEdges: createdEdgesRef.current, createdNodes: createdNodesRef.current, edgePatches: edgePatchesRef.current, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: () => {
+                                                }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: boardDocument ? (_jsx(BoardCanvas, { accessibleLabel: accessibleTitle, document: boardDocument, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: () => {
                                                                 if (!hasFittedRef.current)
                                                                     requestAnimationFrame(fitView);
-                                                            }, onSelectNode: handleSelectNode, onSelectEdge: handleSelectEdge, panActive: canvasPanActive, patches: nodePatchesRef.current, revision: diagramRevision, selectedEdgeId: selectedEdgeId, selectedNodeIds: selectedNodeIds, source: mermaidSource })) : (_jsxs("div", { ref: mediaItemRef, className: "de-diagram-media-item", "data-de-media-item": "true", "data-selected": mediaSelected ? 'true' : undefined, style: {
+                                                            }, onSelectNode: handleSelectNode, onSelectEdge: handleSelectEdge, panActive: canvasPanActive, selectedEdgeId: selectedEdgeId, selectedNodeIds: selectedNodeIds })) : importSource ? (_jsx(BoardLoadState, { error: importError })) : (_jsxs("div", { ref: mediaItemRef, className: "de-diagram-media-item", "data-de-media-item": "true", "data-selected": mediaSelected ? 'true' : undefined, style: {
                                                                 transform: `translate3d(${mediaTransform.x}px, ${mediaTransform.y}px, 0) scale(${mediaTransform.scale})`,
                                                             }, onPointerDown: (event) => beginMediaInteraction(event, 'move'), onPointerMove: moveMediaInteraction, onPointerUp: finishMediaInteraction, onPointerCancel: cancelMediaInteraction, children: [children, editModeActive && mediaSelected && !canvasPanActive ? (_jsx("span", { className: "de-diagram-media-scale-handle", "aria-label": "\u8C03\u6574\u56FE\u7247\u6216\u56FE\u5F62\u5927\u5C0F", role: "button", tabIndex: 0, onPointerDown: (event) => beginMediaInteraction(event, 'scale') })) : null] })) }), _jsx(AnimatePresence, { children: editor ? (_jsx("div", { className: "de-diagram-node-editor", style: {
                                                                 left: editor.left,
@@ -828,6 +867,9 @@ function resolveMediaTransform(value, fallback = { scale: 1, x: 0, y: 0 }) {
         y: typeof position?.y === 'number' && Number.isFinite(position.y) ? position.y : fallback.y,
     };
 }
+function BoardLoadState({ error }) {
+    return (_jsx("div", { className: "de-board de-board--status", role: "status", children: error ? (_jsxs(_Fragment, { children: [_jsx("strong", { children: "\u6682\u65F6\u65E0\u6CD5\u5BFC\u5165\u8FD9\u5F20\u56FE\u8868" }), _jsx("span", { children: error })] })) : (_jsx("span", { children: "\u6B63\u5728\u6784\u5EFA\u753B\u677F\u2026" })) }));
+}
 function createBoardElementId(prefix) {
     boardElementSequence += 1;
     return `de-${prefix}-${Date.now().toString(36)}-${boardElementSequence.toString(36)}`;
@@ -852,4 +894,4 @@ function trapDialogFocus(event, dialog) {
         first.focus();
     }
 }
-//# sourceMappingURL=DiagramFrame.js.map
+//# sourceMappingURL=Board.js.map

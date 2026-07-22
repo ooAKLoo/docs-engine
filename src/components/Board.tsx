@@ -25,43 +25,32 @@ import {useCallback, useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {joinClassNames} from '../classnames.js';
 import {
+  BoardCanvas,
+  type BoardEditRequest,
   type DiagramConnectRequest,
   type DiagramConnectionDropRequest,
-  type DiagramBoardLayout,
   type DiagramCreatedEdge,
   type DiagramCreatedNode,
   type DiagramEdgeRouteChange,
-  type DiagramEdgeRoutePatch,
   type DiagramNodeChange,
-  type DiagramNodePatch,
   type DiagramNodePosition,
-  type DiagramNodeShape,
-  type MermaidEditRequest,
-  MermaidBoard,
-} from './MermaidBoard.js';
+} from './BoardCanvas.js';
+import type {
+  BoardDocument,
+  BoardDocumentChange,
+  BoardImportSource,
+  BoardNodeShape,
+  BoardOperation,
+} from './BoardModel.js';
+import {applyBoardOperation} from './BoardModel.js';
+import {importMermaid} from './MermaidImporter.js';
 
-export type {
-  DiagramAnchorSide,
-  DiagramBoardEdgeLayout,
-  DiagramBoardLayout,
-  DiagramBoardNodeLayout,
-  DiagramCreatedEdge,
-  DiagramCreatedNode,
-  DiagramEdgeRouteChange,
-  DiagramEdgeRoutePatch,
-  DiagramNodeChange,
-  DiagramNodeChangeReason,
-  DiagramNodeShape,
-  DiagramNodeTone,
-  DiagramNodePosition,
-} from './MermaidBoard.js';
-
-export type DiagramBoardMode = 'view' | 'edit';
+export type BoardMode = 'view' | 'edit';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
-const QUICK_SHAPES: Array<{label: string; shape: DiagramNodeShape}> = [
+const QUICK_SHAPES: Array<{label: string; shape: BoardNodeShape}> = [
   {label: '圆角矩形', shape: 'round'},
   {label: '矩形', shape: 'rect'},
   {label: '全圆角矩形', shape: 'stadium'},
@@ -138,65 +127,61 @@ type ShapePickerState = DiagramConnectionDropRequest & {
   top: number;
 };
 
-export type DiagramStructureChange =
-  | {edge: DiagramCreatedEdge; reason: 'create-edge'}
-  | {edge: DiagramCreatedEdge; node: DiagramCreatedNode; reason: 'create-node-and-edge'}
-  | {edgeId: string; reason: 'update-edge-route'; route: DiagramEdgeRoutePatch};
-
-export type DiagramMediaTransform = {
+export type BoardMediaTransform = {
   position: DiagramNodePosition;
   scale: number;
 };
 
-export type DiagramMediaChange = DiagramMediaTransform & {
+export type BoardMediaChange = BoardMediaTransform & {
   reason: 'position' | 'scale';
 };
 
-export type DiagramFrameProps = HTMLAttributes<HTMLElement> & {
-  /** Optional authored geometry for a Mermaid Board; preserves a designed diagram's initial layout. */
-  boardLayout?: DiagramBoardLayout;
-  /** Enable full-screen Board editing. Mermaid adds semantic node/edge editing; media adds move/scale. */
+export type BoardProps = HTMLAttributes<HTMLElement> & {
+  /** Controlled canonical document. Import formats never reach the renderer. */
+  document?: BoardDocument;
+  /** Initial canonical document for an uncontrolled Board. */
+  defaultDocument?: BoardDocument;
+  /** Convenience input converted once into a canonical BoardDocument. */
+  importSource?: BoardImportSource;
+  /** Enable editing. Canonical and imported Boards are editable by default. */
   editable?: boolean;
   /** Show an optional dotted grid in the inline and full-screen canvas. */
   grid?: boolean;
   /** Mode used when the board opens. Edit mode falls back to view when editable is false. */
-  initialMode?: DiagramBoardMode;
-  /** Mermaid source normalized into the single editable Board renderer. */
-  mermaidSource?: string;
-  /** Optional host-owned transform for a non-Mermaid image or SVG placed on the Board. */
-  mediaTransform?: Partial<DiagramMediaTransform>;
-  /** Receive local Mermaid edits so the host can persist them to its source of truth. */
-  onDiagramChange?: (change: DiagramNodeChange) => void;
-  /** Receive position and scale changes for a non-Mermaid image or SVG placed on the Board. */
-  onDiagramMediaChange?: (change: DiagramMediaChange) => void;
-  /** Receive edges and nodes created from the native Board connection handles. */
-  onDiagramStructureChange?: (change: DiagramStructureChange) => void;
+  initialMode?: BoardMode;
+  /** Optional host-owned transform for an image or SVG placed on the Board. */
+  mediaTransform?: Partial<BoardMediaTransform>;
+  /** Receive every canonical document mutation for persistence. */
+  onDocumentChange?: (change: BoardDocumentChange) => void;
+  /** Receive position and scale changes for a media object. */
+  onMediaChange?: (change: BoardMediaChange) => void;
   /** Disable the shared full-screen viewer for a diagram that owns its own interaction. */
   zoomable?: boolean;
   /** Accessible title shown in the full-screen viewer. Falls back to aria-label. */
   viewerTitle?: string;
 };
 
-export function DiagramFrame({
+export function Board({
   className,
   children,
-  boardLayout,
-  editable = false,
+  document: controlledDocument,
+  defaultDocument,
+  importSource,
+  editable,
   grid = false,
   initialMode,
-  mermaidSource,
   mediaTransform: mediaTransformValue,
   zoomable = true,
   viewerTitle,
   onClick,
   onDoubleClick,
   onKeyDown,
-  onDiagramChange,
-  onDiagramMediaChange,
-  onDiagramStructureChange,
+  onDocumentChange,
+  onMediaChange,
   ...props
-}: DiagramFrameProps) {
-  const canEdit = editable;
+}: BoardProps) {
+  const hasBoardInput = Boolean(controlledDocument || defaultDocument || importSource);
+  const canEdit = editable ?? hasBoardInput;
   const dialogId = useId();
   const inlineFigureRef = useRef<HTMLElement>(null);
   const inlineCanvasRef = useRef<HTMLDivElement>(null);
@@ -207,10 +192,6 @@ export function DiagramFrame({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const editorInputRef = useRef<HTMLTextAreaElement>(null);
   const mediaItemRef = useRef<HTMLDivElement>(null);
-  const nodePatchesRef = useRef(new Map<string, DiagramNodePatch>());
-  const edgePatchesRef = useRef(new Map<string, DiagramEdgeRoutePatch>());
-  const createdNodesRef = useRef<DiagramCreatedNode[]>([]);
-  const createdEdgesRef = useRef<DiagramCreatedEdge[]>([]);
   const viewportRef = useRef<BoardViewport>({x: 0, y: 0, scale: 1});
   const inlineViewportRef = useRef<BoardViewport>({x: 0, y: 0, scale: 1});
   const panSessionRef = useRef<PanSession | null>(null);
@@ -228,11 +209,12 @@ export function DiagramFrame({
   const [placeholderHeight, setPlaceholderHeight] = useState(0);
   const [viewport, setViewport] = useState<BoardViewport>(viewportRef.current);
   const [inlineViewport, setInlineViewport] = useState<BoardViewport>(inlineViewportRef.current);
-  const [boardMode, setBoardMode] = useState<DiagramBoardMode>(
+  const [boardMode, setBoardMode] = useState<BoardMode>(
     canEdit && initialMode !== 'view' ? 'edit' : 'view',
   );
   const [boardTool, setBoardToolState] = useState<BoardTool>(canEdit ? 'select' : 'hand');
-  const [diagramRevision, setDiagramRevision] = useState(0);
+  const [internalDocument, setInternalDocument] = useState<BoardDocument | undefined>(defaultDocument);
+  const [importError, setImportError] = useState('');
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
@@ -243,8 +225,55 @@ export function DiagramFrame({
   const [helpOpen, setHelpOpen] = useState(false);
   const [editor, setEditor] = useState<NodeEditorState | null>(null);
   const [shapePicker, setShapePicker] = useState<ShapePickerState | null>(null);
+  const boardDocument = controlledDocument ?? internalDocument;
+  const documentRef = useRef<BoardDocument | undefined>(boardDocument);
+  const onDocumentChangeRef = useRef(onDocumentChange);
   const accessibleTitle =
     viewerTitle ?? (typeof props['aria-label'] === 'string' ? props['aria-label'] : '图表预览');
+
+  useEffect(() => {
+    onDocumentChangeRef.current = onDocumentChange;
+  }, [onDocumentChange]);
+
+  useEffect(() => {
+    if (controlledDocument) documentRef.current = controlledDocument;
+  }, [controlledDocument]);
+
+  useEffect(() => {
+    if (controlledDocument || !importSource) return;
+    let cancelled = false;
+    setImportError('');
+    void importMermaid(importSource.source, {layout: importSource.layout})
+      .then((nextDocument) => {
+        if (cancelled) return;
+        documentRef.current = nextDocument;
+        setInternalDocument(nextDocument);
+        onDocumentChangeRef.current?.({document: nextDocument, reason: 'import'});
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setImportError(error instanceof Error ? error.message : '无法导入这张图表');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [controlledDocument, importSource?.layout, importSource?.source]);
+
+  const mutateDocument = useCallback(
+    (
+      operation: BoardOperation,
+      meta: Omit<BoardDocumentChange, 'document'>,
+    ) => {
+      const current = documentRef.current;
+      if (!current) return;
+      const next = applyBoardOperation(current, operation);
+      documentRef.current = next;
+      if (!controlledDocument) setInternalDocument(next);
+      onDocumentChange?.({...meta, document: next, operation});
+    },
+    [controlledDocument, onDocumentChange],
+  );
 
   const updateViewport = useCallback(
     (update: BoardViewport | ((current: BoardViewport) => BoardViewport)) => {
@@ -308,7 +337,7 @@ export function DiagramFrame({
     if (!canvas || !stage) return null;
     const diagramElements = Array.from(
       stage.querySelectorAll<Element>(
-        'svg .de-mermaid-board__node, svg .de-mermaid-board__edge-label, svg .node, svg .edgeLabel',
+        'svg .de-board__node, svg .de-board__edge-label, svg .node, svg .edgeLabel',
       ),
     );
     const candidates =
@@ -416,7 +445,7 @@ export function DiagramFrame({
   }, []);
 
   const openViewer = useCallback(
-    (requestedMode?: DiagramBoardMode) => {
+    (requestedMode?: BoardMode) => {
       if (!zoomable) return;
       const fallbackMode = canEdit && initialMode !== 'view' ? 'edit' : 'view';
       setBoardMode(canEdit ? (requestedMode ?? fallbackMode) : 'view');
@@ -435,7 +464,7 @@ export function DiagramFrame({
     [canEdit, initialMode, setBoardTool, updateViewport, zoomable],
   );
 
-  const handleEditRequest = useCallback((request: MermaidEditRequest) => {
+  const handleEditRequest = useCallback((request: BoardEditRequest) => {
     const stage = stageRef.current;
     if (!stage) return;
     const stageRect = stage.getBoundingClientRect();
@@ -478,24 +507,34 @@ export function DiagramFrame({
   const handleConnect = useCallback(
     (request: DiagramConnectRequest) => {
       const edge: DiagramCreatedEdge = {...request, id: createBoardElementId('edge')};
-      createdEdgesRef.current = [...createdEdgesRef.current, edge];
-      setDiagramRevision((current) => current + 1);
-      onDiagramStructureChange?.({edge, reason: 'create-edge'});
+      const boardEdge = {
+        ...edge,
+        arrow: true,
+        label: '',
+        manual: true,
+        stroke: 'normal' as const,
+      };
+      mutateDocument(
+        {edge: boardEdge, type: 'create-edge'},
+        {edgeId: edge.id, reason: 'create-edge'},
+      );
     },
-    [onDiagramStructureChange],
+    [mutateDocument],
   );
 
   const handleEdgeRouteChange = useCallback(
     (change: DiagramEdgeRouteChange) => {
-      edgePatchesRef.current.set(change.edgeId, change.route);
-      setDiagramRevision((current) => current + 1);
-      onDiagramStructureChange?.({
-        edgeId: change.edgeId,
-        reason: 'update-edge-route',
-        route: change.route,
-      });
+      mutateDocument(
+        {
+          edgeId: change.edgeId,
+          labelPosition: change.route.label,
+          points: change.route.points,
+          type: 'update-edge-route',
+        },
+        {edgeId: change.edgeId, reason: 'edge-route'},
+      );
     },
-    [onDiagramStructureChange],
+    [mutateDocument],
   );
 
   const handleConnectionDrop = useCallback((request: DiagramConnectionDropRequest) => {
@@ -512,7 +551,7 @@ export function DiagramFrame({
   }, []);
 
   const createConnectedShape = useCallback(
-    (shape: DiagramNodeShape) => {
+    (shape: BoardNodeShape) => {
       if (!shapePicker) return;
       const node: DiagramCreatedNode = {
         id: createBoardElementId('node'),
@@ -529,17 +568,24 @@ export function DiagramFrame({
         targetId: node.id,
         targetSide: shapePicker.targetSide,
       };
-      createdNodesRef.current = [...createdNodesRef.current, node];
-      createdEdgesRef.current = [...createdEdgesRef.current, edge];
-      nodePatchesRef.current.set(node.id, {position: node.position});
+      const boardNode = {...node, classes: []};
+      const boardEdge = {
+        ...edge,
+        arrow: true,
+        label: '',
+        manual: true,
+        stroke: 'normal' as const,
+      };
+      mutateDocument(
+        {edge: boardEdge, node: boardNode, type: 'create-node-and-edge'},
+        {edgeId: edge.id, nodeId: node.id, reason: 'create-node-and-edge'},
+      );
       setSelectedNodeIds([node.id]);
       setSelectedEdgeId(null);
       setMediaSelected(false);
       setShapePicker(null);
-      setDiagramRevision((current) => current + 1);
-      onDiagramStructureChange?.({edge, node, reason: 'create-node-and-edge'});
     },
-    [onDiagramStructureChange, shapePicker],
+    [mutateDocument, shapePicker],
   );
 
   const commitEditor = useCallback(() => {
@@ -549,18 +595,12 @@ export function DiagramFrame({
       setEditor(null);
       return;
     }
-    const previous = nodePatchesRef.current.get(editor.nodeId);
-    const position = previous?.position ?? editor.position;
-    nodePatchesRef.current.set(editor.nodeId, {...previous, label});
-    setDiagramRevision((current) => current + 1);
-    onDiagramChange?.({
-      nodeId: editor.nodeId,
-      label,
-      position,
-      reason: 'label',
-    });
+    mutateDocument(
+      {label, nodeId: editor.nodeId, type: 'update-node-label'},
+      {nodeId: editor.nodeId, reason: 'node-label'},
+    );
     setEditor(null);
-  }, [editor, onDiagramChange]);
+  }, [editor, mutateDocument]);
 
   const cancelEditor = useCallback(() => {
     setEditor(null);
@@ -568,16 +608,17 @@ export function DiagramFrame({
 
   const handleDiagramNodeChange = useCallback(
     (change: DiagramNodeChange) => {
-      const previous = nodePatchesRef.current.get(change.nodeId);
-      nodePatchesRef.current.set(change.nodeId, {
-        ...previous,
-        ...(change.reason === 'label' ? {label: change.label} : null),
-        ...(change.reason === 'position' ? {position: change.position} : null),
-      });
-      setDiagramRevision((current) => current + 1);
-      onDiagramChange?.(change);
+      mutateDocument(
+        change.reason === 'label'
+          ? {label: change.label, nodeId: change.nodeId, type: 'update-node-label'}
+          : {nodeId: change.nodeId, position: change.position, type: 'update-node-position'},
+        {
+          nodeId: change.nodeId,
+          reason: change.reason === 'label' ? 'node-label' : 'node-position',
+        },
+      );
     },
-    [onDiagramChange],
+    [mutateDocument],
   );
 
   useEffect(() => {
@@ -815,7 +856,7 @@ export function DiagramFrame({
       event.button === 0 &&
       canEdit &&
       boardMode === 'edit' &&
-      Boolean(mermaidSource) &&
+      Boolean(boardDocument) &&
       boardToolRef.current === 'select' &&
       !spacePressedRef.current &&
       !interactiveElement;
@@ -854,7 +895,7 @@ export function DiagramFrame({
       (event.button === 0 &&
         (boardToolRef.current === 'hand' ||
           spacePressedRef.current ||
-          (!mermaidSource && !interactiveElement)));
+          (!boardDocument && !interactiveElement)));
     if (!shouldPan) return;
 
     event.preventDefault();
@@ -982,7 +1023,7 @@ export function DiagramFrame({
     }
     mediaDragRef.current = null;
     const transform = mediaTransformRef.current;
-    onDiagramMediaChange?.({
+    onMediaChange?.({
       position: {x: transform.x, y: transform.y},
       reason: session.mode === 'move' ? 'position' : 'scale',
       scale: transform.scale,
@@ -1050,20 +1091,16 @@ export function DiagramFrame({
             transform: `translate3d(${inlineViewport.x}px, ${inlineViewport.y}px, 0) scale(${inlineViewport.scale})`,
           }}
         >
-          {mermaidSource ? (
-            <MermaidBoard
+          {boardDocument ? (
+            <BoardCanvas
               accessibleLabel={accessibleTitle}
-              boardLayout={boardLayout}
-              createdEdges={createdEdgesRef.current}
-              createdNodes={createdNodesRef.current}
-              edgePatches={edgePatchesRef.current}
+              document={boardDocument}
               editable={false}
-              fitPatchedBounds
+              fitContent
               panActive={false}
-              patches={nodePatchesRef.current}
-              revision={diagramRevision}
-              source={mermaidSource}
             />
+          ) : importSource ? (
+            <BoardLoadState error={importError} />
           ) : (
             children
           )}
@@ -1184,7 +1221,7 @@ export function DiagramFrame({
                                 <span>
                                   <strong>编辑</strong>
                                   <small>
-                                    {mermaidSource ? '拖动节点并修改文字' : '拖动并缩放图形'}
+                                    {boardDocument ? '拖动节点并修改文字' : '拖动并缩放图形'}
                                   </small>
                                 </span>
                               </button>
@@ -1268,13 +1305,10 @@ export function DiagramFrame({
                             data-viewer="true"
                             {...props}
                           >
-                            {mermaidSource ? (
-                              <MermaidBoard
+                            {boardDocument ? (
+                              <BoardCanvas
                                 accessibleLabel={accessibleTitle}
-                                boardLayout={boardLayout}
-                                createdEdges={createdEdgesRef.current}
-                                createdNodes={createdNodesRef.current}
-                                edgePatches={edgePatchesRef.current}
+                                document={boardDocument}
                                 editable={editModeActive}
                                 editingNodeId={editor?.nodeId}
                                 onChange={handleDiagramNodeChange}
@@ -1288,12 +1322,11 @@ export function DiagramFrame({
                                 onSelectNode={handleSelectNode}
                                 onSelectEdge={handleSelectEdge}
                                 panActive={canvasPanActive}
-                                patches={nodePatchesRef.current}
-                                revision={diagramRevision}
                                 selectedEdgeId={selectedEdgeId}
                                 selectedNodeIds={selectedNodeIds}
-                                source={mermaidSource}
                               />
+                            ) : importSource ? (
+                              <BoardLoadState error={importError} />
                             ) : (
                               <div
                                 ref={mediaItemRef}
@@ -1558,7 +1591,7 @@ function rectanglesIntersect(
 }
 
 function resolveMediaTransform(
-  value: Partial<DiagramMediaTransform> | undefined,
+  value: Partial<BoardMediaTransform> | undefined,
   fallback: MediaTransform = {scale: 1, x: 0, y: 0},
 ): MediaTransform {
   const position = value?.position;
@@ -1574,12 +1607,27 @@ function resolveMediaTransform(
   };
 }
 
+function BoardLoadState({error}: {error: string}) {
+  return (
+    <div className="de-board de-board--status" role="status">
+      {error ? (
+        <>
+          <strong>暂时无法导入这张图表</strong>
+          <span>{error}</span>
+        </>
+      ) : (
+        <span>正在构建画板…</span>
+      )}
+    </div>
+  );
+}
+
 function createBoardElementId(prefix: 'edge' | 'node') {
   boardElementSequence += 1;
   return `de-${prefix}-${Date.now().toString(36)}-${boardElementSequence.toString(36)}`;
 }
 
-function ShapeGlyph({shape}: {shape: DiagramNodeShape}) {
+function ShapeGlyph({shape}: {shape: BoardNodeShape}) {
   return (
     <svg viewBox="0 0 30 24" aria-hidden="true">
       {shape === 'diamond' ? (

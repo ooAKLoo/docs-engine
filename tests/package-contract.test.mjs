@@ -133,134 +133,84 @@ test('publishes a native Docusaurus Mermaid Board theme', async () => {
     'utf8',
   );
   assert.match(docusaurusTheme, /getThemePath/);
-  assert.match(mermaidTheme, /DiagramFrame/);
-  assert.match(mermaidTheme, /mermaidSource/);
+  assert.match(mermaidTheme, /<Board/);
+  assert.match(mermaidTheme, /importSource=\{\{format: 'mermaid', source: value\}\}/);
   assert.match(mdxTheme, /docusaurusMdxComponents/);
   assert.doesNotMatch(mermaidTheme, /mermaid\.render/);
   assert.doesNotMatch(docusaurusAdapter, /mermaidThemeConfig/);
 });
 
-test('uses one editable Board renderer for every supported Mermaid diagram', async () => {
+test('uses BoardDocument as the only editable diagram model', async () => {
   const mermaidComponentFiles = (await readdir(
     new URL('../src/components/', import.meta.url),
   )).filter((file) => file.startsWith('Mermaid')).sort();
-  const diagramFrame = await readFile(
-    new URL('../src/components/DiagramFrame.tsx', import.meta.url),
+  const board = await readFile(
+    new URL('../src/components/Board.tsx', import.meta.url),
     'utf8',
   );
-  const mermaidBoard = await readFile(
-    new URL('../src/components/MermaidBoard.tsx', import.meta.url),
+  const boardCanvas = await readFile(
+    new URL('../src/components/BoardCanvas.tsx', import.meta.url),
     'utf8',
   );
-  const mermaidBoardParser = await readFile(
-    new URL('../src/components/MermaidBoardParser.ts', import.meta.url),
+  const boardModel = await readFile(
+    new URL('../src/components/BoardModel.ts', import.meta.url),
     'utf8',
   );
-  assert.match(diagramFrame, /createPortal/);
-  assert.match(diagramFrame, /aria-modal="true"/);
-  assert.match(diagramFrame, /event\.key === 'Escape'/);
-  assert.match(diagramFrame, /zoomable\?: boolean/);
-  assert.match(diagramFrame, /editable\?: boolean/);
-  assert.match(diagramFrame, /boardLayout\?: DiagramBoardLayout/);
-  assert.match(diagramFrame, /onDiagramChange/);
-  assert.match(diagramFrame, /onDiagramMediaChange/);
-  assert.match(diagramFrame, /mediaTransform\?: Partial<DiagramMediaTransform>/);
-  assert.match(diagramFrame, /onDiagramStructureChange/);
-  assert.match(diagramFrame, /LazyMotion/);
-  assert.match(diagramFrame, /addEventListener\('wheel', handleWheel, \{passive: false\}\)/);
-  assert.match(diagramFrame, /addEventListener\('wheel', handleInlineWheel, \{passive: false\}\)/);
-  assert.doesNotMatch(diagramFrame, /onWheel=\{handleWheel\}/);
-  assert.match(diagramFrame, /event\.button === 2/);
-  assert.match(diagramFrame, /type MarqueeSession/);
-  assert.match(diagramFrame, /rectanglesIntersect/);
-  assert.match(diagramFrame, /de-diagram-selection-marquee/);
-  assert.match(diagramFrame, /selectedNodeIds/);
-  assert.match(diagramFrame, /event\.key\.toLowerCase\(\) === 'h'/);
-  assert.match(diagramFrame, /mermaidSource\?: string/);
-  assert.match(diagramFrame, /openViewer\(canEdit \? 'edit' : 'view'\)/);
-  assert.match(diagramFrame, /打开画板/);
-  assert.match(diagramFrame, /<MermaidBoard/);
-  assert.doesNotMatch(diagramFrame, /MermaidDiagram/);
-  const mermaidBoardCalls = [...diagramFrame.matchAll(/<MermaidBoard[\s\S]*?\/>/g)]
-    .map((match) => match[0]);
-  assert.equal(mermaidBoardCalls.length, 2);
-  assert.match(mermaidBoardCalls[0], /fitPatchedBounds/);
-  assert.doesNotMatch(mermaidBoardCalls[1], /fitPatchedBounds/);
-  assert.deepEqual(mermaidComponentFiles, ['MermaidBoard.tsx', 'MermaidBoardParser.ts']);
-  assert.match(mermaidBoardParser, /parseMermaidBoard/);
+  const mermaidImporter = await readFile(
+    new URL('../src/components/MermaidImporter.ts', import.meta.url),
+    'utf8',
+  );
+  assert.deepEqual(mermaidComponentFiles, ['MermaidImporter.ts']);
+  assert.match(boardModel, /export type BoardDocument/);
+  assert.match(boardModel, /version: 1/);
+  assert.match(boardModel, /nodes: BoardNode\[\]/);
+  assert.match(boardModel, /edges: BoardEdge\[\]/);
+  assert.match(board, /document\?: BoardDocument/);
+  assert.match(board, /defaultDocument\?: BoardDocument/);
+  assert.match(board, /importSource\?: BoardImportSource/);
+  assert.match(board, /onDocumentChange\?: \(change: BoardDocumentChange\)/);
+  assert.doesNotMatch(board, /mermaidSource|onDiagramChange|onDiagramStructureChange/);
+  assert.match(board, /importMermaid\(importSource\.source/);
+  assert.match(board, /<BoardCanvas/);
+  assert.match(boardCanvas, /document: BoardDocument/);
+  assert.doesNotMatch(boardCanvas, /importMermaid|parseMermaid|source: string/);
+  assert.match(mermaidImporter, /Promise<BoardDocument>/);
   for (const parser of ['parseFlowchart', 'parseSequence', 'parseState', 'parseEntities', 'parseGantt', 'parseGitGraph', 'parseTimeline', 'parseMindmap', 'parsePie']) {
-    assert.match(mermaidBoardParser, new RegExp(`function ${parser}`));
+    assert.match(mermaidImporter, new RegExp(`function ${parser}`));
   }
-  assert.doesNotMatch(mermaidBoardParser, /renderSequence|renderState|renderGantt|<svg/u);
-  assert.doesNotMatch(mermaidBoardParser, /import\('mermaid'\)|getDiagramFromText/);
-  assert.match(mermaidBoard, /parseMermaidBoard/);
-  assert.match(mermaidBoard, /onPointerMove/);
-  assert.match(mermaidBoard, /onDoubleClick/);
-  assert.match(mermaidBoard, /routeEdge/);
-  assert.match(mermaidBoard, /orthogonalPath/);
-  assert.match(mermaidBoard, /sourceGap = 10/);
-  assert.match(mermaidBoard, /targetGap = 14/);
-  assert.match(mermaidBoard, /routeGraphEdges/);
-  assert.match(mermaidBoard, /placeDiagramEdgeLabels/);
-  assert.match(mermaidBoard, /labelMaximumTextWidth/);
-  assert.match(mermaidBoard, /assignDiagramEdgeLanes/);
-  assert.match(mermaidBoard, /calculateAdaptiveRankGaps/);
-  assert.match(mermaidBoard, /DIRECT_ROUTE_LABEL_RESERVE = 47/);
-  assert.match(mermaidBoard, /getRenderedDiagramBounds/);
-  assert.match(mermaidBoard, /getEmbeddedDiagramBounds/);
-  assert.match(mermaidBoard, /unionDiagramBounds/);
-  assert.match(mermaidBoard, /const renderedDisplayBounds = fitPatchedBounds/);
-  assert.match(mermaidBoard, /preserveAspectRatio="xMidYMid meet"/);
-  assert.match(mermaidBoard, /compactDiagramEdgeLabelMetrics/);
-  assert.match(mermaidBoard, /previous\?\.label === label && !sameTextLines\(previous\.lines, metrics\.lines\)/);
-  assert.match(mermaidBoard, /labelMode: placement\?\.mode/);
-  assert.match(mermaidBoard, /data-floating=\{floating \? 'true'/);
-  assert.match(mermaidBoard, /de-mermaid-board__edge-labels/);
-  assert.match(mermaidBoard, /de-mermaid-board__arrows/);
-  assert.match(mermaidBoard, /getBBox\(\)/);
-  assert.match(mermaidBoard, /pairedSourceGap = targetGap \+ 3/);
+  assert.doesNotMatch(mermaidImporter, /renderSequence|renderState|renderGantt|<svg/u);
+  assert.doesNotMatch(mermaidImporter, /import\('mermaid'\)|getDiagramFromText/);
+  assert.match(board, /createPortal/);
+  assert.match(board, /aria-modal="true"/);
+  assert.match(board, /type MarqueeSession/);
+  assert.match(boardCanvas, /onPointerMove/);
+  assert.match(boardCanvas, /onDoubleClick/);
+  assert.match(boardCanvas, /routeGraphEdges/);
+  assert.match(boardCanvas, /placeDiagramEdgeLabels/);
+  assert.match(boardCanvas, /getEmbeddedDiagramBounds/);
+  assert.match(boardCanvas, /preserveAspectRatio="xMidYMid meet"/);
   assert.ok(
-    mermaidBoard.indexOf('className="de-mermaid-board__edges"') <
-      mermaidBoard.indexOf('className="de-mermaid-board__arrows"'),
+    boardCanvas.indexOf('className="de-board__edges"') <
+      boardCanvas.indexOf('className="de-board__arrows"'),
     'all edge shafts must render before all arrowheads',
   );
   assert.ok(
-    mermaidBoard.indexOf('className="de-mermaid-board__arrows"') <
-      mermaidBoard.indexOf('className="de-mermaid-board__edge-labels"'),
+    boardCanvas.indexOf('className="de-board__arrows"') <
+      boardCanvas.indexOf('className="de-board__edge-labels"'),
     'all arrowheads must render before all opaque edge labels',
   );
-  assert.match(mermaidBoard, /appendBoardElements/);
-  assert.match(mermaidBoard, /findObstacleAvoidingRoute/);
-  assert.match(mermaidBoard, /directFacingRouteAvoidsNodes/);
-  assert.match(mermaidBoard, /portGroups/);
-  assert.match(mermaidBoard, /sourceOffset = 0/);
-  assert.match(mermaidBoard, /targetOffset = 0/);
-  assert.match(mermaidBoard, /arrowPoints/);
-  assert.match(mermaidBoard, / A \$\{format\(radius\)\}/);
-  assert.match(mermaidBoard, /snapNodePosition/);
-  assert.match(mermaidBoard, /positionsStart/);
-  assert.match(mermaidBoard, /selectedNodeIds/);
-  assert.match(mermaidBoard, /translateEdgeRoutePatch/);
-  assert.match(mermaidBoard, /beginConnection/);
-  assert.match(mermaidBoard, /onConnectionDrop/);
-  assert.match(mermaidBoard, /onEdgeRouteChange/);
-  assert.match(mermaidBoard, /getRouteSegmentHandles/);
-  assert.match(mermaidBoard, /moveRouteSegment/);
-  assert.match(mermaidBoard, /resolveNodeBadge/);
-  assert.match(mermaidBoard, /roundedDiamondPath/);
-  assert.match(mermaidBoard, /isFeedbackEdge/);
-  assert.match(mermaidBoard, /resolveInitialEdgePatches/);
-  assert.match(mermaidBoard, /isDirectFacingRoute/);
-  assert.match(mermaidBoard, /de-mermaid-board__port/);
-  assert.doesNotMatch(mermaidBoard, /cubicPoint/);
-  assert.doesNotMatch(mermaidBoard, /markerEnd/);
+  assert.match(boardCanvas, /findObstacleAvoidingRoute/);
+  assert.match(boardCanvas, /snapNodePosition/);
+  assert.match(boardCanvas, /beginConnection/);
+  assert.match(boardCanvas, /moveRouteSegment/);
+  assert.doesNotMatch(boardCanvas, /markerEnd/);
   assert.match(styles, /\.de-diagram-inline-toolbar/);
   assert.match(styles, /\.de-diagram-inline-stage/);
-  assert.match(styles, /\.de-mermaid-board__edge-label\[data-floating='true'\] rect/);
+  assert.match(styles, /\.de-board__edge-label\[data-floating='true'\] rect/);
   assert.doesNotMatch(styles, /\.de-native-mermaid|\.de-board-flowchart/);
   assert.match(styles, /\.de-diagram-media-item/);
   assert.match(styles, /\.de-diagram-media-scale-handle/);
-  assert.doesNotMatch(styles, /\.de-diagram-inline-canvas[^}]*\.de-mermaid-board[^}]*min-height/s);
+  assert.doesNotMatch(styles, /\.de-diagram-inline-canvas[^}]*\.de-board[^}]*min-height/s);
   assert.match(styles, /\.de-diagram-viewer-overlay/);
   assert.match(styles, /\.de-diagram-board-brand/);
   assert.match(styles, /\.de-diagram-board-zoom/);
@@ -268,21 +218,21 @@ test('uses one editable Board renderer for every supported Mermaid diagram', asy
   assert.match(styles, /\.de-diagram-node-editor/);
   assert.match(styles, /\.de-diagram-shape-picker/);
   assert.match(styles, /\.de-diagram-selection-marquee/);
-  assert.match(styles, /\.de-mermaid-board__port-dot/);
-  assert.match(styles, /\.de-mermaid-board__connection-preview/);
-  assert.match(styles, /\.de-mermaid-board__guides/);
-  assert.match(styles, /\.de-mermaid-board__edge-path/);
-  assert.match(styles, /\.de-mermaid-board__edge-handle/);
-  assert.match(styles, /\.de-mermaid-board__node-badge/);
-  assert.match(styles, /\.de-mermaid-board__edge\[data-feedback='true'\]/);
-  assert.match(styles, /\.de-mermaid-board__edge-label\[data-bare='true'\]/);
+  assert.match(styles, /\.de-board__port-dot/);
+  assert.match(styles, /\.de-board__connection-preview/);
+  assert.match(styles, /\.de-board__guides/);
+  assert.match(styles, /\.de-board__edge-path/);
+  assert.match(styles, /\.de-board__edge-handle/);
+  assert.match(styles, /\.de-board__node-badge/);
+  assert.match(styles, /\.de-board__edge\[data-feedback='true'\]/);
+  assert.match(styles, /\.de-board__edge-label\[data-bare='true'\]/);
   assert.match(styles, /overflow:\s*visible !important/);
   assert.match(styles, /touch-action:\s*none/);
-  assert.match(index, /DiagramStructureChange/);
-  assert.match(index, /DiagramMediaChange/);
-  assert.match(index, /DiagramMediaTransform/);
-  assert.match(index, /DiagramEdgeRoutePatch/);
-  assert.match(index, /DiagramBoardLayout/);
+  assert.match(index, /BoardDocument/);
+  assert.match(index, /BoardDocumentChange/);
+  assert.match(index, /BoardImportSource/);
+  assert.match(index, /importMermaid/);
+  assert.doesNotMatch(index, /DiagramFrame|DiagramBoardLayout/);
 });
 
 test('exports an interactive host-controlled timeline', async () => {
@@ -322,8 +272,12 @@ test('routes the Docusaurus Mermaid theme into the single Board renderer', async
     new URL('../src/docusaurus-theme/Mermaid/index.tsx', import.meta.url),
     'utf8',
   );
-  assert.match(docusaurusMermaid, /DiagramFrame/);
-  assert.match(docusaurusMermaid, /mermaidSource=\{value\}/);
+  assert.match(docusaurusMermaid, /<Board/);
+  assert.match(docusaurusMermaid, /aria-label="可编辑画板"/);
+  assert.match(docusaurusMermaid, /format: 'mermaid'/);
+  assert.match(docusaurusMermaid, /source: value/);
+  assert.doesNotMatch(docusaurusMermaid, /mermaidSource/);
+  assert.doesNotMatch(docusaurusMermaid, /Mermaid 图表/);
   assert.doesNotMatch(docusaurusMermaid, /mermaid\.render/);
   assert.doesNotMatch(styles, /docusaurus-mermaid-container/);
 });

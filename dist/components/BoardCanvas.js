@@ -1,20 +1,16 @@
 'use client';
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { assignDiagramEdgeLanes, calculateAdaptiveRankGaps, compactDiagramEdgeLabelMetrics, measureDiagramEdgeLabel, measureDiagramTextWidth, placeDiagramEdgeLabels, wrapDiagramText, } from './DiagramAutoLayout.js';
-import { parseMermaidBoard, } from './MermaidBoardParser.js';
+import { assignDiagramEdgeLanes, calculateAdaptiveRankGaps, compactDiagramEdgeLabelMetrics, measureDiagramEdgeLabel, measureDiagramTextWidth, placeDiagramEdgeLabels, wrapDiagramText, } from './BoardAutoLayout.js';
 const DIRECT_ROUTE_LABEL_RESERVE = 47;
 const PAIRED_ROUTE_LABEL_RESERVE = 108;
 const PAIRED_LANE_BASE_OFFSET = 32;
 const PAIRED_LANE_STEP = 30;
-const resolvedGraphs = new Map();
-export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], createdNodes = [], edgePatches = new Map(), editable, editingNodeId, fitPatchedBounds = false, onChange, onConnect, onConnectionDrop, onEdgeRouteChange, onEditRequest, onReady, onSelectNode, onSelectEdge, panActive, patches, revision, selectedEdgeId = null, selectedNodeIds = [], source, }) {
+export function BoardCanvas({ accessibleLabel, document: boardDocument, editable, editingNodeId, fitContent = false, onChange, onConnect, onConnectionDrop, onEdgeRouteChange, onEditRequest, onReady, onSelectNode, onSelectEdge, panActive, selectedEdgeId = null, selectedNodeIds = [], }) {
     const svgRef = useRef(null);
     const dragRef = useRef(null);
     const connectionDraftRef = useRef(null);
     const edgeRouteDragRef = useRef(null);
-    const [parsedGraph, setParsedGraph] = useState(() => resolvedGraphs.get(source) ?? null);
-    const [parseError, setParseError] = useState('');
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [activePortNodeId, setActivePortNodeId] = useState(null);
     const [activePositions, setActivePositions] = useState(null);
@@ -44,36 +40,8 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
             return next;
         });
     }, []);
-    useEffect(() => {
-        let cancelled = false;
-        setMeasuredEdgeLabels(new Map());
-        setParseError('');
-        const cached = resolvedGraphs.get(source);
-        if (cached) {
-            setParsedGraph(cached);
-            return;
-        }
-        setParsedGraph(null);
-        void parseMermaidBoard(source)
-            .then((graph) => {
-            if (!cancelled)
-                setParsedGraph(graph);
-        })
-            .catch((error) => {
-            if (!cancelled) {
-                setParseError(error instanceof Error ? error.message : 'Mermaid 图表解析失败');
-            }
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [source]);
     const layout = useMemo(() => {
-        if (!parsedGraph)
-            return null;
-        // Keep Mermaid's initial rank layout immutable. Board-created nodes and edges are
-        // placed on top of it, otherwise every new relationship would re-rank existing nodes.
-        const graph = ensureLayoutNodePositions(appendBoardElements(layoutDiagramGraph(parsedGraph, patches, boardLayout, measuredEdgeLabels), createdNodes, createdEdges, patches));
+        const graph = ensureLayoutNodePositions(layoutDiagramGraph(boardDocument, new Map(), documentLayout(boardDocument), measuredEdgeLabels));
         if (!activePositions || !dragRef.current)
             return graph;
         return {
@@ -83,30 +51,30 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
                 return position ? { ...node, position } : node;
             }),
         };
-    }, [activePositions, boardLayout, createdEdges, createdNodes, measuredEdgeLabels, parsedGraph, patches, revision]);
+    }, [activePositions, boardDocument, measuredEdgeLabels]);
+    const boardLayout = documentLayout(boardDocument);
     const displayBounds = useMemo(() => {
         if (!layout)
             return { height: 120, left: 0, top: 0, width: 320 };
         // A designed Board scene owns its intentional whitespace in the viewer.
-        // The inline preview applies a content fit later through fitPatchedBounds.
-        if (boardLayout && createdNodes.length === 0) {
+        // The inline preview applies a content fit later through fitContent.
+        if (boardLayout?.width && boardLayout.height) {
             return { height: boardLayout.height, left: 0, top: 0, width: boardLayout.width };
         }
-        if (!fitPatchedBounds && createdNodes.length === 0) {
+        if (!fitContent) {
             return { height: layout.height, left: 0, top: 0, width: layout.width };
         }
         return getLayoutBounds(layout.nodes, 42);
-    }, [boardLayout, createdNodes.length, fitPatchedBounds, layout]);
+    }, [boardLayout, fitContent, layout]);
     useEffect(() => {
-        if (parsedGraph)
-            onReady?.();
-    }, [onReady, parsedGraph]);
+        onReady?.();
+    }, [boardDocument, onReady]);
     const requestEdit = (node, element) => {
         if (!editable || panActive)
             return;
         onSelectNode?.(node.id);
         const matrix = element.ownerSVGElement?.getScreenCTM();
-        const shape = element.querySelector('.de-mermaid-board__node-shape');
+        const shape = element.querySelector('.de-board__node-shape');
         onEditRequest?.({
             fontSize: 14 * (matrix ? Math.hypot(matrix.a, matrix.b) : 1),
             nodeId: node.id,
@@ -206,7 +174,7 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
             layout.edges.forEach((edge) => {
                 if (!selectedIds.has(edge.sourceId) || !selectedIds.has(edge.targetId))
                     return;
-                const patch = edgePatches.get(edge.id) ?? initialPatches.get(edge.id);
+                const patch = initialPatches.get(edge.id);
                 if (!patch)
                     return;
                 routeChanges.push({ edgeId: edge.id, route: translateEdgeRoutePatch(patch, dragDelta) });
@@ -384,15 +352,8 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
         edgeRouteDragRef.current = null;
         setActiveEdgeRoute(null);
     };
-    if (parseError) {
-        return (_jsxs("div", { className: "de-mermaid-board de-mermaid-board--error", role: "img", "aria-label": accessibleLabel, children: [_jsx("strong", { children: "\u6682\u65F6\u65E0\u6CD5\u6E32\u67D3\u8FD9\u5F20\u56FE\u8868" }), _jsx("span", { children: parseError })] }));
-    }
-    if (!layout) {
-        return (_jsx("div", { className: "de-mermaid-board de-mermaid-board--loading", role: "img", "aria-label": accessibleLabel, children: _jsx("span", { children: "\u6B63\u5728\u6784\u5EFA\u753B\u677F\u2026" }) }));
-    }
     const nodesById = new Map(layout.nodes.map((node) => [node.id, node]));
     const routePatches = new Map(resolveInitialEdgePatches(layout.edges, boardLayout));
-    edgePatches.forEach((patch, edgeId) => routePatches.set(edgeId, patch));
     const activeDrag = dragRef.current;
     if (activeDrag) {
         const primaryStart = activeDrag.positionsStart.get(activeDrag.nodeId);
@@ -412,15 +373,11 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
     if (activeEdgeRoute)
         routePatches.set(activeEdgeRoute.edgeId, activeEdgeRoute.route);
     const routedEdges = routeGraphEdges(layout.nodes, layout.edges, routePatches, measuredEdgeLabels);
-    const editedContentBounds = createdNodes.length > 0
-        ? getRenderedDiagramBounds(layout.nodes, routedEdges, 42)
-        : undefined;
-    const renderedDisplayBounds = fitPatchedBounds
+    const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42);
+    const renderedDisplayBounds = fitContent
         ? getEmbeddedDiagramBounds(layout.nodes, routedEdges)
-        : editedContentBounds
-            ? boardLayout
-                ? unionDiagramBounds({ height: boardLayout.height, left: 0, top: 0, width: boardLayout.width }, editedContentBounds)
-                : editedContentBounds
+        : boardLayout?.width && boardLayout.height
+            ? unionDiagramBounds({ height: boardLayout.height, left: 0, top: 0, width: boardLayout.width }, editedContentBounds)
             : displayBounds;
     const draftSource = connectionDraft ? nodesById.get(connectionDraft.sourceId) : undefined;
     const draftTarget = connectionDraft?.targetId
@@ -430,22 +387,22 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
         ? routeDraftConnection(draftSource, draftTarget, connectionDraft, layout.nodes)
         : null;
     const guideBounds = getLayoutBounds(layout.nodes, 34);
-    return (_jsx("div", { className: "de-mermaid-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-mermaid-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [_jsxs("g", { className: "de-mermaid-board__edges", children: [routedEdges.map(({ edge, route }) => {
+    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [_jsxs("g", { className: "de-board__edges", children: [routedEdges.map(({ edge, route }) => {
                             const sourceNode = nodesById.get(edge.sourceId);
                             const targetNode = nodesById.get(edge.targetId);
                             if (!sourceNode || !targetNode || edge.stroke === 'invisible')
                                 return null;
                             const edgeSelected = selectedEdgeId === edge.id;
                             const showEdgeHandles = editable && !panActive && (edgeSelected || hoveredEdgeId === edge.id);
-                            return (_jsxs("g", { className: "de-mermaid-board__edge", "data-de-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-selected": edgeSelected ? 'true' : undefined, onPointerDown: (event) => selectEdge(event, edge.id), onPointerEnter: () => {
+                            return (_jsxs("g", { className: "de-board__edge", "data-de-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-selected": edgeSelected ? 'true' : undefined, onPointerDown: (event) => selectEdge(event, edge.id), onPointerEnter: () => {
                                     if (editable && !panActive)
                                         setHoveredEdgeId(edge.id);
                                 }, onPointerLeave: () => {
                                     if (!edgeRouteDragRef.current) {
                                         setHoveredEdgeId((current) => (current === edge.id ? null : current));
                                     }
-                                }, children: [_jsx("path", { d: route.path, className: "de-mermaid-board__edge-hit" }), _jsx("path", { d: route.path, className: "de-mermaid-board__edge-path", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-source-id": edge.sourceId, "data-target-id": edge.targetId, "data-stroke": edge.stroke, "data-source-side": route.sourceSide, "data-target-side": route.targetSide }), showEdgeHandles ? (_jsx("g", { className: "de-mermaid-board__edge-handles", "aria-hidden": "true", children: getRouteSegmentHandles(route.points).map((handle) => (_jsxs("g", { className: "de-mermaid-board__edge-handle", "data-orientation": handle.orientation, transform: `translate(${format(handle.x)} ${format(handle.y)})`, onPointerDown: (event) => beginEdgeRouteDrag(event, edge.id, handle, route.points), onPointerMove: moveEdgeRouteDrag, onPointerUp: finishEdgeRouteDrag, onPointerCancel: cancelEdgeRouteDrag, children: [_jsx("circle", { className: "de-mermaid-board__edge-handle-hit", r: "12" }), _jsx("circle", { className: "de-mermaid-board__edge-handle-dot", r: "4.5" })] }, `${edge.id}-${handle.segmentIndex}`))) })) : null] }, edge.id));
-                        }), draftRoute ? (_jsx("g", { className: "de-mermaid-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-mermaid-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-mermaid-board__arrows", children: [routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-mermaid-board__arrow", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-mermaid-board__connection-preview", children: _jsx("polygon", { className: "de-mermaid-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-mermaid-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-mermaid-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-mermaid-board__nodes", children: layout.nodes.map((node) => {
+                                }, children: [_jsx("path", { d: route.path, className: "de-board__edge-hit" }), _jsx("path", { d: route.path, className: "de-board__edge-path", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-source-id": edge.sourceId, "data-target-id": edge.targetId, "data-stroke": edge.stroke, "data-source-side": route.sourceSide, "data-target-side": route.targetSide }), showEdgeHandles ? (_jsx("g", { className: "de-board__edge-handles", "aria-hidden": "true", children: getRouteSegmentHandles(route.points).map((handle) => (_jsxs("g", { className: "de-board__edge-handle", "data-orientation": handle.orientation, transform: `translate(${format(handle.x)} ${format(handle.y)})`, onPointerDown: (event) => beginEdgeRouteDrag(event, edge.id, handle, route.points), onPointerMove: moveEdgeRouteDrag, onPointerUp: finishEdgeRouteDrag, onPointerCancel: cancelEdgeRouteDrag, children: [_jsx("circle", { className: "de-board__edge-handle-hit", r: "12" }), _jsx("circle", { className: "de-board__edge-handle-dot", r: "4.5" })] }, `${edge.id}-${handle.segmentIndex}`))) })) : null] }, edge.id));
+                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
                         const selected = selectedNodeIds.includes(node.id);
                         const editing = editingNodeId === node.id;
                         const badge = resolveNodeBadge(node.classes);
@@ -458,7 +415,7 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
                                 hoveredNodeId === node.id ||
                                 activePortNodeId === node.id ||
                                 connectionDraft?.targetId === node.id);
-                        return (_jsxs("g", { className: "de-mermaid-board__node", "data-de-node-id": node.id, "data-selected": selected ? 'true' : undefined, "data-editing": editing ? 'true' : undefined, "data-connect-target": connectionDraft?.targetId === node.id ? 'true' : undefined, "data-badge": badge ?? undefined, "data-detail": detailLabel ? 'true' : undefined, "data-placeholder": node.placeholder ? 'true' : undefined, "data-tone": node.tone, transform: `translate(${format(node.position.x)} ${format(node.position.y)})`, role: editable ? 'button' : undefined, tabIndex: editable ? 0 : undefined, "aria-label": editable ? `图表节点：${node.label}。拖动可移动，双击可编辑。` : undefined, onPointerEnter: () => {
+                        return (_jsxs("g", { className: "de-board__node", "data-de-node-id": node.id, "data-selected": selected ? 'true' : undefined, "data-editing": editing ? 'true' : undefined, "data-connect-target": connectionDraft?.targetId === node.id ? 'true' : undefined, "data-badge": badge ?? undefined, "data-detail": detailLabel ? 'true' : undefined, "data-placeholder": node.placeholder ? 'true' : undefined, "data-tone": node.tone, transform: `translate(${format(node.position.x)} ${format(node.position.y)})`, role: editable ? 'button' : undefined, tabIndex: editable ? 0 : undefined, "aria-label": editable ? `图表节点：${node.label}。拖动可移动，双击可编辑。` : undefined, onPointerEnter: () => {
                                 if (editable && !panActive)
                                     setHoveredNodeId(node.id);
                             }, onPointerLeave: (event) => {
@@ -509,9 +466,9 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
                                         reason: 'position',
                                     });
                                 });
-                            }, children: [_jsx(NodeShape, { node: node }), _jsx("text", { className: "de-mermaid-board__node-label", textAnchor: "middle", transform: badge ? 'translate(0 8)' : undefined, children: node.textLines.map((line, index, lines) => (_jsx("tspan", { x: "0", dy: index === 0 ? `${-(lines.length - 1) * 0.58}em` : '1.16em', children: line || ' ' }, `${node.id}-${index}`))) }), badge ? (_jsxs("g", { className: "de-mermaid-board__node-badge", "aria-hidden": "true", children: [_jsx("rect", { x: -badgeWidth / 2, y: -node.height / 2 + 29, width: badgeWidth, height: 28, rx: 8 }), _jsx("text", { x: 0, y: -node.height / 2 + 43, textAnchor: "middle", children: badge })] })) : null, showPorts ? (_jsx("g", { className: "de-mermaid-board__ports", "aria-hidden": "true", children: ['top', 'right', 'bottom', 'left'].map((side) => {
+                            }, children: [_jsx(NodeShape, { node: node }), _jsx("text", { className: "de-board__node-label", textAnchor: "middle", transform: badge ? 'translate(0 8)' : undefined, children: node.textLines.map((line, index, lines) => (_jsx("tspan", { x: "0", dy: index === 0 ? `${-(lines.length - 1) * 0.58}em` : '1.16em', children: line || ' ' }, `${node.id}-${index}`))) }), badge ? (_jsxs("g", { className: "de-board__node-badge", "aria-hidden": "true", children: [_jsx("rect", { x: -badgeWidth / 2, y: -node.height / 2 + 29, width: badgeWidth, height: 28, rx: 8 }), _jsx("text", { x: 0, y: -node.height / 2 + 43, textAnchor: "middle", children: badge })] })) : null, showPorts ? (_jsx("g", { className: "de-board__ports", "aria-hidden": "true", children: ['top', 'right', 'bottom', 'left'].map((side) => {
                                         const point = anchorPoint(node, side, 0, 16);
-                                        return (_jsxs("g", { className: "de-mermaid-board__port", "data-side": side, transform: `translate(${format(point.x - node.position.x)} ${format(point.y - node.position.y)})`, onPointerEnter: () => {
+                                        return (_jsxs("g", { className: "de-board__port", "data-side": side, transform: `translate(${format(point.x - node.position.x)} ${format(point.y - node.position.y)})`, onPointerEnter: () => {
                                                 setHoveredNodeId(node.id);
                                                 setActivePortNodeId(node.id);
                                             }, onPointerLeave: (event) => {
@@ -525,7 +482,7 @@ export function MermaidBoard({ accessibleLabel, boardLayout, createdEdges = [], 
                                             }, onPointerDown: (event) => {
                                                 setActivePortNodeId(node.id);
                                                 beginConnection(event, node, side);
-                                            }, onPointerMove: moveConnection, onPointerUp: finishConnection, onPointerCancel: cancelConnection, children: [_jsx("circle", { className: "de-mermaid-board__port-hit", r: "13" }), _jsx("circle", { className: "de-mermaid-board__port-dot", r: "5" })] }, side));
+                                            }, onPointerMove: moveConnection, onPointerUp: finishConnection, onPointerCancel: cancelConnection, children: [_jsx("circle", { className: "de-board__port-hit", r: "13" }), _jsx("circle", { className: "de-board__port-dot", r: "5" })] }, side));
                                     }) })) : null] }, node.id));
                     }) })] }) }));
 }
@@ -593,18 +550,44 @@ function BoardEdgeLabel({ edge, onMeasure, route, }) {
             fonts?.removeEventListener('loadingdone', handleFontsLoaded);
         };
     }, [edge.id, edge.label, labelAlign, linesKey, measurementKey, naturalPaddingX, naturalPaddingY, onMeasure]);
-    return (_jsxs("g", { className: "de-mermaid-board__edge-label", "data-bare": edge.bareLabel ? 'true' : undefined, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-floating": floating ? 'true' : undefined, transform: `translate(${format(route.label.x)} ${format(route.label.y)})`, children: [_jsx("rect", { x: labelBoxX, y: labelBoxY, width: labelBoxWidth, height: labelBoxHeight, rx: floating ? 3 : edge.bareLabel ? 7 : 8 }), _jsx("text", { ref: textRef, textAnchor: labelAlign, dominantBaseline: "central", children: metrics.lines.map((line, index, lines) => (_jsx("tspan", { x: "0", dy: index === 0 ? `${-(lines.length - 1) * 0.67}em` : '1.34em', children: line || ' ' }, `${edge.id}-label-${index}`))) })] }));
+    return (_jsxs("g", { className: "de-board__edge-label", "data-bare": edge.bareLabel ? 'true' : undefined, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-floating": floating ? 'true' : undefined, transform: `translate(${format(route.label.x)} ${format(route.label.y)})`, children: [_jsx("rect", { x: labelBoxX, y: labelBoxY, width: labelBoxWidth, height: labelBoxHeight, rx: floating ? 3 : edge.bareLabel ? 7 : 8 }), _jsx("text", { ref: textRef, textAnchor: labelAlign, dominantBaseline: "central", children: metrics.lines.map((line, index, lines) => (_jsx("tspan", { x: "0", dy: index === 0 ? `${-(lines.length - 1) * 0.67}em` : '1.34em', children: line || ' ' }, `${edge.id}-label-${index}`))) })] }));
 }
 function NodeShape({ node }) {
     const halfWidth = node.width / 2;
     const halfHeight = node.height / 2;
     if (node.shape === 'diamond') {
-        return (_jsx("path", { className: "de-mermaid-board__node-shape", d: roundedDiamondPath(halfWidth, halfHeight) }));
+        return (_jsx("path", { className: "de-board__node-shape", d: roundedDiamondPath(halfWidth, halfHeight) }));
     }
     if (node.shape === 'circle') {
-        return (_jsx("ellipse", { className: "de-mermaid-board__node-shape", cx: "0", cy: "0", rx: halfWidth, ry: halfHeight }));
+        return (_jsx("ellipse", { className: "de-board__node-shape", cx: "0", cy: "0", rx: halfWidth, ry: halfHeight }));
     }
-    return (_jsx("rect", { className: "de-mermaid-board__node-shape", x: -halfWidth, y: -halfHeight, width: node.width, height: node.height, rx: node.shape === 'stadium' ? halfHeight : node.shape === 'round' || hasBoardClass(node.classes, 'deBoardDetail') ? 18 : 12, ry: node.shape === 'stadium' ? halfHeight : node.shape === 'round' || hasBoardClass(node.classes, 'deBoardDetail') ? 18 : 12 }));
+    return (_jsx("rect", { className: "de-board__node-shape", x: -halfWidth, y: -halfHeight, width: node.width, height: node.height, rx: node.shape === 'stadium' ? halfHeight : node.shape === 'round' || hasBoardClass(node.classes, 'deBoardDetail') ? 18 : 12, ry: node.shape === 'stadium' ? halfHeight : node.shape === 'round' || hasBoardClass(node.classes, 'deBoardDetail') ? 18 : 12 }));
+}
+function documentLayout(document) {
+    const nodes = Object.fromEntries(document.nodes.flatMap((node) => node.position
+        ? [[node.id, { height: node.height, position: node.position, width: node.width }]]
+        : []));
+    const edges = document.edges.flatMap((edge) => edge.points?.length || edge.labelPosition || edge.sourceSide || edge.targetSide
+        ? [{
+                bareLabel: edge.bareLabel,
+                label: edge.label,
+                labelAlign: edge.labelAlign,
+                labelPosition: edge.labelPosition,
+                points: edge.points,
+                sourceId: edge.sourceId,
+                sourceSide: edge.sourceSide,
+                targetId: edge.targetId,
+                targetSide: edge.targetSide,
+            }]
+        : []);
+    if (!document.canvas && Object.keys(nodes).length === 0 && edges.length === 0)
+        return undefined;
+    return {
+        edges,
+        height: document.canvas?.height,
+        nodes,
+        width: document.canvas?.width,
+    };
 }
 function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = new Map()) {
     const measuredNodes = graph.nodes.map((node) => {
@@ -627,7 +610,7 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
     // Dotted return edges are visual feedback loops. They must not turn an
     // otherwise forward flow into a cyclic rank graph and reshuffle the cards.
     const edges = applyBoardEdgeLayout(graph.edges, boardLayout);
-    const ranks = assignRanks(measuredNodes, edges.filter((edge) => !isFeedbackEdge(edge)));
+    const ranks = assignRanks(measuredNodes, edges.filter((edge) => !edge.manual && !isFeedbackEdge(edge)));
     const groups = new Map();
     measuredNodes.forEach((node) => {
         const rank = ranks.get(node.id) ?? 0;
@@ -750,47 +733,6 @@ function findBoardEdgeLayout(edge, boardLayout) {
     return boardLayout.edges?.find((layout) => layout.sourceId === edge.sourceId &&
         layout.targetId === edge.targetId &&
         (layout.label === undefined || layout.label === edge.label));
-}
-function appendBoardElements(base, createdNodes, createdEdges, patches) {
-    const knownNodeIds = new Set(base.nodes.map((node) => node.id));
-    const nodes = [
-        ...base.nodes,
-        ...createdNodes
-            .filter((node) => !knownNodeIds.has(node.id))
-            .map((node) => {
-            const patch = patches.get(node.id);
-            const label = patch?.label ?? node.label;
-            return {
-                classes: [],
-                id: node.id,
-                label,
-                placeholder: node.placeholder && patch?.label === undefined,
-                position: patch?.position ?? node.position,
-                shape: node.shape,
-                tone: node.tone,
-                ...measureNode(label, node.shape),
-            };
-        }),
-    ];
-    const bounds = getLayoutBounds(nodes, 42);
-    return {
-        edges: [
-            ...base.edges,
-            ...createdEdges.map((edge) => ({
-                arrow: true,
-                id: edge.id,
-                label: '',
-                sourceId: edge.sourceId,
-                sourceSide: edge.sourceSide,
-                stroke: 'normal',
-                targetId: edge.targetId,
-                targetSide: edge.targetSide,
-            })),
-        ],
-        height: Math.max(base.height, bounds.height + Math.max(0, -bounds.top)),
-        nodes,
-        width: Math.max(base.width, bounds.width + Math.max(0, -bounds.left)),
-    };
 }
 function ensureLayoutNodePositions(graph) {
     let repairedNodes = 0;
@@ -1816,4 +1758,4 @@ function format(value) {
     const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
     return Number(safeValue.toFixed(2));
 }
-//# sourceMappingURL=MermaidBoard.js.map
+//# sourceMappingURL=BoardCanvas.js.map

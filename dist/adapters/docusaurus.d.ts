@@ -1,7 +1,7 @@
 import { Annotation } from '../components/Annotation.js';
 import { Callout } from '../components/Callout.js';
 import { CodeBlock } from '../components/CodeBlock.js';
-import { DiagramFrame } from '../components/DiagramFrame.js';
+import { Board } from '../components/Board.js';
 import { Formula } from '../components/Formula.js';
 import { Priority } from '../components/Priority.js';
 import { ResourceLink } from '../components/ResourceLink.js';
@@ -16,7 +16,7 @@ export declare const docusaurusMdxComponents: {
     Annotation: typeof Annotation;
     Callout: typeof Callout;
     CodeBlock: typeof CodeBlock;
-    DiagramFrame: typeof DiagramFrame;
+    Board: typeof Board;
     Formula: typeof Formula;
     Priority: typeof Priority;
     ResourceLink: typeof ResourceLink;

@@ -19,7 +19,7 @@ pnpm showcase
 - `styles/tokens.css`：颜色、排版与组件 token。
 - `styles/content.css`：Annotation、Callout、Table、SummaryPanel、Status、Priority、RiskGrid、转换比较与图表容器。
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
-- `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock 与统一 Mermaid Board）。
+- `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board 与导入器）。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
 - React 作为 peer dependency，同时兼容 React 18 与 React 19。
 
@@ -52,13 +52,15 @@ pnpm showcase
 
 ## 宿主边界
 
-- Lula 保留 Docusaurus、目录与内容构建脚本；Docs Engine 拥有 Mermaid 和 MDX 组件映射。
+- Lula 保留 Docusaurus、目录与内容构建脚本；Docs Engine 拥有 Board、Mermaid 导入和 MDX 组件映射。
 - oVita 保留 Next.js、Markdown 文件读取、业务 DocBlock、状态编辑和写回 API。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
-### Mermaid 统一 Board 渲染
+### Board-first 图表架构
 
-Docs Engine 不调用 `mermaid.render()`，也不修补 Mermaid 生成的旧 SVG。`flowchart`、`sequenceDiagram`、`stateDiagram-v2`、`classDiagram`、`erDiagram`、`gantt`、`gitGraph`、`timeline`、`mindmap` 与 `pie` 全部先由包内解析器转换成同一种 Board 节点/连线模型，再交给唯一的 `MermaidBoard` 渲染和编辑。不存在按图表类型分流的第二套 SVG 渲染器；Board 使用 SVG 画布只是单一渲染器的内部实现。
+`BoardDocument` 是渲染、编辑和持久化唯一认可的图表模型，完整包含节点、连线、锚点、路线、位置与画布尺寸。`BoardCanvas` 只读取 `BoardDocument`，不读取 Mermaid 文本，也不存在第二套按语法类型分流的 SVG 渲染器。
+
+Mermaid 只是便于作者和 Agent 输入的导入格式。`importMermaid()` 把 `flowchart`、`sequenceDiagram`、`stateDiagram-v2`、`classDiagram`、`erDiagram`、`gantt`、`gitGraph`、`timeline`、`mindmap` 与 `pie` 一次性转换成 `BoardDocument`；转换完成后，渲染和编辑链路不再依赖原始文本。Docs Engine 不安装 Mermaid 包、不调用 `mermaid.render()`，也不修补第三方 SVG。
 
 对于 Docusaurus，包内主题同时接管 Markdown 的 `mermaid` fence 与 MDX 组件映射。首次接入只需在框架配置中注册该主题；这是 Docusaurus 的加载边界，包无法被 npm 自动发现。此后升级 Docs Engine 不再需要依赖方修改渲染器、MDX 映射或文档内容：
 
@@ -68,51 +70,32 @@ themes: ['@ooakloo/docs-engine/adapters/docusaurus-theme'],
 
 迁移后应移除 `@docusaurus/theme-mermaid`、旧的 `themeConfig.mermaid` 和任何宿主自建 `mermaid.render()` 包装器，确保运行时只有 Docs Engine 一个渲染器。
 
-### 画板式图表查看与编辑
+### 画板查看、编辑与持久化
 
-`DiagramFrame` 默认提供接近飞书画板的正文与全屏交互。正文预览会按节点、完整路线、箭头和标签的实际渲染边界执行内容级取景，并补充自适应安全留白；全屏则保留设计稿 `boardLayout` 的作者画布与有意留白。正文以浅灰点阵作为画布背景，不显示额外外边框；鼠标停在正文画布内时，滚轮直接平移，`⌘ / Ctrl + 滚轮` 以指针位置为中心缩放；单击才进入无边画板。普通 SVG、PNG 与 Mermaid 共用全屏缩放能力，并支持 `Space + 左键`、右键拖动或 `H` 手型模式平移画布，以及滚轮平移、全览、恢复 100%、`Esc` 退出和键盘焦点约束。全屏点阵背景通过 `grid` 显式开启，默认与飞书画板一样保持纯色画布。
+`Board` 默认提供接近飞书画板的正文与全屏交互。正文预览按节点、完整路线、箭头和标签的实际渲染边界执行内容级取景；全屏保留文档中的作者画布与有意留白。正文内可滚轮平移，`⌘ / Ctrl + 滚轮` 以指针为中心缩放；全屏支持 `Space + 左键`、右键拖动或手型工具平移、全览、恢复 100%、`Esc` 退出和键盘焦点约束。
 
-同时传入 `mermaidSource` 与 `editable` 后支持拖动节点、`Shift` 约束移动方向、自动对齐参考线、方向键微调、双击原地编辑文字，以及点击空白处取消选中。选择工具下可从空白处拖出选区，框中多个节点后拖动任一已选节点即可整组移动；按住 `Shift`、`⌘` 或 `Ctrl` 框选或点击节点可追加选择。文字编辑层与原节点的形状、填充色、尺寸、字号和对齐方式重合，不会切换成另一种输入框样式。
+传入 `document`、`defaultDocument` 或 `importSource` 后默认启用编辑。节点支持拖动、对齐、框选、成组移动和双击原地编辑；连接点支持建立关系和创建新图形；连线控制点支持调整圆角正交路径。只有显式设置 `editable={false}` 才进入只读画板。
 
 节点 hover 或选中时会显示上、右、下、左四个浅蓝连接点。从连接点拖动可实时拉出圆角正交箭头：松到已有节点会自动吸附并建立连线；松到空白处会在终点显示图形选择器，选择矩形、圆角矩形、全圆角矩形、圆形或菱形后创建新节点并保持连接。新增关系不会再参与 Mermaid 的 rank 排版，因此既有节点坐标保持不动；同一节点同一锚点的连线共享同一个起点，不会为了避让而沿节点边界上下分散。选中或 hover 连线会显示两个可拖动的中段控制点，用来直接改变正交路线。箭头和线身按独立几何裁切，入线与出线不会因为共用中心锚点而在箭头尖端露出残线。
 
-未传入 `boardLayout` 时，统一 Board 会在首次排版中测量节点与边标签的真实占位，并把端点留白、折线 stub、箭头长度与双向轨道共同计入 rank 间距。路由完成后，标签只会绑定到沿线方向足以承载自身的线段；较短但仍可承载的区域会触发完整文本换行，而不是截断语义。若设计稿或人工路线短到无法同时容纳胶囊和箭头，Board 会改用紧邻连线的 compact 浮签，并把所有箭头几何作为硬避让区，不会用白底盖住箭头。节点、标签和已占用标签矩形共同参与候选评分，同一对节点的往返连线会分配到不同轨道。所有线身和箭头先绘制，所有标签及其不透明底色随后统一绘制，因此后出现的连线也不会盖住先出现的文字。
+首次自动排版会测量节点和边标签真实占位，并把端点留白、折线、箭头和双向轨道共同计入层级间距。标签只会绑定到足以承载自身的线段；必要时完整换行或改用紧邻连线的浮签。节点、标签、箭头和既有标签共同参与碰撞评分，线身与箭头先绘制，标签背景最后绘制，避免文字、线段和箭头互相覆盖。
 
-对于由设计师精确编排过的图，可继续用 Mermaid 作为语义来源，同时传入 `boardLayout` 固定节点坐标、尺寸、锚点、标签位置和回流路径；自动避碰把显式位置视为不可移动约束，不会替用户重新摆放。打开画板后仍可拖动、原地编辑和继续调整连线。
-
-组件在当前会话内保留编辑结果。宿主通过 `onDiagramChange` 持久化文字和位置，通过 `onDiagramStructureChange` 持久化新建节点与连线；不传 `mermaidSource` 的 SVG/PNG 也可设置 `editable`，在全屏画板中选中、移动、缩放，并通过 `onDiagramMediaChange` 持久化对象变换：
+非受控用法由组件在会话内保存下一份 `BoardDocument`；受控用法通过唯一的 `onDocumentChange` 接收完整文档并持久化。无需再分别拼接“节点补丁”“新建连线”和“路线补丁”：
 
 ```tsx
-<DiagramFrame
-  editable
-  mermaidSource={source}
-  boardLayout={{
-    width: 1280,
-    height: 470,
-    nodes: {decision: {position: {x: 520, y: 166}, width: 204, height: 140}},
-    edges: [{
-      sourceId: 'retry', targetId: 'test', sourceSide: 'bottom', targetSide: 'bottom',
-      points: [{x: 520, y: 380}, {x: 520, y: 424}, {x: 320, y: 424}, {x: 320, y: 225}],
-    }],
-  }}
+<Board
+  document={document}
   aria-label="用户旅程图"
-  onDiagramChange={(change) => saveDiagramNodeChange(change)}
-  onDiagramStructureChange={(change) => saveDiagramStructureChange(change)}
+  onDocumentChange={({document: next}) => saveBoardDocument(next)}
 />
 
-<DiagramFrame
-  editable
-  aria-label="市场验证路径图"
-  mediaTransform={marketDiagramTransform}
-  onDiagramMediaChange={(change) => saveDiagramMediaChange(change)}
->
-  <img src="/market-validation-path.svg" alt="市场验证路径图" />
-</DiagramFrame>
+<Board
+  importSource={{format: 'mermaid', source}}
+  aria-label="从 Mermaid 导入的可编辑画板"
+/>
 ```
 
-`onDiagramChange` 会返回 `nodeId`、最新 `label`、画布坐标 `position` 和变更原因 `label | position`；`onDiagramStructureChange` 会返回新节点、连线及其固定锚点方向，或 `update-edge-route` 的 `edgeId` 与正交路径点；`onDiagramMediaChange` 会返回普通图形的 `position`、`scale` 与变更原因 `position | scale`。把返回的 `position` 与 `scale` 传回 `mediaTransform`，即可由宿主在刷新后恢复图形位置。不需要编辑的 Mermaid 或媒体只需不传 `editable`，仍保留正文和全屏的缩放与平移能力。
-
-已有独立交互的图表可以显式设置 `zoomable={false}`。
+设计师精确编排的 Mermaid 可把 `layout` 放进 `importSource`，导入器会把坐标、尺寸、锚点和路线直接合并进新文档。之后这些几何信息与 Mermaid 无关，仍可由同一个 Board 继续编辑。已有独立交互的内容可显式设置 `zoomable={false}`。
 
 ### 交互式项目时间轴
 

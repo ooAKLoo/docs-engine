@@ -7,7 +7,7 @@ declare const _default: {
     Annotation: typeof import("../../index.js").Annotation;
     Callout: typeof import("../../index.js").Callout;
     CodeBlock: typeof import("../../index.js").CodeBlock;
-    DiagramFrame: typeof import("../../index.js").DiagramFrame;
+    Board: typeof import("../../index.js").Board;
     Formula: typeof import("../../index.js").Formula;
     Priority: typeof import("../../index.js").Priority;
     ResourceLink: typeof import("../../index.js").ResourceLink;

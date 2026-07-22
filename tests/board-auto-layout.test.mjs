@@ -8,7 +8,7 @@ import {
   measureDiagramEdgeLabel,
   placeDiagramEdgeLabels,
   wrapDiagramText,
-} from '../dist/components/DiagramAutoLayout.js';
+} from '../dist/components/BoardAutoLayout.js';
 
 test('expands adjacent ranks until the entire edge label fits', () => {
   const label = measureDiagramEdgeLabel('2. 识别文本与上下文');

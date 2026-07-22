@@ -1,4 +1,4 @@
-import {DiagramFrame} from '../../components/DiagramFrame.js';
+import {Board} from '../../components/Board.js';
 
 type MermaidProps = {
   value: string;
@@ -6,5 +6,5 @@ type MermaidProps = {
 
 /** Docusaurus swizzle target for every Markdown `mermaid` fence. */
 export default function Mermaid({value}: MermaidProps) {
-  return <DiagramFrame aria-label="Mermaid 图表" mermaidSource={value} />;
+  return <Board aria-label="可编辑画板" importSource={{format: 'mermaid', source: value}} />;
 }

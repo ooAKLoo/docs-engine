@@ -436,4 +436,4 @@ function rectangleIntersectionArea(first, second) {
     const height = Math.max(0, Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top));
     return width * height;
 }
-//# sourceMappingURL=DiagramAutoLayout.js.map
+//# sourceMappingURL=BoardAutoLayout.js.map

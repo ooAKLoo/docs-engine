@@ -1,7 +1,9 @@
 export { Annotation } from './components/Annotation.js';
 export { Callout } from './components/Callout.js';
 export { CodeBlock } from './components/CodeBlock.js';
-export { DiagramFrame, } from './components/DiagramFrame.js';
+export { Board, } from './components/Board.js';
+export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImporter.js';
+export { applyBoardOperation } from './components/BoardModel.js';
 export { DocumentContent } from './components/DocumentContent.js';
 export { Formula } from './components/Formula.js';
 export { Priority } from './components/Priority.js';

@@ -12,29 +12,27 @@ import {
   measureDiagramTextWidth,
   placeDiagramEdgeLabels,
   wrapDiagramText,
-} from './DiagramAutoLayout.js';
+} from './BoardAutoLayout.js';
 import {
-  parseMermaidBoard,
-  type DiagramAnchorSide,
-  type DiagramNodeShape,
-  type DiagramNodeTone,
-  type ParsedDiagramEdge,
-  type ParsedDiagramGraph,
-  type ParsedDiagramNode,
-} from './MermaidBoardParser.js';
+  type BoardAnchorSide,
+  type BoardDocument,
+  type BoardEdge,
+  type BoardNode,
+  type BoardNodeShape,
+  type BoardNodeTone,
+  type BoardPoint,
+} from './BoardModel.js';
 
-export type {
-  DiagramAnchorSide,
-  DiagramNodeShape,
-  DiagramNodeTone,
-} from './MermaidBoardParser.js';
+type DiagramAnchorSide = BoardAnchorSide;
+type DiagramNodeShape = BoardNodeShape;
+type DiagramNodeTone = BoardNodeTone;
+type ParsedDiagramEdge = BoardEdge;
+type ParsedDiagramGraph = BoardDocument;
+type ParsedDiagramNode = BoardNode;
 
 export type DiagramNodeChangeReason = 'label' | 'position';
 
-export type DiagramNodePosition = {
-  x: number;
-  y: number;
-};
+export type DiagramNodePosition = BoardPoint;
 
 export type DiagramNodeChange = {
   nodeId: string;
@@ -48,15 +46,13 @@ export type DiagramNodePatch = {
   position?: DiagramNodePosition;
 };
 
-/** Fixed geometry for an authored Board node. Omit it to keep automatic Mermaid layout. */
-export type DiagramBoardNodeLayout = {
+type DiagramBoardNodeLayout = {
   height?: number;
   position: DiagramNodePosition;
   width?: number;
 };
 
-/** Optional authored route/style for a Mermaid edge on the native Board. */
-export type DiagramBoardEdgeLayout = {
+type DiagramBoardEdgeLayout = {
   /** Render the edge label as the light, bare SVG-style annotation instead of a chip. */
   bareLabel?: boolean;
   label?: string;
@@ -69,18 +65,14 @@ export type DiagramBoardEdgeLayout = {
   targetSide?: DiagramAnchorSide;
 };
 
-/**
- * An authored Board scene layered over Mermaid semantics. Mermaid still parses text,
- * nodes and relationships; this object supplies exact initial coordinates and routes.
- */
-export type DiagramBoardLayout = {
+type DiagramBoardLayout = {
   edges?: DiagramBoardEdgeLayout[];
-  height: number;
+  height?: number;
   nodes: Record<string, DiagramBoardNodeLayout>;
-  width: number;
+  width?: number;
 };
 
-export type MermaidEditRequest = {
+export type BoardEditRequest = {
   fontSize: number;
   nodeId: string;
   label: string;
@@ -204,42 +196,31 @@ export type DiagramConnectionDropRequest = {
   tone: DiagramNodeTone;
 };
 
-export type MermaidBoardProps = {
+export type BoardCanvasProps = {
   accessibleLabel: string;
-  boardLayout?: DiagramBoardLayout;
-  createdEdges?: DiagramCreatedEdge[];
-  createdNodes?: DiagramCreatedNode[];
-  edgePatches?: Map<string, DiagramEdgeRoutePatch>;
+  document: BoardDocument;
   editable: boolean;
   editingNodeId?: string;
-  fitPatchedBounds?: boolean;
+  fitContent?: boolean;
   onChange?: (change: DiagramNodeChange) => void;
   onConnect?: (request: DiagramConnectRequest) => void;
   onConnectionDrop?: (request: DiagramConnectionDropRequest) => void;
   onEdgeRouteChange?: (change: DiagramEdgeRouteChange) => void;
-  onEditRequest?: (request: MermaidEditRequest) => void;
+  onEditRequest?: (request: BoardEditRequest) => void;
   onReady?: () => void;
   onSelectNode?: (nodeId: string | null, additive?: boolean) => void;
   onSelectEdge?: (edgeId: string | null) => void;
   panActive: boolean;
-  patches: Map<string, DiagramNodePatch>;
-  revision: number;
   selectedEdgeId?: string | null;
   selectedNodeIds?: readonly string[];
-  source: string;
 };
 
-const resolvedGraphs = new Map<string, ParsedDiagramGraph>();
-
-export function MermaidBoard({
+export function BoardCanvas({
   accessibleLabel,
-  boardLayout,
-  createdEdges = [],
-  createdNodes = [],
-  edgePatches = new Map(),
+  document: boardDocument,
   editable,
   editingNodeId,
-  fitPatchedBounds = false,
+  fitContent = false,
   onChange,
   onConnect,
   onConnectionDrop,
@@ -249,20 +230,13 @@ export function MermaidBoard({
   onSelectNode,
   onSelectEdge,
   panActive,
-  patches,
-  revision,
   selectedEdgeId = null,
   selectedNodeIds = [],
-  source,
-}: MermaidBoardProps) {
+}: BoardCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragSession | null>(null);
   const connectionDraftRef = useRef<ConnectionDraft | null>(null);
   const edgeRouteDragRef = useRef<EdgeRouteDragSession | null>(null);
-  const [parsedGraph, setParsedGraph] = useState<ParsedDiagramGraph | null>(
-    () => resolvedGraphs.get(source) ?? null,
-  );
-  const [parseError, setParseError] = useState('');
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [activePortNodeId, setActivePortNodeId] = useState<string | null>(null);
   const [activePositions, setActivePositions] = useState<Map<string, DiagramNodePosition> | null>(
@@ -303,41 +277,9 @@ export function MermaidBoard({
     [],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    setMeasuredEdgeLabels(new Map());
-    setParseError('');
-    const cached = resolvedGraphs.get(source);
-    if (cached) {
-      setParsedGraph(cached);
-      return;
-    }
-    setParsedGraph(null);
-    void parseMermaidBoard(source)
-      .then((graph) => {
-        if (!cancelled) setParsedGraph(graph);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setParseError(error instanceof Error ? error.message : 'Mermaid 图表解析失败');
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [source]);
-
   const layout = useMemo(() => {
-    if (!parsedGraph) return null;
-    // Keep Mermaid's initial rank layout immutable. Board-created nodes and edges are
-    // placed on top of it, otherwise every new relationship would re-rank existing nodes.
     const graph = ensureLayoutNodePositions(
-      appendBoardElements(
-        layoutDiagramGraph(parsedGraph, patches, boardLayout, measuredEdgeLabels),
-        createdNodes,
-        createdEdges,
-        patches,
-      ),
+      layoutDiagramGraph(boardDocument, new Map(), documentLayout(boardDocument), measuredEdgeLabels),
     );
     if (!activePositions || !dragRef.current) return graph;
     return {
@@ -347,30 +289,32 @@ export function MermaidBoard({
         return position ? {...node, position} : node;
       }),
     };
-  }, [activePositions, boardLayout, createdEdges, createdNodes, measuredEdgeLabels, parsedGraph, patches, revision]);
+  }, [activePositions, boardDocument, measuredEdgeLabels]);
+
+  const boardLayout = documentLayout(boardDocument);
 
   const displayBounds = useMemo(() => {
     if (!layout) return {height: 120, left: 0, top: 0, width: 320};
     // A designed Board scene owns its intentional whitespace in the viewer.
-    // The inline preview applies a content fit later through fitPatchedBounds.
-    if (boardLayout && createdNodes.length === 0) {
+    // The inline preview applies a content fit later through fitContent.
+    if (boardLayout?.width && boardLayout.height) {
       return {height: boardLayout.height, left: 0, top: 0, width: boardLayout.width};
     }
-    if (!fitPatchedBounds && createdNodes.length === 0) {
+    if (!fitContent) {
       return {height: layout.height, left: 0, top: 0, width: layout.width};
     }
     return getLayoutBounds(layout.nodes, 42);
-  }, [boardLayout, createdNodes.length, fitPatchedBounds, layout]);
+  }, [boardLayout, fitContent, layout]);
 
   useEffect(() => {
-    if (parsedGraph) onReady?.();
-  }, [onReady, parsedGraph]);
+    onReady?.();
+  }, [boardDocument, onReady]);
 
   const requestEdit = (node: LayoutNode, element: SVGGElement) => {
     if (!editable || panActive) return;
     onSelectNode?.(node.id);
     const matrix = element.ownerSVGElement?.getScreenCTM();
-    const shape = element.querySelector<SVGGraphicsElement>('.de-mermaid-board__node-shape');
+    const shape = element.querySelector<SVGGraphicsElement>('.de-board__node-shape');
     onEditRequest?.({
       fontSize: 14 * (matrix ? Math.hypot(matrix.a, matrix.b) : 1),
       nodeId: node.id,
@@ -468,7 +412,7 @@ export function MermaidBoard({
       const initialPatches = resolveInitialEdgePatches(layout.edges, boardLayout);
       layout.edges.forEach((edge) => {
         if (!selectedIds.has(edge.sourceId) || !selectedIds.has(edge.targetId)) return;
-        const patch = edgePatches.get(edge.id) ?? initialPatches.get(edge.id);
+        const patch = initialPatches.get(edge.id);
         if (!patch) return;
         routeChanges.push({edgeId: edge.id, route: translateEdgeRoutePatch(patch, dragDelta)});
       });
@@ -657,30 +601,8 @@ export function MermaidBoard({
     setActiveEdgeRoute(null);
   };
 
-  if (parseError) {
-    return (
-      <div className="de-mermaid-board de-mermaid-board--error" role="img" aria-label={accessibleLabel}>
-        <strong>暂时无法渲染这张图表</strong>
-        <span>{parseError}</span>
-      </div>
-    );
-  }
-
-  if (!layout) {
-    return (
-      <div
-        className="de-mermaid-board de-mermaid-board--loading"
-        role="img"
-        aria-label={accessibleLabel}
-      >
-        <span>正在构建画板…</span>
-      </div>
-    );
-  }
-
   const nodesById = new Map(layout.nodes.map((node) => [node.id, node]));
   const routePatches = new Map(resolveInitialEdgePatches(layout.edges, boardLayout));
-  edgePatches.forEach((patch, edgeId) => routePatches.set(edgeId, patch));
   const activeDrag = dragRef.current;
   if (activeDrag) {
     const primaryStart = activeDrag.positionsStart.get(activeDrag.nodeId);
@@ -702,18 +624,14 @@ export function MermaidBoard({
     routePatches,
     measuredEdgeLabels,
   );
-  const editedContentBounds = createdNodes.length > 0
-    ? getRenderedDiagramBounds(layout.nodes, routedEdges, 42)
-    : undefined;
-  const renderedDisplayBounds = fitPatchedBounds
+  const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42);
+  const renderedDisplayBounds = fitContent
     ? getEmbeddedDiagramBounds(layout.nodes, routedEdges)
-    : editedContentBounds
-      ? boardLayout
-        ? unionDiagramBounds(
-            {height: boardLayout.height, left: 0, top: 0, width: boardLayout.width},
-            editedContentBounds,
-          )
-        : editedContentBounds
+    : boardLayout?.width && boardLayout.height
+      ? unionDiagramBounds(
+          {height: boardLayout.height, left: 0, top: 0, width: boardLayout.width},
+          editedContentBounds,
+        )
       : displayBounds;
   const draftSource = connectionDraft ? nodesById.get(connectionDraft.sourceId) : undefined;
   const draftTarget = connectionDraft?.targetId
@@ -727,19 +645,19 @@ export function MermaidBoard({
 
   return (
     <div
-      className="de-mermaid-board"
+      className="de-board"
       data-authored-layout={boardLayout ? 'true' : undefined}
       role="img"
       aria-label={accessibleLabel}
     >
       <svg
         ref={svgRef}
-        className="de-mermaid-board__svg"
+        className="de-board__svg"
         viewBox={`${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`}
         preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
-        <g className="de-mermaid-board__edges">
+        <g className="de-board__edges">
           {routedEdges.map(({edge, route}) => {
             const sourceNode = nodesById.get(edge.sourceId);
             const targetNode = nodesById.get(edge.targetId);
@@ -750,7 +668,7 @@ export function MermaidBoard({
             return (
               <g
                 key={edge.id}
-                className="de-mermaid-board__edge"
+                className="de-board__edge"
                 data-de-edge-id={edge.id}
                 data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
                 data-selected={edgeSelected ? 'true' : undefined}
@@ -764,10 +682,10 @@ export function MermaidBoard({
                   }
                 }}
               >
-                <path d={route.path} className="de-mermaid-board__edge-hit" />
+                <path d={route.path} className="de-board__edge-hit" />
                 <path
                   d={route.path}
-                  className="de-mermaid-board__edge-path"
+                  className="de-board__edge-path"
                   data-edge-id={edge.id}
                   data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
                   data-source-id={edge.sourceId}
@@ -777,11 +695,11 @@ export function MermaidBoard({
                   data-target-side={route.targetSide}
                 />
                 {showEdgeHandles ? (
-                  <g className="de-mermaid-board__edge-handles" aria-hidden="true">
+                  <g className="de-board__edge-handles" aria-hidden="true">
                     {getRouteSegmentHandles(route.points).map((handle) => (
                       <g
                         key={`${edge.id}-${handle.segmentIndex}`}
-                        className="de-mermaid-board__edge-handle"
+                        className="de-board__edge-handle"
                         data-orientation={handle.orientation}
                         transform={`translate(${format(handle.x)} ${format(handle.y)})`}
                         onPointerDown={(event) =>
@@ -791,8 +709,8 @@ export function MermaidBoard({
                         onPointerUp={finishEdgeRouteDrag}
                         onPointerCancel={cancelEdgeRouteDrag}
                       >
-                        <circle className="de-mermaid-board__edge-handle-hit" r="12" />
-                        <circle className="de-mermaid-board__edge-handle-dot" r="4.5" />
+                        <circle className="de-board__edge-handle-hit" r="12" />
+                        <circle className="de-board__edge-handle-dot" r="4.5" />
                       </g>
                     ))}
                   </g>
@@ -801,18 +719,18 @@ export function MermaidBoard({
             );
           })}
           {draftRoute ? (
-            <g className="de-mermaid-board__connection-preview" aria-hidden="true">
-              <path d={draftRoute.path} className="de-mermaid-board__edge-path" />
+            <g className="de-board__connection-preview" aria-hidden="true">
+              <path d={draftRoute.path} className="de-board__edge-path" />
             </g>
           ) : null}
         </g>
 
-        <g className="de-mermaid-board__arrows">
+        <g className="de-board__arrows">
           {routedEdges.map(({edge, route}) =>
             route.arrowPoints && edge.stroke !== 'invisible' ? (
               <polygon
                 key={edge.id}
-                className="de-mermaid-board__arrow"
+                className="de-board__arrow"
                 data-edge-id={edge.id}
                 data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
                 points={route.arrowPoints}
@@ -820,13 +738,13 @@ export function MermaidBoard({
             ) : null,
           )}
           {draftRoute?.arrowPoints ? (
-            <g className="de-mermaid-board__connection-preview">
-              <polygon className="de-mermaid-board__arrow" points={draftRoute.arrowPoints} />
+            <g className="de-board__connection-preview">
+              <polygon className="de-board__arrow" points={draftRoute.arrowPoints} />
             </g>
           ) : null}
         </g>
 
-        <g className="de-mermaid-board__edge-labels">
+        <g className="de-board__edge-labels">
           {routedEdges.map(({edge, route}) =>
             edge.label && edge.stroke !== 'invisible' ? (
               <BoardEdgeLabel
@@ -840,7 +758,7 @@ export function MermaidBoard({
         </g>
 
         {guides.x !== undefined || guides.y !== undefined ? (
-          <g className="de-mermaid-board__guides">
+          <g className="de-board__guides">
             {guides.x !== undefined ? (
               <line
                 x1={guides.x}
@@ -860,7 +778,7 @@ export function MermaidBoard({
           </g>
         ) : null}
 
-        <g className="de-mermaid-board__nodes">
+        <g className="de-board__nodes">
           {layout.nodes.map((node) => {
             const selected = selectedNodeIds.includes(node.id);
             const editing = editingNodeId === node.id;
@@ -880,7 +798,7 @@ export function MermaidBoard({
             return (
               <g
                 key={node.id}
-                className="de-mermaid-board__node"
+                className="de-board__node"
                 data-de-node-id={node.id}
                 data-selected={selected ? 'true' : undefined}
                 data-editing={editing ? 'true' : undefined}
@@ -950,7 +868,7 @@ export function MermaidBoard({
               >
                 <NodeShape node={node} />
                 <text
-                  className="de-mermaid-board__node-label"
+                  className="de-board__node-label"
                   textAnchor="middle"
                   transform={badge ? 'translate(0 8)' : undefined}
                 >
@@ -965,7 +883,7 @@ export function MermaidBoard({
                   ))}
                 </text>
                 {badge ? (
-                  <g className="de-mermaid-board__node-badge" aria-hidden="true">
+                  <g className="de-board__node-badge" aria-hidden="true">
                     <rect
                       x={-badgeWidth / 2}
                       y={-node.height / 2 + 29}
@@ -979,13 +897,13 @@ export function MermaidBoard({
                   </g>
                 ) : null}
                 {showPorts ? (
-                  <g className="de-mermaid-board__ports" aria-hidden="true">
+                  <g className="de-board__ports" aria-hidden="true">
                     {(['top', 'right', 'bottom', 'left'] as const).map((side) => {
                       const point = anchorPoint(node, side, 0, 16);
                       return (
                         <g
                           key={side}
-                          className="de-mermaid-board__port"
+                          className="de-board__port"
                           data-side={side}
                           transform={`translate(${format(point.x - node.position.x)} ${format(point.y - node.position.y)})`}
                           onPointerEnter={() => {
@@ -1009,8 +927,8 @@ export function MermaidBoard({
                           onPointerUp={finishConnection}
                           onPointerCancel={cancelConnection}
                         >
-                          <circle className="de-mermaid-board__port-hit" r="13" />
-                          <circle className="de-mermaid-board__port-dot" r="5" />
+                          <circle className="de-board__port-hit" r="13" />
+                          <circle className="de-board__port-dot" r="5" />
                         </g>
                       );
                     })}
@@ -1112,7 +1030,7 @@ function BoardEdgeLabel({
 
   return (
     <g
-      className="de-mermaid-board__edge-label"
+      className="de-board__edge-label"
       data-bare={edge.bareLabel ? 'true' : undefined}
       data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
       data-floating={floating ? 'true' : undefined}
@@ -1146,7 +1064,7 @@ function NodeShape({node}: {node: LayoutNode}) {
   if (node.shape === 'diamond') {
     return (
       <path
-        className="de-mermaid-board__node-shape"
+        className="de-board__node-shape"
         d={roundedDiamondPath(halfWidth, halfHeight)}
       />
     );
@@ -1154,7 +1072,7 @@ function NodeShape({node}: {node: LayoutNode}) {
   if (node.shape === 'circle') {
     return (
       <ellipse
-        className="de-mermaid-board__node-shape"
+        className="de-board__node-shape"
         cx="0"
         cy="0"
         rx={halfWidth}
@@ -1164,7 +1082,7 @@ function NodeShape({node}: {node: LayoutNode}) {
   }
   return (
     <rect
-      className="de-mermaid-board__node-shape"
+      className="de-board__node-shape"
       x={-halfWidth}
       y={-halfHeight}
       width={node.width}
@@ -1173,6 +1091,38 @@ function NodeShape({node}: {node: LayoutNode}) {
       ry={node.shape === 'stadium' ? halfHeight : node.shape === 'round' || hasBoardClass(node.classes, 'deBoardDetail') ? 18 : 12}
     />
   );
+}
+
+function documentLayout(document: BoardDocument): DiagramBoardLayout | undefined {
+  const nodes = Object.fromEntries(
+    document.nodes.flatMap((node) =>
+      node.position
+        ? [[node.id, {height: node.height, position: node.position, width: node.width}]]
+        : [],
+    ),
+  );
+  const edges = document.edges.flatMap((edge): DiagramBoardEdgeLayout[] =>
+    edge.points?.length || edge.labelPosition || edge.sourceSide || edge.targetSide
+      ? [{
+          bareLabel: edge.bareLabel,
+          label: edge.label,
+          labelAlign: edge.labelAlign,
+          labelPosition: edge.labelPosition,
+          points: edge.points,
+          sourceId: edge.sourceId,
+          sourceSide: edge.sourceSide,
+          targetId: edge.targetId,
+          targetSide: edge.targetSide,
+        }]
+      : [],
+  );
+  if (!document.canvas && Object.keys(nodes).length === 0 && edges.length === 0) return undefined;
+  return {
+    edges,
+    height: document.canvas?.height,
+    nodes,
+    width: document.canvas?.width,
+  };
 }
 
 function layoutDiagramGraph(
@@ -1201,7 +1151,10 @@ function layoutDiagramGraph(
   // Dotted return edges are visual feedback loops. They must not turn an
   // otherwise forward flow into a cyclic rank graph and reshuffle the cards.
   const edges = applyBoardEdgeLayout(graph.edges, boardLayout);
-  const ranks = assignRanks(measuredNodes, edges.filter((edge) => !isFeedbackEdge(edge)));
+  const ranks = assignRanks(
+    measuredNodes,
+    edges.filter((edge) => !edge.manual && !isFeedbackEdge(edge)),
+  );
   const groups = new Map<number, typeof measuredNodes>();
   measuredNodes.forEach((node) => {
     const rank = ranks.get(node.id) ?? 0;
@@ -1355,53 +1308,6 @@ function findBoardEdgeLayout(edge: ParsedDiagramEdge, boardLayout: DiagramBoardL
       layout.targetId === edge.targetId &&
       (layout.label === undefined || layout.label === edge.label),
   );
-}
-
-function appendBoardElements(
-  base: LayoutGraph,
-  createdNodes: DiagramCreatedNode[],
-  createdEdges: DiagramCreatedEdge[],
-  patches: Map<string, DiagramNodePatch>,
-): LayoutGraph {
-  const knownNodeIds = new Set(base.nodes.map((node) => node.id));
-  const nodes = [
-    ...base.nodes,
-    ...createdNodes
-      .filter((node) => !knownNodeIds.has(node.id))
-      .map<LayoutNode>((node) => {
-        const patch = patches.get(node.id);
-        const label = patch?.label ?? node.label;
-        return {
-          classes: [],
-          id: node.id,
-          label,
-          placeholder: node.placeholder && patch?.label === undefined,
-          position: patch?.position ?? node.position,
-          shape: node.shape,
-          tone: node.tone,
-          ...measureNode(label, node.shape),
-        };
-      }),
-  ];
-  const bounds = getLayoutBounds(nodes, 42);
-  return {
-    edges: [
-      ...base.edges,
-      ...createdEdges.map<ParsedDiagramEdge>((edge) => ({
-        arrow: true,
-        id: edge.id,
-        label: '',
-        sourceId: edge.sourceId,
-        sourceSide: edge.sourceSide,
-        stroke: 'normal',
-        targetId: edge.targetId,
-        targetSide: edge.targetSide,
-      })),
-    ],
-    height: Math.max(base.height, bounds.height + Math.max(0, -bounds.top)),
-    nodes,
-    width: Math.max(base.width, bounds.width + Math.max(0, -bounds.left)),
-  };
 }
 
 function ensureLayoutNodePositions(graph: LayoutGraph): LayoutGraph {

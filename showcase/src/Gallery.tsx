@@ -1,9 +1,9 @@
 import {useState, type CSSProperties} from 'react';
 import {
   Annotation,
+  Board,
   Callout,
   CodeBlock,
-  DiagramFrame,
   DocumentContent,
   Formula,
   Priority,
@@ -13,7 +13,7 @@ import {
   Status,
   StatusEditor,
   StatusFieldEditor,
-  type DiagramBoardLayout,
+  type BoardImportLayout,
   type StatusOption,
   SummaryPanel,
   Table,
@@ -156,7 +156,7 @@ const unifiedBoardLayout = {
       targetSide: 'bottom',
     },
   ],
-} satisfies DiagramBoardLayout;
+} satisfies BoardImportLayout;
 
 const initialTimelineItems: TimelineItem[] = [
   {
@@ -398,9 +398,8 @@ export function Gallery() {
           <p>
             Mermaid 只负责提供结构化文本。所有受支持语法都会转换成同一种 Board 节点与连线，并交给同一个可编辑渲染器；不存在按图表类型切换的 SVG 渲染分支。下面的语音链路同时用于检查多行节点文案、英文下行字母和边标签的位置。
           </p>
-          <DiagramFrame
-            editable
-            mermaidSource={mermaidSource}
+          <Board
+            importSource={{format: 'mermaid', source: mermaidSource}}
             aria-label="ASR 到 LLM 再到 TTS 的语音链路图"
           />
           <p>
@@ -408,26 +407,26 @@ export function Gallery() {
           </p>
           <h3>时序语法，同一 Board</h3>
           <p>输入是 <code>sequenceDiagram</code>，输出仍然是相同的可选中、可拖动、可编辑 Board 对象。</p>
-          <DiagramFrame
-            editable
-            mermaidSource={sequenceMermaidSource}
+          <Board
+            importSource={{format: 'mermaid', source: sequenceMermaidSource}}
             aria-label="孩子、Lula 设备和 Companion Agent 的时序交互图"
           />
           <h3>Urban / Uber 因果链路</h3>
           <p>保留原先的 Urban/Uber Demo，用于检查“GPS 普及”等中英文混排标签和连续因果链路。</p>
-          <DiagramFrame
-            editable
-            mermaidSource={urbanUberMermaidSource}
+          <Board
+            importSource={{format: 'mermaid', source: urbanUberMermaidSource}}
             aria-label="智能手机、GPS、移动支付与 Uber 出现的因果链路"
           />
           <h3>设计布局，同一 Board</h3>
           <p>
-            这张图通过 <code>boardLayout</code> 保留市场验证图的精确构图，但没有独立渲染器。它仍由同一个 Board 的节点与连线构成：正文内可滚轮平移、⌘ / Ctrl + 滚轮缩放；打开画板后可选中、拖动、双击原地编辑，并从锚点创建或调整连线。
+            这张图在 Mermaid 导入时应用精确构图，导入后仍只是一份 <code>BoardDocument</code>。正文内可滚轮平移、⌘ / Ctrl + 滚轮缩放；打开画板后可选中、拖动、双击原地编辑，并从锚点创建或调整连线。
           </p>
-          <DiagramFrame
-            boardLayout={unifiedBoardLayout}
-            editable
-            mermaidSource={unifiedBoardMermaidSource}
+          <Board
+            importSource={{
+              format: 'mermaid',
+              layout: unifiedBoardLayout,
+              source: unifiedBoardMermaidSource,
+            }}
             aria-label="用户反馈到实验决策的统一画板"
           />
         </section>

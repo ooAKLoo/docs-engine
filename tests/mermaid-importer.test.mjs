@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {parseMermaidBoard} from '../dist/components/MermaidBoardParser.js';
+import {importMermaid} from '../dist/components/MermaidImporter.js';
 
 test('keeps authored flowchart labels and shapes when later edges use bare ids', async () => {
-  const graph = await parseMermaidBoard(`flowchart LR
+  const graph = await importMermaid(`flowchart LR
     product([首批产品<br/>完成交付准备]) --> koc[7 名 KOC 测试<br/>真实家庭使用]
     koc --> retention{7 日留存达标？}
     retention -->|通过| early[约 70 名付费早鸟<br/>验证真实购买意愿]
@@ -13,7 +13,7 @@ test('keeps authored flowchart labels and shapes when later edges use bare ids',
     kol --> production([大货生产<br/>铺设销售渠道])`);
 
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  assert.equal(graph.kind, 'flowchart');
+  assert.equal(graph.diagramKind, 'flowchart');
   assert.equal(nodes.get('koc')?.label, '7 名 KOC 测试\n真实家庭使用');
   assert.equal(nodes.get('retention')?.label, '7 日留存达标？');
   assert.equal(nodes.get('retention')?.shape, 'diamond');
@@ -23,7 +23,7 @@ test('keeps authored flowchart labels and shapes when later edges use bare ids',
 });
 
 test('parses labelled feedback edges and chained flowchart edges', async () => {
-  const graph = await parseMermaidBoard(`flowchart LR
+  const graph = await importMermaid(`flowchart LR
     mic[麦克风] --> afe[音频前端] --> preroll[预录缓冲]
     optimize[优化产品体验] -.优化后复测.-> afe`);
 
@@ -38,7 +38,7 @@ test('parses labelled feedback edges and chained flowchart edges', async () => {
 });
 
 test('keeps dashed sequence arrows out of actor ids', async () => {
-  const graph = await parseMermaidBoard(`sequenceDiagram
+  const graph = await importMermaid(`sequenceDiagram
     participant Child as 孩子
     participant Lula as Lula 设备
     participant Agent as Companion Agent
@@ -150,8 +150,9 @@ test('normalizes every supported Mermaid syntax into the same Board graph model'
   ];
 
   for (const fixture of fixtures) {
-    const graph = await parseMermaidBoard(fixture.source);
-    assert.equal(graph.kind, fixture.kind);
+    const graph = await importMermaid(fixture.source);
+    assert.equal(graph.version, 1);
+    assert.equal(graph.diagramKind, fixture.kind);
     assert.ok(graph.nodes.length > 0, `${fixture.kind} should create Board nodes`);
     assert.ok(graph.edges.length > 0, `${fixture.kind} should create Board edges`);
     assert.ok(graph.nodes.every((node) => node.id && node.label && node.shape && node.tone));
@@ -161,7 +162,21 @@ test('normalizes every supported Mermaid syntax into the same Board graph model'
 
 test('rejects syntax that has not been mapped to Board instead of falling back to another renderer', async () => {
   await assert.rejects(
-    () => parseMermaidBoard('journey\n  title unsupported'),
-    /尚未接入统一 Board/u,
+    () => importMermaid('journey\n  title unsupported'),
+    /尚未接入画板导入器/u,
   );
+});
+
+test('applies authored geometry during import and returns only a canonical BoardDocument', async () => {
+  const document = await importMermaid('flowchart LR\n  a[开始] --> b[完成]', {
+    layout: {
+      height: 240,
+      nodes: {a: {position: {x: 80, y: 120}}},
+      width: 480,
+    },
+  });
+
+  assert.deepEqual(document.canvas, {height: 240, width: 480});
+  assert.deepEqual(document.nodes.find((node) => node.id === 'a')?.position, {x: 80, y: 120});
+  assert.equal('source' in document, false);
 });

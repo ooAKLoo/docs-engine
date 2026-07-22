@@ -1,18 +1,20 @@
-export type DiagramDirection = 'LR' | 'RL' | 'TB' | 'BT';
-export type DiagramAnchorSide = 'top' | 'right' | 'bottom' | 'left';
-export type DiagramNodeShape = 'rect' | 'round' | 'stadium' | 'circle' | 'diamond';
-export type DiagramNodeTone = 'blue' | 'purple' | 'teal' | 'green' | 'orange' | 'neutral';
-export type MermaidBoardKind =
-  | 'flowchart'
-  | 'sequence'
-  | 'state'
-  | 'class'
-  | 'er'
-  | 'gantt'
-  | 'git'
-  | 'timeline'
-  | 'mindmap'
-  | 'pie';
+import type {
+  BoardAnchorSide,
+  BoardDiagramKind,
+  BoardDirection,
+  BoardDocument,
+  BoardEdge,
+  BoardImportLayout,
+  BoardNode,
+  BoardNodeShape,
+  BoardNodeTone,
+} from './BoardModel.js';
+
+type DiagramDirection = BoardDirection;
+type DiagramAnchorSide = BoardAnchorSide;
+type DiagramNodeShape = BoardNodeShape;
+type DiagramNodeTone = BoardNodeTone;
+type MermaidDiagramKind = BoardDiagramKind;
 
 export type ParsedDiagramNode = {
   classes: string[];
@@ -39,7 +41,7 @@ export type ParsedDiagramEdge = {
 export type ParsedDiagramGraph = {
   direction: DiagramDirection;
   edges: ParsedDiagramEdge[];
-  kind: MermaidBoardKind;
+  kind: MermaidDiagramKind;
   nodes: ParsedDiagramNode[];
 };
 
@@ -48,21 +50,36 @@ type Entity = {fields: string[]; name: string};
 
 const diagramTones: DiagramNodeTone[] = ['blue', 'teal', 'purple', 'orange', 'green', 'neutral'];
 
-export async function parseMermaidBoard(source: string): Promise<ParsedDiagramGraph> {
-  const kind = diagramKind(source);
-  if (kind === 'flowchart') return parseFlowchart(source);
-  if (kind === 'sequence') return parseSequence(source);
-  if (kind === 'state') return parseState(source);
-  if (kind === 'class' || kind === 'er') return parseEntities(kind, source);
-  if (kind === 'gantt') return parseGantt(source);
-  if (kind === 'git') return parseGitGraph(source);
-  if (kind === 'timeline') return parseTimeline(source);
-  if (kind === 'mindmap') return parseMindmap(source);
-  if (kind === 'pie') return parsePie(source);
-  throw new Error('当前 Mermaid 语法尚未接入统一 Board');
+export async function importMermaid(
+  source: string,
+  options: {layout?: BoardImportLayout} = {},
+): Promise<BoardDocument> {
+  const kind = detectMermaidDiagramKind(source);
+  let graph: ParsedDiagramGraph;
+  if (kind === 'flowchart') graph = parseFlowchart(source);
+  else if (kind === 'sequence') graph = parseSequence(source);
+  else if (kind === 'state') graph = parseState(source);
+  else if (kind === 'class' || kind === 'er') graph = parseEntities(kind, source);
+  else if (kind === 'gantt') graph = parseGantt(source);
+  else if (kind === 'git') graph = parseGitGraph(source);
+  else if (kind === 'timeline') graph = parseTimeline(source);
+  else if (kind === 'mindmap') graph = parseMindmap(source);
+  else if (kind === 'pie') graph = parsePie(source);
+  else throw new Error('当前 Mermaid 语法尚未接入画板导入器');
+
+  return applyImportLayout(
+    {
+      diagramKind: graph.kind,
+      direction: graph.direction,
+      edges: graph.edges,
+      nodes: graph.nodes,
+      version: 1,
+    },
+    options.layout,
+  );
 }
 
-export function diagramKind(source: string): MermaidBoardKind | 'unsupported' {
+export function detectMermaidDiagramKind(source: string): MermaidDiagramKind | 'unsupported' {
   const first = sourceLines(source)[0]?.trim().toLowerCase() ?? '';
   if (first.startsWith('flowchart') || first.startsWith('graph')) return 'flowchart';
   if (first.startsWith('sequencediagram')) return 'sequence';
@@ -75,6 +92,34 @@ export function diagramKind(source: string): MermaidBoardKind | 'unsupported' {
   if (first.startsWith('mindmap')) return 'mindmap';
   if (first.startsWith('pie')) return 'pie';
   return 'unsupported';
+}
+
+function applyImportLayout(document: BoardDocument, layout?: BoardImportLayout): BoardDocument {
+  if (!layout) return document;
+  return {
+    ...document,
+    canvas: {height: layout.height, width: layout.width},
+    edges: document.edges.map((edge): BoardEdge => {
+      const authored = layout.edges?.find(
+        (candidate) => candidate.sourceId === edge.sourceId && candidate.targetId === edge.targetId,
+      );
+      if (!authored) return edge;
+      return {
+        ...edge,
+        bareLabel: authored.bareLabel ?? edge.bareLabel,
+        label: authored.label ?? edge.label,
+        labelAlign: authored.labelAlign ?? edge.labelAlign,
+        labelPosition: authored.labelPosition,
+        points: authored.points,
+        sourceSide: authored.sourceSide ?? edge.sourceSide,
+        targetSide: authored.targetSide ?? edge.targetSide,
+      };
+    }),
+    nodes: document.nodes.map((node): BoardNode => {
+      const authored = layout.nodes[node.id];
+      return authored ? {...node, ...authored} : node;
+    }),
+  };
 }
 
 function parseFlowchart(source: string): ParsedDiagramGraph {

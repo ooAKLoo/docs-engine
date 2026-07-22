@@ -62,4 +62,4 @@ export declare function assignDiagramEdgeLanes(edges: PairableDiagramEdge[]): Ma
  * every automatic edge label. Explicit label positions are immutable reservations.
  */
 export declare function placeDiagramEdgeLabels(edges: DiagramCollisionEdge[], nodes: DiagramCollisionNode[]): Map<string, DiagramLabelPlacement>;
-//# sourceMappingURL=DiagramAutoLayout.d.ts.map
+//# sourceMappingURL=BoardAutoLayout.d.ts.map
