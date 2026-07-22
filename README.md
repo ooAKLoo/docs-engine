@@ -48,7 +48,7 @@ pnpm showcase
 
 ### 文档创作 Skill
 
-`skills/author-technical-docs` 指导 Agent 在写作阶段选择正文、公式、表格、代码、Callout、时间轴与原生图表。Skill 明确禁止依靠运行时文本特征猜测语义，并提供适用于 Lula、oVita 及其他依赖项目的结构决策、MDX 写法和发布前检查清单。
+`skills/author-technical-docs` 指导 Agent 在写作阶段选择正文、公式、表格、代码、Callout、时间轴与原生图表。Skill 明确禁止依靠运行时文本特征猜测语义，并提供适用于 Lula、oVita 及其他依赖项目的结构决策、MDX 写法和发布前检查清单。软件架构内容还必须先选择读者视图：静态边界使用 C4 / Component / Deployment，跨参与者调用使用 Sequence，生命周期使用 State，数据结构使用 ER / Class；超过复杂度阈值时按视图拆图，不得把所有关系退化成一张 `flowchart`。
 
 ## 宿主边界
 
@@ -63,6 +63,8 @@ pnpm showcase
 `BoardDocument` 是渲染、编辑和持久化唯一认可的图表模型，完整包含节点、连线、锚点、路线、位置与画布尺寸。`BoardCanvas` 只读取 `BoardDocument`，不读取 Mermaid 文本，也不存在第二套按语法类型分流的 SVG 渲染器。
 
 Mermaid 只是便于作者和 Agent 输入的导入格式。`importMermaid()` 把 `flowchart`、`sequenceDiagram`、`stateDiagram-v2`、`classDiagram`、`erDiagram`、`gantt`、`gitGraph`、`timeline`、`mindmap` 与 `pie` 一次性转换成 `BoardDocument`；转换完成后，渲染和编辑链路不再依赖原始文本。Docs Engine 不安装 Mermaid 包、不调用 `mermaid.render()`，也不修补第三方 SVG。
+
+导入不是“只抽取节点和边”。`flowchart` 的 `subgraph` 会保留为 `BoardDocument.groups`，由 Board 先排布容器、再排布容器成员，容器本身进入取景和碰撞边界；`sequenceDiagram` 使用参与者、生命线和自上而下的消息时间轴，不再经过通用 DAG rank 布局。宿主不需要为架构图和时序图编写 CSS、固定坐标或二次渲染器。
 
 对于 Docusaurus，包内主题同时接管 Markdown 的 `mermaid` fence 与 MDX 组件映射。首次接入只需在框架配置中注册该主题；这是 Docusaurus 的加载边界，包无法被 npm 自动发现。此后升级 Docs Engine 不再需要依赖方修改渲染器、MDX 映射或文档内容：
 
@@ -80,7 +82,7 @@ themes: ['@ooakloo/docs-engine/adapters/docusaurus-theme'],
 
 节点 hover 或选中时会显示上、右、下、左四个浅蓝连接点。从连接点拖动可实时拉出圆角正交箭头：松到已有节点会自动吸附并建立连线；松到空白处会在终点显示图形选择器，选择矩形、圆角矩形、全圆角矩形、圆形或菱形后创建新节点并保持连接。新增关系不会再参与 Mermaid 的 rank 排版，因此既有节点坐标保持不动；同一节点同一锚点的连线共享同一个起点，不会为了避让而沿节点边界上下分散。选中或 hover 连线会显示两个可拖动的中段控制点，用来直接改变正交路线。箭头和线身按独立几何裁切，入线与出线不会因为共用中心锚点而在箭头尖端露出残线。
 
-首次自动排版会测量节点和边标签真实占位，并把端点留白、折线、箭头和双向轨道共同计入层级间距。标签只会绑定到足以承载自身的线段；必要时完整换行或改用紧邻连线的浮签。节点、标签、箭头和既有标签共同参与碰撞评分，线身与箭头先绘制，标签背景最后绘制，避免文字、线段和箭头互相覆盖。
+首次自动排版会测量节点和边标签真实占位，并把端点留白、折线、箭头、双向轨道和语义容器共同计入层级间距。标签只会绑定到足以承载自身的线段；必要时完整换行或改用紧邻连线的浮签。节点、分组、标签、箭头和既有标签共同参与布局边界，线身与箭头先绘制，标签背景最后绘制，避免文字、线段和箭头互相覆盖。作者手工拖动后的坐标仍按原样保存，自动布局只负责首次导入。
 
 非受控用法由组件在会话内保存下一份 `BoardDocument`；受控用法通过唯一的 `onDocumentChange` 接收完整文档并持久化。无需再分别拼接“节点补丁”“新建连线”和“路线补丁”：
 

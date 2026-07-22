@@ -4,6 +4,7 @@ import type {
   BoardDirection,
   BoardDocument,
   BoardEdge,
+  BoardGroup,
   BoardImportLayout,
   BoardNode,
   BoardNodeShape,
@@ -41,6 +42,7 @@ export type ParsedDiagramEdge = {
 export type ParsedDiagramGraph = {
   direction: DiagramDirection;
   edges: ParsedDiagramEdge[];
+  groups?: BoardGroup[];
   kind: MermaidDiagramKind;
   nodes: ParsedDiagramNode[];
 };
@@ -72,6 +74,7 @@ export async function importMermaid(
       diagramKind: graph.kind,
       direction: graph.direction,
       edges: graph.edges,
+      groups: graph.groups,
       nodes: graph.nodes,
       version: 1,
     },
@@ -129,6 +132,15 @@ function parseFlowchart(source: string): ParsedDiagramGraph {
   const nodes = new Map<string, ParsedDiagramNode>();
   const edges: ParsedDiagramEdge[] = [];
   const classes = new Map<string, string[]>();
+  const groups: BoardGroup[] = [];
+  const groupStack: string[] = [];
+
+  const attachToActiveGroup = (nodeId: string) => {
+    const groupId = groupStack.at(-1);
+    if (!groupId) return;
+    const group = groups.find((candidate) => candidate.id === groupId);
+    if (group && !group.nodeIds.includes(nodeId)) group.nodeIds.push(nodeId);
+  };
 
   const ensureNode = (token: string) => {
     const parsed = parseFlowNode(token);
@@ -138,11 +150,31 @@ function parseFlowchart(source: string): ParsedDiagramGraph {
       ? {...previous, classes: nodeClasses, tone: resolveTone(nodeClasses)}
       : {...previous, ...parsed, classes: nodeClasses, tone: resolveTone(nodeClasses)};
     nodes.set(parsed.id, next);
+    attachToActiveGroup(parsed.id);
     return next;
   };
 
   lines.forEach((line) => {
-    if (!line || /^(?:subgraph|end|classDef|linkStyle|style|click|direction)\b/iu.test(line)) return;
+    const subgraph = line.match(/^subgraph\s+(.+)$/iu);
+    if (subgraph) {
+      const parsed = parseFlowGroupDefinition(subgraph[1], groups.length);
+      const uniqueId = groups.some((group) => group.id === parsed.id)
+        ? `${parsed.id}:${groups.length + 1}`
+        : parsed.id;
+      groups.push({
+        ...parsed,
+        id: uniqueId,
+        nodeIds: [],
+        ...(groupStack.at(-1) ? {parentId: groupStack.at(-1)} : null),
+      });
+      groupStack.push(uniqueId);
+      return;
+    }
+    if (/^end\b/iu.test(line)) {
+      groupStack.pop();
+      return;
+    }
+    if (!line || /^(?:classDef|linkStyle|style|click|direction)\b/iu.test(line)) return;
     const classAssignment = line.match(/^class\s+(.+?)\s+([\w-]+)$/iu);
     if (classAssignment) {
       classAssignment[1].split(',').map((id) => id.trim()).filter(Boolean).forEach((id) => {
@@ -176,9 +208,21 @@ function parseFlowchart(source: string): ParsedDiagramGraph {
   return {
     direction: resolveDirection(header[1]),
     edges,
+    groups: groups.length > 0 ? groups : undefined,
     kind: 'flowchart',
     nodes: [...nodes.values()],
   };
+}
+
+function parseFlowGroupDefinition(value: string, index: number): Pick<BoardGroup, 'id' | 'label'> {
+  const definition = value.trim();
+  const explicit = definition.match(/^([\p{L}\p{N}_:-]+)\s*\[(.+)\]$/u);
+  if (explicit) return {id: explicit[1], label: normalizeLabel(explicit[2])};
+  const quoted = definition.match(/^["'](.+)["']$/u);
+  if (quoted) return {id: `group:${index + 1}`, label: normalizeLabel(quoted[1])};
+  const named = definition.match(/^([\p{L}\p{N}_:-]+)(?:\s+(.+))?$/u);
+  if (named) return {id: named[1], label: normalizeLabel(named[2] ?? named[1])};
+  return {id: `group:${index + 1}`, label: normalizeLabel(definition)};
 }
 
 function parseFlowEdges(line: string) {

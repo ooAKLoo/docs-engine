@@ -1654,6 +1654,31 @@
   overflow: visible;
 }
 
+.de-board__groups,
+.de-board__lifelines {
+  pointer-events: none;
+}
+
+.de-board__group rect {
+  fill: rgba(255, 255, 255, 0.58);
+  stroke: #dfe3ec;
+  stroke-width: 1.2px;
+  vector-effect: non-scaling-stroke;
+}
+
+.de-board__group text {
+  fill: #6b6f7b;
+  font: 650 12px/1 var(--de-font-sans);
+  letter-spacing: 0.02em;
+}
+
+.de-board__lifelines line {
+  stroke: #cfd3df;
+  stroke-width: 1.4px;
+  stroke-dasharray: 5 7;
+  vector-effect: non-scaling-stroke;
+}
+
 .de-board__node {
   outline: none;
 }

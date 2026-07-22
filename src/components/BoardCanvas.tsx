@@ -17,6 +17,7 @@ import {
   type BoardAnchorSide,
   type BoardDocument,
   type BoardEdge,
+  type BoardGroup,
   type BoardNode,
   type BoardNodeShape,
   type BoardNodeTone,
@@ -29,6 +30,8 @@ type DiagramNodeTone = BoardNodeTone;
 type ParsedDiagramEdge = BoardEdge;
 type ParsedDiagramGraph = BoardDocument;
 type ParsedDiagramNode = BoardNode;
+
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export type DiagramNodeChangeReason = 'label' | 'position';
 
@@ -88,8 +91,22 @@ type LayoutNode = ParsedDiagramNode & {
   width: number;
 };
 
+type MeasuredLayoutNode = Omit<LayoutNode, 'position'>;
+
+type DiagramBounds = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+};
+
+type LayoutGroup = BoardGroup & {
+  bounds: DiagramBounds;
+};
+
 type LayoutGraph = {
   edges: ParsedDiagramEdge[];
+  groups: LayoutGroup[];
   height: number;
   nodes: LayoutNode[];
   width: number;
@@ -282,12 +299,14 @@ export function BoardCanvas({
       layoutDiagramGraph(boardDocument, new Map(), documentLayout(boardDocument), measuredEdgeLabels),
     );
     if (!activePositions || !dragRef.current) return graph;
+    const nodes = graph.nodes.map((node) => {
+      const position = activePositions.get(node.id);
+      return position ? {...node, position} : node;
+    });
     return {
       ...graph,
-      nodes: graph.nodes.map((node) => {
-        const position = activePositions.get(node.id);
-        return position ? {...node, position} : node;
-      }),
+      groups: layoutBoardGroups(boardDocument.groups ?? [], nodes),
+      nodes,
     };
   }, [activePositions, boardDocument, measuredEdgeLabels]);
 
@@ -303,7 +322,7 @@ export function BoardCanvas({
     if (!fitContent) {
       return {height: layout.height, left: 0, top: 0, width: layout.width};
     }
-    return getLayoutBounds(layout.nodes, 42);
+    return getLayoutBounds(layout.nodes, 42, layout.groups);
   }, [boardLayout, fitContent, layout]);
 
   useEffect(() => {
@@ -623,10 +642,11 @@ export function BoardCanvas({
     layout.edges,
     routePatches,
     measuredEdgeLabels,
+    boardDocument.diagramKind,
   );
-  const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42);
+  const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42, layout.groups);
   const renderedDisplayBounds = fitContent
-    ? getEmbeddedDiagramBounds(layout.nodes, routedEdges)
+    ? getEmbeddedDiagramBounds(layout.nodes, routedEdges, layout.groups)
     : boardLayout?.width && boardLayout.height
       ? unionDiagramBounds(
           {height: boardLayout.height, left: 0, top: 0, width: boardLayout.width},
@@ -641,7 +661,7 @@ export function BoardCanvas({
     connectionDraft && draftSource
       ? routeDraftConnection(draftSource, draftTarget, connectionDraft, layout.nodes)
       : null;
-  const guideBounds = getLayoutBounds(layout.nodes, 34);
+  const guideBounds = getLayoutBounds(layout.nodes, 34, layout.groups);
 
   return (
     <div
@@ -657,6 +677,45 @@ export function BoardCanvas({
         preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
+        {layout.groups.length > 0 ? (
+          <g className="de-board__groups">
+            {layout.groups.map((group) => (
+              <g
+                key={group.id}
+                className="de-board__group"
+                data-de-group-id={group.id}
+                data-tone={group.tone ?? 'neutral'}
+              >
+                <rect
+                  x={group.bounds.left}
+                  y={group.bounds.top}
+                  width={group.bounds.right - group.bounds.left}
+                  height={group.bounds.bottom - group.bounds.top}
+                  rx="18"
+                  ry="18"
+                />
+                <text x={group.bounds.left + 18} y={group.bounds.top + 24}>
+                  {group.label}
+                </text>
+              </g>
+            ))}
+          </g>
+        ) : null}
+
+        {boardDocument.diagramKind === 'sequence' ? (
+          <g className="de-board__lifelines">
+            {layout.nodes.map((node) => (
+              <line
+                key={`${node.id}:lifeline`}
+                x1={node.position.x}
+                x2={node.position.x}
+                y1={node.position.y + node.height / 2 + 10}
+                y2={layout.height - 28}
+              />
+            ))}
+          </g>
+        ) : null}
+
         <g className="de-board__edges">
           {routedEdges.map(({edge, route}) => {
             const sourceNode = nodesById.get(edge.sourceId);
@@ -988,7 +1047,7 @@ function BoardEdgeLabel({
   const labelBoxWidth = activeBounds ? activeBounds.width + labelPaddingX * 2 : metrics.width;
   const labelBoxHeight = activeBounds ? activeBounds.height + labelPaddingY * 2 : metrics.height;
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     let cancelled = false;
     const measure = () => {
       const element = textRef.current;
@@ -1151,6 +1210,26 @@ function layoutDiagramGraph(
   // Dotted return edges are visual feedback loops. They must not turn an
   // otherwise forward flow into a cyclic rank graph and reshuffle the cards.
   const edges = applyBoardEdgeLayout(graph.edges, boardLayout);
+  if (graph.diagramKind === 'sequence') {
+    return layoutSequenceDiagramGraph(
+      measuredNodes,
+      edges,
+      graph.groups ?? [],
+      boardLayout,
+      measuredEdgeLabels,
+    );
+  }
+  if (hasGroupLayout(graph.groups ?? [], measuredNodes)) {
+    return layoutGroupedDiagramGraph(
+      measuredNodes,
+      edges,
+      graph.groups ?? [],
+      graph.direction,
+      patches,
+      boardLayout,
+      measuredEdgeLabels,
+    );
+  }
   const ranks = assignRanks(
     measuredNodes,
     edges.filter((edge) => !edge.manual && !isFeedbackEdge(edge)),
@@ -1161,6 +1240,16 @@ function layoutDiagramGraph(
     const group = groups.get(rank) ?? [];
     group.push(node);
     groups.set(rank, group);
+  });
+  const groupOrderByNode = new Map<string, number>();
+  (graph.groups ?? []).forEach((group, index) => {
+    group.nodeIds.forEach((nodeId) => groupOrderByNode.set(nodeId, index));
+  });
+  groups.forEach((group) => {
+    group.sort((first, second) =>
+      (groupOrderByNode.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+      (groupOrderByNode.get(second.id) ?? Number.MAX_SAFE_INTEGER),
+    );
   });
   const sortedRanks = [...groups.keys()].sort((first, second) => first - second);
   const horizontal = graph.direction === 'LR' || graph.direction === 'RL';
@@ -1269,7 +1358,232 @@ function layoutDiagramGraph(
     };
   });
 
-  return {edges, height, nodes, width};
+  return {
+    edges,
+    groups: layoutBoardGroups(graph.groups ?? [], nodes),
+    height,
+    nodes,
+    width,
+  };
+}
+
+function hasGroupLayout(groups: BoardGroup[], nodes: MeasuredLayoutNode[]) {
+  const topLevelGroups = groups.filter((group) => !group.parentId);
+  if (topLevelGroups.length < 2) return false;
+  const groupedNodeIds = new Set(groups.flatMap((group) => group.nodeIds));
+  return groupedNodeIds.size >= Math.max(2, Math.ceil(nodes.length * 0.5));
+}
+
+function layoutGroupedDiagramGraph(
+  measuredNodes: MeasuredLayoutNode[],
+  edges: ParsedDiagramEdge[],
+  groups: BoardGroup[],
+  direction: BoardDocument['direction'],
+  patches: Map<string, DiagramNodePatch>,
+  boardLayout: DiagramBoardLayout | undefined,
+  measuredEdgeLabels: ReadonlyMap<string, MeasuredEdgeLabel>,
+): LayoutGraph {
+  const horizontal = direction === 'LR' || direction === 'RL';
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const childrenByGroup = new Map<string, BoardGroup[]>();
+  groups.forEach((group) => {
+    if (!group.parentId || !groupById.has(group.parentId)) return;
+    const children = childrenByGroup.get(group.parentId) ?? [];
+    children.push(group);
+    childrenByGroup.set(group.parentId, children);
+  });
+  const topLevelGroups = groups.filter((group) => !group.parentId || !groupById.has(group.parentId));
+  const collectNodeIds = (group: BoardGroup): string[] => [
+    ...group.nodeIds,
+    ...(childrenByGroup.get(group.id) ?? []).flatMap(collectNodeIds),
+  ];
+  const topGroupNodeIds = new Map(
+    topLevelGroups.map((group) => [group.id, [...new Set(collectNodeIds(group))]]),
+  );
+  const rootGroupByNode = new Map<string, string>();
+  topLevelGroups.forEach((group) => {
+    (topGroupNodeIds.get(group.id) ?? []).forEach((nodeId) => {
+      if (!rootGroupByNode.has(nodeId)) rootGroupByNode.set(nodeId, group.id);
+    });
+  });
+  const ungrouped = measuredNodes.filter((node) => !rootGroupByNode.has(node.id));
+  const units = [
+    ...topLevelGroups.map((group, index) => ({
+      id: group.id,
+      index,
+      nodes: measuredNodes.filter((node) => rootGroupByNode.get(node.id) === group.id),
+    })),
+    ...(ungrouped.length > 0 ? [{id: '__ungrouped__', index: topLevelGroups.length, nodes: ungrouped}] : []),
+  ].filter((unit) => unit.nodes.length > 0);
+  const unitById = new Map(units.map((unit) => [unit.id, unit]));
+  const unitByNode = new Map<string, string>();
+  units.forEach((unit) => unit.nodes.forEach((node) => unitByNode.set(node.id, unit.id)));
+
+  // Mermaid subgraphs are semantic containers. Rank those containers first,
+  // then lay out their members inside them. Backward/cyclic dependencies are
+  // routed as feedback edges and never stretch or interleave the containers.
+  const ranks = new Map(units.map((unit) => [unit.id, 0]));
+  for (let pass = 0; pass < units.length; pass += 1) {
+    let changed = false;
+    edges.forEach((edge) => {
+      if (isFeedbackEdge(edge)) return;
+      const sourceId = unitByNode.get(edge.sourceId);
+      const targetId = unitByNode.get(edge.targetId);
+      if (!sourceId || !targetId || sourceId === targetId) return;
+      const source = unitById.get(sourceId);
+      const target = unitById.get(targetId);
+      if (!source || !target || source.index >= target.index) return;
+      const next = Math.max(ranks.get(targetId) ?? 0, (ranks.get(sourceId) ?? 0) + 1);
+      if (next !== ranks.get(targetId)) {
+        ranks.set(targetId, next);
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+
+  const nodeGap = 34;
+  const groupGap = 46;
+  const groupHorizontalPadding = 24;
+  const groupTopPadding = 44;
+  const groupBottomPadding = 22;
+  const margin = 42;
+  const groupedByRank = new Map<number, typeof units>();
+  units.forEach((unit) => {
+    const rank = ranks.get(unit.id) ?? 0;
+    const list = groupedByRank.get(rank) ?? [];
+    list.push(unit);
+    groupedByRank.set(rank, list);
+  });
+  const sortedRanks = [...groupedByRank.keys()].sort((first, second) => first - second);
+  const unitSize = new Map(units.map((unit) => {
+    const memberPrimary = Math.max(...unit.nodes.map((node) => horizontal ? node.width : node.height));
+    const memberCross = unit.nodes.reduce(
+      (sum, node) => sum + (horizontal ? node.height : node.width),
+      0,
+    ) + Math.max(0, unit.nodes.length - 1) * nodeGap;
+    return [unit.id, {
+      cross: memberCross + groupTopPadding + groupBottomPadding,
+      primary: memberPrimary + groupHorizontalPadding * 2,
+    }];
+  }));
+  const rankPrimarySizes = sortedRanks.map((rank) => Math.max(
+    ...(groupedByRank.get(rank) ?? []).map((unit) => unitSize.get(unit.id)?.primary ?? 0),
+  ));
+  const rankCrossSizes = sortedRanks.map((rank) => {
+    const rankUnits = groupedByRank.get(rank) ?? [];
+    return rankUnits.reduce((sum, unit) => sum + (unitSize.get(unit.id)?.cross ?? 0), 0) +
+      Math.max(0, rankUnits.length - 1) * groupGap;
+  });
+  const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
+  const rankGaps = calculateAdaptiveRankGaps(
+    sortedRanks.length,
+    horizontal,
+    edges.flatMap((edge) => {
+      const sourceUnit = unitByNode.get(edge.sourceId);
+      const targetUnit = unitByNode.get(edge.targetId);
+      const sourceRank = sourceUnit === undefined ? undefined : rankIndexes.get(ranks.get(sourceUnit) ?? 0);
+      const targetRank = targetUnit === undefined ? undefined : rankIndexes.get(ranks.get(targetUnit) ?? 0);
+      if (sourceRank === undefined || targetRank === undefined || sourceRank === targetRank) return [];
+      return [{
+        label: edge.label,
+        metrics: naturalEdgeLabelMetrics(edge, measuredEdgeLabels),
+        routePadding: PAIRED_ROUTE_LABEL_RESERVE,
+        sourceRank,
+        targetRank,
+      }];
+    }),
+    136,
+  );
+  const crossSize = Math.max(1, ...rankCrossSizes);
+  const primarySize = rankPrimarySizes.reduce((sum, size) => sum + size, 0) +
+    rankGaps.reduce((sum, gap) => sum + gap, 0);
+  const automaticWidth = horizontal ? primarySize + margin * 2 : crossSize + margin * 2;
+  const automaticHeight = horizontal ? crossSize + margin * 2 : primarySize + margin * 2;
+  const width = boardLayout?.width ?? automaticWidth;
+  const height = boardLayout?.height ?? automaticHeight;
+  const positions = new Map<string, DiagramNodePosition>();
+  let primaryCursor = margin;
+  sortedRanks.forEach((rank, rankIndex) => {
+    const rankUnits = groupedByRank.get(rank) ?? [];
+    const rankPrimary = rankPrimarySizes[rankIndex];
+    const primaryCenter = primaryCursor + rankPrimary / 2;
+    let crossCursor = margin + (crossSize - rankCrossSizes[rankIndex]) / 2;
+    rankUnits.forEach((unit) => {
+      const size = unitSize.get(unit.id)!;
+      let memberCursor = crossCursor + groupTopPadding;
+      unit.nodes.forEach((node) => {
+        const memberCross = horizontal ? node.height : node.width;
+        const crossCenter = memberCursor + memberCross / 2;
+        positions.set(node.id, horizontal
+          ? {x: primaryCenter, y: crossCenter}
+          : {x: crossCenter, y: primaryCenter});
+        memberCursor += memberCross + nodeGap;
+      });
+      crossCursor += size.cross + groupGap;
+    });
+    primaryCursor += rankPrimary + (rankGaps[rankIndex] ?? 0);
+  });
+  const nodes = measuredNodes.map<LayoutNode>((node) => {
+    const base = positions.get(node.id) ?? {x: margin + node.width / 2, y: margin + node.height / 2};
+    const oriented = direction === 'RL'
+      ? {x: width - base.x, y: base.y}
+      : direction === 'BT'
+        ? {x: base.x, y: height - base.y}
+        : base;
+    return {
+      ...node,
+      position: patches.get(node.id)?.position ?? boardLayout?.nodes[node.id]?.position ?? oriented,
+    };
+  });
+  return {
+    edges,
+    groups: layoutBoardGroups(groups, nodes),
+    height,
+    nodes,
+    width,
+  };
+}
+
+function layoutSequenceDiagramGraph(
+  measuredNodes: MeasuredLayoutNode[],
+  edges: ParsedDiagramEdge[],
+  groups: BoardGroup[],
+  boardLayout: DiagramBoardLayout | undefined,
+  measuredEdgeLabels: ReadonlyMap<string, MeasuredEdgeLabel>,
+): LayoutGraph {
+  const marginX = 56;
+  const actorY = 58;
+  const actorGap = 248;
+  const firstMessageY = 154;
+  const messageGap = Math.max(
+    68,
+    ...edges.map((edge) => naturalEdgeLabelMetrics(edge, measuredEdgeLabels).height + 34),
+  );
+  const automaticWidth = Math.max(
+    320,
+    marginX * 2 +
+      measuredNodes.reduce((sum, node) => sum + node.width, 0) +
+      Math.max(0, measuredNodes.length - 1) * actorGap,
+  );
+  const width = boardLayout?.width ?? automaticWidth;
+  const height = boardLayout?.height ?? firstMessageY + Math.max(1, edges.length) * messageGap + 48;
+  let cursor = marginX;
+  const nodes = measuredNodes.map<LayoutNode>((node) => {
+    const automaticPosition = {x: cursor + node.width / 2, y: actorY};
+    cursor += node.width + actorGap;
+    return {
+      ...node,
+      position: boardLayout?.nodes[node.id]?.position ?? automaticPosition,
+    };
+  });
+  return {
+    edges,
+    groups: layoutBoardGroups(groups, nodes),
+    height,
+    nodes,
+    width,
+  };
 }
 
 function applyBoardEdgeLayout(edges: ParsedDiagramEdge[], boardLayout?: DiagramBoardLayout) {
@@ -1448,7 +1762,11 @@ function routeGraphEdges(
   edges: ParsedDiagramEdge[],
   edgePatches: Map<string, DiagramEdgeRoutePatch>,
   measuredEdgeLabels: ReadonlyMap<string, MeasuredEdgeLabel> = new Map(),
+  diagramKind?: BoardDocument['diagramKind'],
 ) {
+  if (diagramKind === 'sequence') {
+    return routeSequenceGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels);
+  }
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const candidates = edges.flatMap<RoutedEdgeCandidate>((edge, index) => {
     if (edge.stroke === 'invisible') return [];
@@ -1566,6 +1884,63 @@ function routeGraphEdges(
         labelMaximumTextWidth: placement?.maximumTextWidth,
       },
     };
+  });
+}
+
+function routeSequenceGraphEdges(
+  nodes: LayoutNode[],
+  edges: ParsedDiagramEdge[],
+  edgePatches: Map<string, DiagramEdgeRoutePatch>,
+  measuredEdgeLabels: ReadonlyMap<string, MeasuredEdgeLabel>,
+) {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const firstMessageY = 154;
+  const messageGap = Math.max(
+    68,
+    ...edges.map((edge) => naturalEdgeLabelMetrics(edge, measuredEdgeLabels).height + 34),
+  );
+  return edges.flatMap((edge, index) => {
+    if (edge.stroke === 'invisible') return [];
+    const source = nodesById.get(edge.sourceId);
+    const target = nodesById.get(edge.targetId);
+    if (!source || !target) return [];
+    const y = firstMessageY + index * messageGap;
+    const forward = target.position.x >= source.position.x;
+    const sourceSide: AnchorSide = forward ? 'right' : 'left';
+    const targetSide: AnchorSide = forward ? 'left' : 'right';
+    const metrics = naturalEdgeLabelMetrics(edge, measuredEdgeLabels);
+    const automaticPoints = source.id === target.id
+      ? [
+          {x: source.position.x, y},
+          {x: source.position.x + 78, y},
+          {x: source.position.x + 78, y: y + 38},
+          {x: source.position.x, y: y + 38},
+        ]
+      : [
+          {x: source.position.x, y},
+          {x: target.position.x, y},
+        ];
+    const patch = edgePatches.get(edge.id);
+    const points = patch?.points.length && isOrthogonalRoute(patch.points)
+      ? normalizeOrthogonalPoints(patch.points)
+      : automaticPoints;
+    const route = finalizeEdgeRoute(points, edge.arrow, sourceSide, targetSide);
+    const midpoint = source.id === target.id
+      ? {x: source.position.x + 39, y: y - metrics.height / 2 - 7}
+      : {
+          x: (source.position.x + target.position.x) / 2,
+          y: y - metrics.height / 2 - 7,
+        };
+    return [{
+      edge,
+      route: {
+        ...route,
+        label: patch?.label ?? midpoint,
+        labelMaximumTextWidth: source.id === target.id
+          ? 156
+          : Math.max(120, Math.min(300, Math.abs(target.position.x - source.position.x) - 32)),
+      },
+    }];
   });
 }
 
@@ -2390,12 +2765,69 @@ function snapNodePosition(
   };
 }
 
-function getLayoutBounds(nodes: LayoutNode[], padding: number) {
-  if (nodes.length === 0) return {height: 120, left: 0, top: 0, width: 320};
-  const left = Math.min(...nodes.map((node) => node.position.x - node.width / 2)) - padding;
-  const right = Math.max(...nodes.map((node) => node.position.x + node.width / 2)) + padding;
-  const top = Math.min(...nodes.map((node) => node.position.y - node.height / 2)) - padding;
-  const bottom = Math.max(...nodes.map((node) => node.position.y + node.height / 2)) + padding;
+function layoutBoardGroups(groups: BoardGroup[], nodes: LayoutNode[]): LayoutGroup[] {
+  const nodeBounds = new Map(nodes.map((node) => [node.id, {
+    bottom: node.position.y + node.height / 2,
+    left: node.position.x - node.width / 2,
+    right: node.position.x + node.width / 2,
+    top: node.position.y - node.height / 2,
+  }]));
+  const groupsById = new Map(groups.map((group) => [group.id, group]));
+  const children = new Map<string, BoardGroup[]>();
+  groups.forEach((group) => {
+    if (!group.parentId || !groupsById.has(group.parentId)) return;
+    const nested = children.get(group.parentId) ?? [];
+    nested.push(group);
+    children.set(group.parentId, nested);
+  });
+  const resolved = new Map<string, LayoutGroup>();
+  const resolving = new Set<string>();
+  const resolve = (group: BoardGroup): LayoutGroup | undefined => {
+    const previous = resolved.get(group.id);
+    if (previous) return previous;
+    if (resolving.has(group.id)) return undefined;
+    resolving.add(group.id);
+    const rectangles: DiagramBounds[] = group.nodeIds.flatMap((nodeId) => {
+      const bounds = nodeBounds.get(nodeId);
+      return bounds ? [bounds] : [];
+    });
+    (children.get(group.id) ?? []).forEach((child) => {
+      const nested = resolve(child);
+      if (nested) rectangles.push(nested.bounds);
+    });
+    resolving.delete(group.id);
+    if (rectangles.length === 0) return undefined;
+    const bounds = {
+      bottom: Math.max(...rectangles.map((rectangle) => rectangle.bottom)) + 22,
+      left: Math.min(...rectangles.map((rectangle) => rectangle.left)) - 24,
+      right: Math.max(...rectangles.map((rectangle) => rectangle.right)) + 24,
+      top: Math.min(...rectangles.map((rectangle) => rectangle.top)) - 44,
+    };
+    const layoutGroup = {...group, bounds};
+    resolved.set(group.id, layoutGroup);
+    return layoutGroup;
+  };
+  return groups.flatMap((group) => {
+    const layout = resolve(group);
+    return layout ? [layout] : [];
+  });
+}
+
+function getLayoutBounds(nodes: LayoutNode[], padding: number, groups: LayoutGroup[] = []) {
+  const rectangles: DiagramBounds[] = [
+    ...nodes.map((node) => ({
+      bottom: node.position.y + node.height / 2,
+      left: node.position.x - node.width / 2,
+      right: node.position.x + node.width / 2,
+      top: node.position.y - node.height / 2,
+    })),
+    ...groups.map((group) => group.bounds),
+  ];
+  if (rectangles.length === 0) return {height: 120, left: 0, top: 0, width: 320};
+  const left = Math.min(...rectangles.map((rectangle) => rectangle.left)) - padding;
+  const right = Math.max(...rectangles.map((rectangle) => rectangle.right)) + padding;
+  const top = Math.min(...rectangles.map((rectangle) => rectangle.top)) - padding;
+  const bottom = Math.max(...rectangles.map((rectangle) => rectangle.bottom)) + padding;
   return {height: bottom - top, left, top, width: right - left};
 }
 
@@ -2403,13 +2835,17 @@ function getRenderedDiagramBounds(
   nodes: LayoutNode[],
   routedEdges: Array<{edge: ParsedDiagramEdge; route: EdgeRoute}>,
   padding: number,
+  groups: LayoutGroup[] = [],
 ) {
-  const rectangles = nodes.map((node) => ({
-    bottom: node.position.y + node.height / 2,
-    left: node.position.x - node.width / 2,
-    right: node.position.x + node.width / 2,
-    top: node.position.y - node.height / 2,
-  }));
+  const rectangles = [
+    ...nodes.map((node) => ({
+      bottom: node.position.y + node.height / 2,
+      left: node.position.x - node.width / 2,
+      right: node.position.x + node.width / 2,
+      top: node.position.y - node.height / 2,
+    })),
+    ...groups.map((group) => group.bounds),
+  ];
   routedEdges.forEach(({edge, route}) => {
     route.points.forEach((point) => {
       rectangles.push({bottom: point.y, left: point.x, right: point.x, top: point.y});
@@ -2448,8 +2884,9 @@ function getRenderedDiagramBounds(
 function getEmbeddedDiagramBounds(
   nodes: LayoutNode[],
   routedEdges: Array<{edge: ParsedDiagramEdge; route: EdgeRoute}>,
+  groups: LayoutGroup[] = [],
 ) {
-  const content = getRenderedDiagramBounds(nodes, routedEdges, 0);
+  const content = getRenderedDiagramBounds(nodes, routedEdges, 0, groups);
   const shortestContentAxis = Math.min(content.width, content.height);
   const padding = clamp(shortestContentAxis * 0.055, 24, 36);
   return {

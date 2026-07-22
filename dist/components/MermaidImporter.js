@@ -26,6 +26,7 @@ export async function importMermaid(source, options = {}) {
         diagramKind: graph.kind,
         direction: graph.direction,
         edges: graph.edges,
+        groups: graph.groups,
         nodes: graph.nodes,
         version: 1,
     }, options.layout);
@@ -89,6 +90,16 @@ function parseFlowchart(source) {
     const nodes = new Map();
     const edges = [];
     const classes = new Map();
+    const groups = [];
+    const groupStack = [];
+    const attachToActiveGroup = (nodeId) => {
+        const groupId = groupStack.at(-1);
+        if (!groupId)
+            return;
+        const group = groups.find((candidate) => candidate.id === groupId);
+        if (group && !group.nodeIds.includes(nodeId))
+            group.nodeIds.push(nodeId);
+    };
     const ensureNode = (token) => {
         const parsed = parseFlowNode(token);
         const previous = nodes.get(parsed.id);
@@ -97,10 +108,30 @@ function parseFlowchart(source) {
             ? { ...previous, classes: nodeClasses, tone: resolveTone(nodeClasses) }
             : { ...previous, ...parsed, classes: nodeClasses, tone: resolveTone(nodeClasses) };
         nodes.set(parsed.id, next);
+        attachToActiveGroup(parsed.id);
         return next;
     };
     lines.forEach((line) => {
-        if (!line || /^(?:subgraph|end|classDef|linkStyle|style|click|direction)\b/iu.test(line))
+        const subgraph = line.match(/^subgraph\s+(.+)$/iu);
+        if (subgraph) {
+            const parsed = parseFlowGroupDefinition(subgraph[1], groups.length);
+            const uniqueId = groups.some((group) => group.id === parsed.id)
+                ? `${parsed.id}:${groups.length + 1}`
+                : parsed.id;
+            groups.push({
+                ...parsed,
+                id: uniqueId,
+                nodeIds: [],
+                ...(groupStack.at(-1) ? { parentId: groupStack.at(-1) } : null),
+            });
+            groupStack.push(uniqueId);
+            return;
+        }
+        if (/^end\b/iu.test(line)) {
+            groupStack.pop();
+            return;
+        }
+        if (!line || /^(?:classDef|linkStyle|style|click|direction)\b/iu.test(line))
             return;
         const classAssignment = line.match(/^class\s+(.+?)\s+([\w-]+)$/iu);
         if (classAssignment) {
@@ -138,9 +169,23 @@ function parseFlowchart(source) {
     return {
         direction: resolveDirection(header[1]),
         edges,
+        groups: groups.length > 0 ? groups : undefined,
         kind: 'flowchart',
         nodes: [...nodes.values()],
     };
+}
+function parseFlowGroupDefinition(value, index) {
+    const definition = value.trim();
+    const explicit = definition.match(/^([\p{L}\p{N}_:-]+)\s*\[(.+)\]$/u);
+    if (explicit)
+        return { id: explicit[1], label: normalizeLabel(explicit[2]) };
+    const quoted = definition.match(/^["'](.+)["']$/u);
+    if (quoted)
+        return { id: `group:${index + 1}`, label: normalizeLabel(quoted[1]) };
+    const named = definition.match(/^([\p{L}\p{N}_:-]+)(?:\s+(.+))?$/u);
+    if (named)
+        return { id: named[1], label: normalizeLabel(named[2] ?? named[1]) };
+    return { id: `group:${index + 1}`, label: normalizeLabel(definition) };
 }
 function parseFlowEdges(line) {
     const labelled = line.match(/^(.+?)\s+--\s+(.+?)\s+-->\s+(.+)$/u);

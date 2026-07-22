@@ -19,6 +19,7 @@ export type {
   BoardDocumentChange,
   BoardDocumentChangeReason,
   BoardEdge,
+  BoardGroup,
   BoardImportEdgeLayout,
   BoardImportLayout,
   BoardImportNodeLayout,

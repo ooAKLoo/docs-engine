@@ -1,4 +1,4 @@
-import type { BoardAnchorSide, BoardDiagramKind, BoardDirection, BoardDocument, BoardImportLayout, BoardNodeShape, BoardNodeTone } from './BoardModel.js';
+import type { BoardAnchorSide, BoardDiagramKind, BoardDirection, BoardDocument, BoardGroup, BoardImportLayout, BoardNodeShape, BoardNodeTone } from './BoardModel.js';
 type DiagramDirection = BoardDirection;
 type DiagramAnchorSide = BoardAnchorSide;
 type DiagramNodeShape = BoardNodeShape;
@@ -27,6 +27,7 @@ export type ParsedDiagramEdge = {
 export type ParsedDiagramGraph = {
     direction: DiagramDirection;
     edges: ParsedDiagramEdge[];
+    groups?: BoardGroup[];
     kind: MermaidDiagramKind;
     nodes: ParsedDiagramNode[];
 };

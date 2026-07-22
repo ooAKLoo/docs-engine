@@ -2,6 +2,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { assignDiagramEdgeLanes, calculateAdaptiveRankGaps, compactDiagramEdgeLabelMetrics, measureDiagramEdgeLabel, measureDiagramTextWidth, placeDiagramEdgeLabels, wrapDiagramText, } from './BoardAutoLayout.js';
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 const DIRECT_ROUTE_LABEL_RESERVE = 47;
 const PAIRED_ROUTE_LABEL_RESERVE = 108;
 const PAIRED_LANE_BASE_OFFSET = 32;
@@ -44,12 +45,14 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
         const graph = ensureLayoutNodePositions(layoutDiagramGraph(boardDocument, new Map(), documentLayout(boardDocument), measuredEdgeLabels));
         if (!activePositions || !dragRef.current)
             return graph;
+        const nodes = graph.nodes.map((node) => {
+            const position = activePositions.get(node.id);
+            return position ? { ...node, position } : node;
+        });
         return {
             ...graph,
-            nodes: graph.nodes.map((node) => {
-                const position = activePositions.get(node.id);
-                return position ? { ...node, position } : node;
-            }),
+            groups: layoutBoardGroups(boardDocument.groups ?? [], nodes),
+            nodes,
         };
     }, [activePositions, boardDocument, measuredEdgeLabels]);
     const boardLayout = documentLayout(boardDocument);
@@ -64,7 +67,7 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
         if (!fitContent) {
             return { height: layout.height, left: 0, top: 0, width: layout.width };
         }
-        return getLayoutBounds(layout.nodes, 42);
+        return getLayoutBounds(layout.nodes, 42, layout.groups);
     }, [boardLayout, fitContent, layout]);
     useEffect(() => {
         onReady?.();
@@ -372,10 +375,10 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
     }
     if (activeEdgeRoute)
         routePatches.set(activeEdgeRoute.edgeId, activeEdgeRoute.route);
-    const routedEdges = routeGraphEdges(layout.nodes, layout.edges, routePatches, measuredEdgeLabels);
-    const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42);
+    const routedEdges = routeGraphEdges(layout.nodes, layout.edges, routePatches, measuredEdgeLabels, boardDocument.diagramKind);
+    const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42, layout.groups);
     const renderedDisplayBounds = fitContent
-        ? getEmbeddedDiagramBounds(layout.nodes, routedEdges)
+        ? getEmbeddedDiagramBounds(layout.nodes, routedEdges, layout.groups)
         : boardLayout?.width && boardLayout.height
             ? unionDiagramBounds({ height: boardLayout.height, left: 0, top: 0, width: boardLayout.width }, editedContentBounds)
             : displayBounds;
@@ -386,8 +389,8 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
     const draftRoute = connectionDraft && draftSource
         ? routeDraftConnection(draftSource, draftTarget, connectionDraft, layout.nodes)
         : null;
-    const guideBounds = getLayoutBounds(layout.nodes, 34);
-    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [_jsxs("g", { className: "de-board__edges", children: [routedEdges.map(({ edge, route }) => {
+    const guideBounds = getLayoutBounds(layout.nodes, 34, layout.groups);
+    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [layout.groups.length > 0 ? (_jsx("g", { className: "de-board__groups", children: layout.groups.map((group) => (_jsxs("g", { className: "de-board__group", "data-de-group-id": group.id, "data-tone": group.tone ?? 'neutral', children: [_jsx("rect", { x: group.bounds.left, y: group.bounds.top, width: group.bounds.right - group.bounds.left, height: group.bounds.bottom - group.bounds.top, rx: "18", ry: "18" }), _jsx("text", { x: group.bounds.left + 18, y: group.bounds.top + 24, children: group.label })] }, group.id))) })) : null, boardDocument.diagramKind === 'sequence' ? (_jsx("g", { className: "de-board__lifelines", children: layout.nodes.map((node) => (_jsx("line", { x1: node.position.x, x2: node.position.x, y1: node.position.y + node.height / 2 + 10, y2: layout.height - 28 }, `${node.id}:lifeline`))) })) : null, _jsxs("g", { className: "de-board__edges", children: [routedEdges.map(({ edge, route }) => {
                             const sourceNode = nodesById.get(edge.sourceId);
                             const targetNode = nodesById.get(edge.targetId);
                             if (!sourceNode || !targetNode || edge.stroke === 'invisible')
@@ -511,7 +514,7 @@ function BoardEdgeLabel({ edge, onMeasure, route, }) {
     const labelBoxY = activeBounds ? activeBounds.y - labelPaddingY : -metrics.height / 2;
     const labelBoxWidth = activeBounds ? activeBounds.width + labelPaddingX * 2 : metrics.width;
     const labelBoxHeight = activeBounds ? activeBounds.height + labelPaddingY * 2 : metrics.height;
-    useLayoutEffect(() => {
+    useIsomorphicLayoutEffect(() => {
         let cancelled = false;
         const measure = () => {
             const element = textRef.current;
@@ -610,6 +613,12 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
     // Dotted return edges are visual feedback loops. They must not turn an
     // otherwise forward flow into a cyclic rank graph and reshuffle the cards.
     const edges = applyBoardEdgeLayout(graph.edges, boardLayout);
+    if (graph.diagramKind === 'sequence') {
+        return layoutSequenceDiagramGraph(measuredNodes, edges, graph.groups ?? [], boardLayout, measuredEdgeLabels);
+    }
+    if (hasGroupLayout(graph.groups ?? [], measuredNodes)) {
+        return layoutGroupedDiagramGraph(measuredNodes, edges, graph.groups ?? [], graph.direction, patches, boardLayout, measuredEdgeLabels);
+    }
     const ranks = assignRanks(measuredNodes, edges.filter((edge) => !edge.manual && !isFeedbackEdge(edge)));
     const groups = new Map();
     measuredNodes.forEach((node) => {
@@ -617,6 +626,14 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
         const group = groups.get(rank) ?? [];
         group.push(node);
         groups.set(rank, group);
+    });
+    const groupOrderByNode = new Map();
+    (graph.groups ?? []).forEach((group, index) => {
+        group.nodeIds.forEach((nodeId) => groupOrderByNode.set(nodeId, index));
+    });
+    groups.forEach((group) => {
+        group.sort((first, second) => (groupOrderByNode.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+            (groupOrderByNode.get(second.id) ?? Number.MAX_SAFE_INTEGER));
     });
     const sortedRanks = [...groups.keys()].sort((first, second) => first - second);
     const horizontal = graph.direction === 'LR' || graph.direction === 'RL';
@@ -696,7 +713,203 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
             position: patches.get(node.id)?.position ?? boardLayout?.nodes[node.id]?.position ?? oriented,
         };
     });
-    return { edges, height, nodes, width };
+    return {
+        edges,
+        groups: layoutBoardGroups(graph.groups ?? [], nodes),
+        height,
+        nodes,
+        width,
+    };
+}
+function hasGroupLayout(groups, nodes) {
+    const topLevelGroups = groups.filter((group) => !group.parentId);
+    if (topLevelGroups.length < 2)
+        return false;
+    const groupedNodeIds = new Set(groups.flatMap((group) => group.nodeIds));
+    return groupedNodeIds.size >= Math.max(2, Math.ceil(nodes.length * 0.5));
+}
+function layoutGroupedDiagramGraph(measuredNodes, edges, groups, direction, patches, boardLayout, measuredEdgeLabels) {
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const childrenByGroup = new Map();
+    groups.forEach((group) => {
+        if (!group.parentId || !groupById.has(group.parentId))
+            return;
+        const children = childrenByGroup.get(group.parentId) ?? [];
+        children.push(group);
+        childrenByGroup.set(group.parentId, children);
+    });
+    const topLevelGroups = groups.filter((group) => !group.parentId || !groupById.has(group.parentId));
+    const collectNodeIds = (group) => [
+        ...group.nodeIds,
+        ...(childrenByGroup.get(group.id) ?? []).flatMap(collectNodeIds),
+    ];
+    const topGroupNodeIds = new Map(topLevelGroups.map((group) => [group.id, [...new Set(collectNodeIds(group))]]));
+    const rootGroupByNode = new Map();
+    topLevelGroups.forEach((group) => {
+        (topGroupNodeIds.get(group.id) ?? []).forEach((nodeId) => {
+            if (!rootGroupByNode.has(nodeId))
+                rootGroupByNode.set(nodeId, group.id);
+        });
+    });
+    const ungrouped = measuredNodes.filter((node) => !rootGroupByNode.has(node.id));
+    const units = [
+        ...topLevelGroups.map((group, index) => ({
+            id: group.id,
+            index,
+            nodes: measuredNodes.filter((node) => rootGroupByNode.get(node.id) === group.id),
+        })),
+        ...(ungrouped.length > 0 ? [{ id: '__ungrouped__', index: topLevelGroups.length, nodes: ungrouped }] : []),
+    ].filter((unit) => unit.nodes.length > 0);
+    const unitById = new Map(units.map((unit) => [unit.id, unit]));
+    const unitByNode = new Map();
+    units.forEach((unit) => unit.nodes.forEach((node) => unitByNode.set(node.id, unit.id)));
+    // Mermaid subgraphs are semantic containers. Rank those containers first,
+    // then lay out their members inside them. Backward/cyclic dependencies are
+    // routed as feedback edges and never stretch or interleave the containers.
+    const ranks = new Map(units.map((unit) => [unit.id, 0]));
+    for (let pass = 0; pass < units.length; pass += 1) {
+        let changed = false;
+        edges.forEach((edge) => {
+            if (isFeedbackEdge(edge))
+                return;
+            const sourceId = unitByNode.get(edge.sourceId);
+            const targetId = unitByNode.get(edge.targetId);
+            if (!sourceId || !targetId || sourceId === targetId)
+                return;
+            const source = unitById.get(sourceId);
+            const target = unitById.get(targetId);
+            if (!source || !target || source.index >= target.index)
+                return;
+            const next = Math.max(ranks.get(targetId) ?? 0, (ranks.get(sourceId) ?? 0) + 1);
+            if (next !== ranks.get(targetId)) {
+                ranks.set(targetId, next);
+                changed = true;
+            }
+        });
+        if (!changed)
+            break;
+    }
+    const nodeGap = 34;
+    const groupGap = 46;
+    const groupHorizontalPadding = 24;
+    const groupTopPadding = 44;
+    const groupBottomPadding = 22;
+    const margin = 42;
+    const groupedByRank = new Map();
+    units.forEach((unit) => {
+        const rank = ranks.get(unit.id) ?? 0;
+        const list = groupedByRank.get(rank) ?? [];
+        list.push(unit);
+        groupedByRank.set(rank, list);
+    });
+    const sortedRanks = [...groupedByRank.keys()].sort((first, second) => first - second);
+    const unitSize = new Map(units.map((unit) => {
+        const memberPrimary = Math.max(...unit.nodes.map((node) => horizontal ? node.width : node.height));
+        const memberCross = unit.nodes.reduce((sum, node) => sum + (horizontal ? node.height : node.width), 0) + Math.max(0, unit.nodes.length - 1) * nodeGap;
+        return [unit.id, {
+                cross: memberCross + groupTopPadding + groupBottomPadding,
+                primary: memberPrimary + groupHorizontalPadding * 2,
+            }];
+    }));
+    const rankPrimarySizes = sortedRanks.map((rank) => Math.max(...(groupedByRank.get(rank) ?? []).map((unit) => unitSize.get(unit.id)?.primary ?? 0)));
+    const rankCrossSizes = sortedRanks.map((rank) => {
+        const rankUnits = groupedByRank.get(rank) ?? [];
+        return rankUnits.reduce((sum, unit) => sum + (unitSize.get(unit.id)?.cross ?? 0), 0) +
+            Math.max(0, rankUnits.length - 1) * groupGap;
+    });
+    const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
+    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, edges.flatMap((edge) => {
+        const sourceUnit = unitByNode.get(edge.sourceId);
+        const targetUnit = unitByNode.get(edge.targetId);
+        const sourceRank = sourceUnit === undefined ? undefined : rankIndexes.get(ranks.get(sourceUnit) ?? 0);
+        const targetRank = targetUnit === undefined ? undefined : rankIndexes.get(ranks.get(targetUnit) ?? 0);
+        if (sourceRank === undefined || targetRank === undefined || sourceRank === targetRank)
+            return [];
+        return [{
+                label: edge.label,
+                metrics: naturalEdgeLabelMetrics(edge, measuredEdgeLabels),
+                routePadding: PAIRED_ROUTE_LABEL_RESERVE,
+                sourceRank,
+                targetRank,
+            }];
+    }), 136);
+    const crossSize = Math.max(1, ...rankCrossSizes);
+    const primarySize = rankPrimarySizes.reduce((sum, size) => sum + size, 0) +
+        rankGaps.reduce((sum, gap) => sum + gap, 0);
+    const automaticWidth = horizontal ? primarySize + margin * 2 : crossSize + margin * 2;
+    const automaticHeight = horizontal ? crossSize + margin * 2 : primarySize + margin * 2;
+    const width = boardLayout?.width ?? automaticWidth;
+    const height = boardLayout?.height ?? automaticHeight;
+    const positions = new Map();
+    let primaryCursor = margin;
+    sortedRanks.forEach((rank, rankIndex) => {
+        const rankUnits = groupedByRank.get(rank) ?? [];
+        const rankPrimary = rankPrimarySizes[rankIndex];
+        const primaryCenter = primaryCursor + rankPrimary / 2;
+        let crossCursor = margin + (crossSize - rankCrossSizes[rankIndex]) / 2;
+        rankUnits.forEach((unit) => {
+            const size = unitSize.get(unit.id);
+            let memberCursor = crossCursor + groupTopPadding;
+            unit.nodes.forEach((node) => {
+                const memberCross = horizontal ? node.height : node.width;
+                const crossCenter = memberCursor + memberCross / 2;
+                positions.set(node.id, horizontal
+                    ? { x: primaryCenter, y: crossCenter }
+                    : { x: crossCenter, y: primaryCenter });
+                memberCursor += memberCross + nodeGap;
+            });
+            crossCursor += size.cross + groupGap;
+        });
+        primaryCursor += rankPrimary + (rankGaps[rankIndex] ?? 0);
+    });
+    const nodes = measuredNodes.map((node) => {
+        const base = positions.get(node.id) ?? { x: margin + node.width / 2, y: margin + node.height / 2 };
+        const oriented = direction === 'RL'
+            ? { x: width - base.x, y: base.y }
+            : direction === 'BT'
+                ? { x: base.x, y: height - base.y }
+                : base;
+        return {
+            ...node,
+            position: patches.get(node.id)?.position ?? boardLayout?.nodes[node.id]?.position ?? oriented,
+        };
+    });
+    return {
+        edges,
+        groups: layoutBoardGroups(groups, nodes),
+        height,
+        nodes,
+        width,
+    };
+}
+function layoutSequenceDiagramGraph(measuredNodes, edges, groups, boardLayout, measuredEdgeLabels) {
+    const marginX = 56;
+    const actorY = 58;
+    const actorGap = 248;
+    const firstMessageY = 154;
+    const messageGap = Math.max(68, ...edges.map((edge) => naturalEdgeLabelMetrics(edge, measuredEdgeLabels).height + 34));
+    const automaticWidth = Math.max(320, marginX * 2 +
+        measuredNodes.reduce((sum, node) => sum + node.width, 0) +
+        Math.max(0, measuredNodes.length - 1) * actorGap);
+    const width = boardLayout?.width ?? automaticWidth;
+    const height = boardLayout?.height ?? firstMessageY + Math.max(1, edges.length) * messageGap + 48;
+    let cursor = marginX;
+    const nodes = measuredNodes.map((node) => {
+        const automaticPosition = { x: cursor + node.width / 2, y: actorY };
+        cursor += node.width + actorGap;
+        return {
+            ...node,
+            position: boardLayout?.nodes[node.id]?.position ?? automaticPosition,
+        };
+    });
+    return {
+        edges,
+        groups: layoutBoardGroups(groups, nodes),
+        height,
+        nodes,
+        width,
+    };
 }
 function applyBoardEdgeLayout(edges, boardLayout) {
     if (!boardLayout?.edges?.length)
@@ -831,7 +1044,10 @@ function pairedLaneOffset(laneIndex) {
     const lane = Math.max(1, Math.abs(laneIndex));
     return PAIRED_LANE_BASE_OFFSET + (lane - 1) * PAIRED_LANE_STEP;
 }
-function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map()) {
+function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map(), diagramKind) {
+    if (diagramKind === 'sequence') {
+        return routeSequenceGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels);
+    }
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
     const candidates = edges.flatMap((edge, index) => {
         if (edge.stroke === 'invisible')
@@ -913,6 +1129,56 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
                 labelMaximumTextWidth: placement?.maximumTextWidth,
             },
         };
+    });
+}
+function routeSequenceGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels) {
+    const nodesById = new Map(nodes.map((node) => [node.id, node]));
+    const firstMessageY = 154;
+    const messageGap = Math.max(68, ...edges.map((edge) => naturalEdgeLabelMetrics(edge, measuredEdgeLabels).height + 34));
+    return edges.flatMap((edge, index) => {
+        if (edge.stroke === 'invisible')
+            return [];
+        const source = nodesById.get(edge.sourceId);
+        const target = nodesById.get(edge.targetId);
+        if (!source || !target)
+            return [];
+        const y = firstMessageY + index * messageGap;
+        const forward = target.position.x >= source.position.x;
+        const sourceSide = forward ? 'right' : 'left';
+        const targetSide = forward ? 'left' : 'right';
+        const metrics = naturalEdgeLabelMetrics(edge, measuredEdgeLabels);
+        const automaticPoints = source.id === target.id
+            ? [
+                { x: source.position.x, y },
+                { x: source.position.x + 78, y },
+                { x: source.position.x + 78, y: y + 38 },
+                { x: source.position.x, y: y + 38 },
+            ]
+            : [
+                { x: source.position.x, y },
+                { x: target.position.x, y },
+            ];
+        const patch = edgePatches.get(edge.id);
+        const points = patch?.points.length && isOrthogonalRoute(patch.points)
+            ? normalizeOrthogonalPoints(patch.points)
+            : automaticPoints;
+        const route = finalizeEdgeRoute(points, edge.arrow, sourceSide, targetSide);
+        const midpoint = source.id === target.id
+            ? { x: source.position.x + 39, y: y - metrics.height / 2 - 7 }
+            : {
+                x: (source.position.x + target.position.x) / 2,
+                y: y - metrics.height / 2 - 7,
+            };
+        return [{
+                edge,
+                route: {
+                    ...route,
+                    label: patch?.label ?? midpoint,
+                    labelMaximumTextWidth: source.id === target.id
+                        ? 156
+                        : Math.max(120, Math.min(300, Math.abs(target.position.x - source.position.x) - 32)),
+                },
+            }];
     });
 }
 function measuredEdgeLabel(edge, measurements) {
@@ -1615,22 +1881,86 @@ function snapNodePosition(nodes, movingNode, requested) {
         },
     };
 }
-function getLayoutBounds(nodes, padding) {
-    if (nodes.length === 0)
+function layoutBoardGroups(groups, nodes) {
+    const nodeBounds = new Map(nodes.map((node) => [node.id, {
+            bottom: node.position.y + node.height / 2,
+            left: node.position.x - node.width / 2,
+            right: node.position.x + node.width / 2,
+            top: node.position.y - node.height / 2,
+        }]));
+    const groupsById = new Map(groups.map((group) => [group.id, group]));
+    const children = new Map();
+    groups.forEach((group) => {
+        if (!group.parentId || !groupsById.has(group.parentId))
+            return;
+        const nested = children.get(group.parentId) ?? [];
+        nested.push(group);
+        children.set(group.parentId, nested);
+    });
+    const resolved = new Map();
+    const resolving = new Set();
+    const resolve = (group) => {
+        const previous = resolved.get(group.id);
+        if (previous)
+            return previous;
+        if (resolving.has(group.id))
+            return undefined;
+        resolving.add(group.id);
+        const rectangles = group.nodeIds.flatMap((nodeId) => {
+            const bounds = nodeBounds.get(nodeId);
+            return bounds ? [bounds] : [];
+        });
+        (children.get(group.id) ?? []).forEach((child) => {
+            const nested = resolve(child);
+            if (nested)
+                rectangles.push(nested.bounds);
+        });
+        resolving.delete(group.id);
+        if (rectangles.length === 0)
+            return undefined;
+        const bounds = {
+            bottom: Math.max(...rectangles.map((rectangle) => rectangle.bottom)) + 22,
+            left: Math.min(...rectangles.map((rectangle) => rectangle.left)) - 24,
+            right: Math.max(...rectangles.map((rectangle) => rectangle.right)) + 24,
+            top: Math.min(...rectangles.map((rectangle) => rectangle.top)) - 44,
+        };
+        const layoutGroup = { ...group, bounds };
+        resolved.set(group.id, layoutGroup);
+        return layoutGroup;
+    };
+    return groups.flatMap((group) => {
+        const layout = resolve(group);
+        return layout ? [layout] : [];
+    });
+}
+function getLayoutBounds(nodes, padding, groups = []) {
+    const rectangles = [
+        ...nodes.map((node) => ({
+            bottom: node.position.y + node.height / 2,
+            left: node.position.x - node.width / 2,
+            right: node.position.x + node.width / 2,
+            top: node.position.y - node.height / 2,
+        })),
+        ...groups.map((group) => group.bounds),
+    ];
+    if (rectangles.length === 0)
         return { height: 120, left: 0, top: 0, width: 320 };
-    const left = Math.min(...nodes.map((node) => node.position.x - node.width / 2)) - padding;
-    const right = Math.max(...nodes.map((node) => node.position.x + node.width / 2)) + padding;
-    const top = Math.min(...nodes.map((node) => node.position.y - node.height / 2)) - padding;
-    const bottom = Math.max(...nodes.map((node) => node.position.y + node.height / 2)) + padding;
+    const left = Math.min(...rectangles.map((rectangle) => rectangle.left)) - padding;
+    const right = Math.max(...rectangles.map((rectangle) => rectangle.right)) + padding;
+    const top = Math.min(...rectangles.map((rectangle) => rectangle.top)) - padding;
+    const bottom = Math.max(...rectangles.map((rectangle) => rectangle.bottom)) + padding;
     return { height: bottom - top, left, top, width: right - left };
 }
-function getRenderedDiagramBounds(nodes, routedEdges, padding) {
-    const rectangles = nodes.map((node) => ({
-        bottom: node.position.y + node.height / 2,
-        left: node.position.x - node.width / 2,
-        right: node.position.x + node.width / 2,
-        top: node.position.y - node.height / 2,
-    }));
+function getRenderedDiagramBounds(nodes, routedEdges, padding, groups = []) {
+    const rectangles = [
+        ...nodes.map((node) => ({
+            bottom: node.position.y + node.height / 2,
+            left: node.position.x - node.width / 2,
+            right: node.position.x + node.width / 2,
+            top: node.position.y - node.height / 2,
+        })),
+        ...groups.map((group) => group.bounds),
+    ];
     routedEdges.forEach(({ edge, route }) => {
         route.points.forEach((point) => {
             rectangles.push({ bottom: point.y, left: point.x, right: point.x, top: point.y });
@@ -1662,8 +1992,8 @@ function getRenderedDiagramBounds(nodes, routedEdges, padding) {
     const bottom = Math.max(...rectangles.map((rectangle) => rectangle.bottom)) + padding;
     return { height: bottom - top, left, top, width: right - left };
 }
-function getEmbeddedDiagramBounds(nodes, routedEdges) {
-    const content = getRenderedDiagramBounds(nodes, routedEdges, 0);
+function getEmbeddedDiagramBounds(nodes, routedEdges, groups = []) {
+    const content = getRenderedDiagramBounds(nodes, routedEdges, 0, groups);
     const shortestContentAxis = Math.min(content.width, content.height);
     const padding = clamp(shortestContentAxis * 0.055, 24, 36);
     return {

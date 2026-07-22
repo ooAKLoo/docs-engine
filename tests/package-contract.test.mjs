@@ -176,6 +176,8 @@ test('uses BoardDocument as the only editable diagram model', async () => {
   assert.match(boardModel, /version: 1/);
   assert.match(boardModel, /nodes: BoardNode\[\]/);
   assert.match(boardModel, /edges: BoardEdge\[\]/);
+  assert.match(boardModel, /export type BoardGroup/);
+  assert.match(boardModel, /groups\?: BoardGroup\[\]/);
   assert.match(board, /document\?: BoardDocument/);
   assert.match(board, /defaultDocument\?: BoardDocument/);
   assert.match(board, /importSource\?: BoardImportSource/);
@@ -197,6 +199,9 @@ test('uses BoardDocument as the only editable diagram model', async () => {
   assert.match(boardCanvas, /onPointerMove/);
   assert.match(boardCanvas, /onDoubleClick/);
   assert.match(boardCanvas, /routeGraphEdges/);
+  assert.match(boardCanvas, /routeSequenceGraphEdges/);
+  assert.match(boardCanvas, /className="de-board__lifelines"/);
+  assert.match(boardCanvas, /className="de-board__groups"/);
   assert.match(boardCanvas, /placeDiagramEdgeLabels/);
   assert.match(boardCanvas, /getEmbeddedDiagramBounds/);
   assert.match(boardCanvas, /preserveAspectRatio="xMidYMid meet"/);
@@ -216,6 +221,8 @@ test('uses BoardDocument as the only editable diagram model', async () => {
   assert.match(boardCanvas, /moveRouteSegment/);
   assert.doesNotMatch(boardCanvas, /markerEnd/);
   assert.match(styles, /\.de-diagram-inline-toolbar/);
+  assert.match(styles, /\.de-board__group rect/);
+  assert.match(styles, /\.de-board__lifelines line/);
   assert.match(styles, /\.de-diagram-inline-stage/);
   assert.match(styles, /\.de-board__edge-label\[data-floating='true'\] rect/);
   assert.doesNotMatch(styles, /\.de-native-mermaid|\.de-board-flowchart/);

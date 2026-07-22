@@ -32,6 +32,15 @@ export type BoardNode = {
   width?: number;
 };
 
+/** A semantic container such as a module boundary, responsibility area or deployment zone. */
+export type BoardGroup = {
+  id: string;
+  label: string;
+  nodeIds: string[];
+  parentId?: string;
+  tone?: BoardNodeTone;
+};
+
 export type BoardEdge = {
   arrow: boolean;
   bareLabel?: boolean;
@@ -63,6 +72,7 @@ export type BoardDocument = {
   diagramKind?: BoardDiagramKind;
   direction: BoardDirection;
   edges: BoardEdge[];
+  groups?: BoardGroup[];
   nodes: BoardNode[];
   version: 1;
 };

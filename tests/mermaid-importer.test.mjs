@@ -37,6 +37,27 @@ test('parses labelled feedback edges and chained flowchart edges', async () => {
   );
 });
 
+test('preserves Mermaid subgraphs as native Board groups', async () => {
+  const document = await importMermaid(`flowchart LR
+    subgraph Access[接入与装配]
+      gateway[设备网关]
+      subgraph Clients[客户端]
+        guardian[家长应用]
+      end
+    end
+    subgraph Runtime[儿童运行时]
+      realtime[实时语音]
+    end
+    gateway --> realtime
+    guardian --> realtime`);
+
+  assert.deepEqual(document.groups, [
+    {id: 'Access', label: '接入与装配', nodeIds: ['gateway']},
+    {id: 'Clients', label: '客户端', nodeIds: ['guardian'], parentId: 'Access'},
+    {id: 'Runtime', label: '儿童运行时', nodeIds: ['realtime']},
+  ]);
+});
+
 test('keeps dashed sequence arrows out of actor ids', async () => {
   const graph = await importMermaid(`sequenceDiagram
     participant Child as 孩子

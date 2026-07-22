@@ -4,7 +4,7 @@ export { CodeBlock, type CodeBlockProps } from './components/CodeBlock.js';
 export { Board, type BoardMediaChange, type BoardMediaTransform, type BoardMode, type BoardProps, } from './components/Board.js';
 export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImporter.js';
 export { applyBoardOperation } from './components/BoardModel.js';
-export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardDocumentChange, BoardDocumentChangeReason, BoardEdge, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardImportSource, BoardNode, BoardNodeShape, BoardNodeTone, BoardOperation, BoardPoint, } from './components/BoardModel.js';
+export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardDocumentChange, BoardDocumentChangeReason, BoardEdge, BoardGroup, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardImportSource, BoardNode, BoardNodeShape, BoardNodeTone, BoardOperation, BoardPoint, } from './components/BoardModel.js';
 export { DocumentContent, type DocumentContentProps } from './components/DocumentContent.js';
 export { Formula, type FormulaProps } from './components/Formula.js';
 export { Priority, type PriorityLevel, type PriorityProps } from './components/Priority.js';
