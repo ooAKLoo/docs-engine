@@ -1,7 +1,33 @@
 'use client';
 
 import type {PointerEvent as ReactPointerEvent} from 'react';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {
+  assignDiagramEdgeLanes,
+  calculateAdaptiveRankGaps,
+  compactDiagramEdgeLabelMetrics,
+  type DiagramLabelMetrics,
+  type DiagramLabelPlacement,
+  measureDiagramEdgeLabel,
+  measureDiagramTextWidth,
+  placeDiagramEdgeLabels,
+  wrapDiagramText,
+} from './DiagramAutoLayout.js';
+import {
+  parseMermaidBoard,
+  type DiagramAnchorSide,
+  type DiagramNodeShape,
+  type DiagramNodeTone,
+  type ParsedDiagramEdge,
+  type ParsedDiagramGraph,
+  type ParsedDiagramNode,
+} from './MermaidBoardParser.js';
+
+export type {
+  DiagramAnchorSide,
+  DiagramNodeShape,
+  DiagramNodeTone,
+} from './MermaidBoardParser.js';
 
 export type DiagramNodeChangeReason = 'label' | 'position';
 
@@ -63,51 +89,22 @@ export type MermaidEditRequest = {
   rect: DOMRect;
 };
 
-type FlowDirection = 'LR' | 'RL' | 'TB' | 'BT';
-export type DiagramNodeShape = 'rect' | 'round' | 'stadium' | 'circle' | 'diamond';
-export type DiagramNodeTone = 'blue' | 'purple' | 'teal' | 'green' | 'orange' | 'neutral';
-type FlowNodeShape = DiagramNodeShape;
-type FlowNodeTone = DiagramNodeTone;
-
-type ParsedFlowNode = {
-  classes: string[];
-  id: string;
-  label: string;
-  placeholder?: boolean;
-  shape: FlowNodeShape;
-  tone: FlowNodeTone;
-};
-
-type ParsedFlowEdge = {
-  arrow: boolean;
-  bareLabel?: boolean;
-  id: string;
-  label: string;
-  labelAlign?: 'start' | 'middle' | 'end';
-  sourceSide?: AnchorSide;
-  sourceId: string;
-  stroke: 'normal' | 'thick' | 'dotted' | 'invisible';
-  targetSide?: AnchorSide;
-  targetId: string;
-};
-
-type ParsedFlowGraph = {
-  direction: FlowDirection;
-  edges: ParsedFlowEdge[];
-  nodes: ParsedFlowNode[];
-};
-
-type LayoutNode = ParsedFlowNode & {
+type LayoutNode = ParsedDiagramNode & {
   height: number;
   position: DiagramNodePosition;
+  textLines: string[];
   width: number;
 };
 
 type LayoutGraph = {
-  edges: ParsedFlowEdge[];
+  edges: ParsedDiagramEdge[];
   height: number;
   nodes: LayoutNode[];
   width: number;
+};
+
+type MeasuredEdgeLabel = DiagramLabelMetrics & {
+  label: string;
 };
 
 type AlignmentGuides = {
@@ -115,12 +112,14 @@ type AlignmentGuides = {
   y?: number;
 };
 
-export type DiagramAnchorSide = 'top' | 'right' | 'bottom' | 'left';
 type AnchorSide = DiagramAnchorSide;
 
 type EdgeRoute = {
   arrowPoints?: string;
   label: DiagramNodePosition;
+  labelMode?: DiagramLabelPlacement['mode'];
+  /** Text width selected from the actual carrier segment after routing. */
+  labelMaximumTextWidth?: number;
   path: string;
   points: DiagramNodePosition[];
   sourceSide: AnchorSide;
@@ -159,6 +158,11 @@ type EdgeRouteDragSession = {
   points: DiagramNodePosition[];
   pointerId: number;
 };
+
+const DIRECT_ROUTE_LABEL_RESERVE = 47;
+const PAIRED_ROUTE_LABEL_RESERVE = 108;
+const PAIRED_LANE_BASE_OFFSET = 32;
+const PAIRED_LANE_STEP = 30;
 
 export type DiagramCreatedNode = {
   id: string;
@@ -200,7 +204,7 @@ export type DiagramConnectionDropRequest = {
   tone: DiagramNodeTone;
 };
 
-export type MermaidFlowchartProps = {
+export type MermaidBoardProps = {
   accessibleLabel: string;
   boardLayout?: DiagramBoardLayout;
   createdEdges?: DiagramCreatedEdge[];
@@ -225,12 +229,9 @@ export type MermaidFlowchartProps = {
   source: string;
 };
 
-const resolvedGraphs = new Map<string, ParsedFlowGraph>();
-const pendingGraphs = new Map<string, Promise<ParsedFlowGraph>>();
-let parseQueue: Promise<void> = Promise.resolve();
-let mermaidInitialized = false;
+const resolvedGraphs = new Map<string, ParsedDiagramGraph>();
 
-export function MermaidFlowchart({
+export function MermaidBoard({
   accessibleLabel,
   boardLayout,
   createdEdges = [],
@@ -253,12 +254,12 @@ export function MermaidFlowchart({
   selectedEdgeId = null,
   selectedNodeIds = [],
   source,
-}: MermaidFlowchartProps) {
+}: MermaidBoardProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragSession | null>(null);
   const connectionDraftRef = useRef<ConnectionDraft | null>(null);
   const edgeRouteDragRef = useRef<EdgeRouteDragSession | null>(null);
-  const [parsedGraph, setParsedGraph] = useState<ParsedFlowGraph | null>(
+  const [parsedGraph, setParsedGraph] = useState<ParsedDiagramGraph | null>(
     () => resolvedGraphs.get(source) ?? null,
   );
   const [parseError, setParseError] = useState('');
@@ -271,9 +272,33 @@ export function MermaidFlowchart({
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [activeEdgeRoute, setActiveEdgeRoute] = useState<DiagramEdgeRouteChange | null>(null);
+  const [measuredEdgeLabels, setMeasuredEdgeLabels] = useState<Map<string, MeasuredEdgeLabel>>(
+    () => new Map(),
+  );
+
+  const recordEdgeLabelMeasurement = useCallback(
+    (edgeId: string, label: string, metrics: DiagramLabelMetrics) => {
+      setMeasuredEdgeLabels((current) => {
+        const previous = current.get(edgeId);
+        if (
+          previous?.label === label &&
+          Math.abs(previous.width - metrics.width) < 0.25 &&
+          Math.abs(previous.height - metrics.height) < 0.25 &&
+          sameTextLines(previous.lines, metrics.lines)
+        ) {
+          return current;
+        }
+        const next = new Map(current);
+        next.set(edgeId, {...metrics, label});
+        return next;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
+    setMeasuredEdgeLabels(new Map());
     setParseError('');
     const cached = resolvedGraphs.get(source);
     if (cached) {
@@ -281,13 +306,13 @@ export function MermaidFlowchart({
       return;
     }
     setParsedGraph(null);
-    void parseMermaidFlowchart(source)
+    void parseMermaidBoard(source)
       .then((graph) => {
         if (!cancelled) setParsedGraph(graph);
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setParseError(error instanceof Error ? error.message : 'Mermaid 流程图解析失败');
+          setParseError(error instanceof Error ? error.message : 'Mermaid 图表解析失败');
         }
       });
     return () => {
@@ -301,7 +326,7 @@ export function MermaidFlowchart({
     // placed on top of it, otherwise every new relationship would re-rank existing nodes.
     const graph = ensureLayoutNodePositions(
       appendBoardElements(
-        layoutFlowGraph(parsedGraph, patches, boardLayout),
+        layoutDiagramGraph(parsedGraph, patches, boardLayout, measuredEdgeLabels),
         createdNodes,
         createdEdges,
         patches,
@@ -315,12 +340,12 @@ export function MermaidFlowchart({
         return position ? {...node, position} : node;
       }),
     };
-  }, [activePositions, boardLayout, createdEdges, createdNodes, parsedGraph, patches, revision]);
+  }, [activePositions, boardLayout, createdEdges, createdNodes, measuredEdgeLabels, parsedGraph, patches, revision]);
 
   const displayBounds = useMemo(() => {
     if (!layout) return {height: 120, left: 0, top: 0, width: 320};
-    // A designed Board scene owns its intentional whitespace (for example the
-    // feedback lane beneath a flow). Do not crop it down to node-only bounds.
+    // A designed Board scene owns its intentional whitespace in the viewer.
+    // The inline preview applies a content fit later through fitPatchedBounds.
     if (boardLayout && createdNodes.length === 0) {
       return {height: boardLayout.height, left: 0, top: 0, width: boardLayout.width};
     }
@@ -338,7 +363,7 @@ export function MermaidFlowchart({
     if (!editable || panActive) return;
     onSelectNode?.(node.id);
     const matrix = element.ownerSVGElement?.getScreenCTM();
-    const shape = element.querySelector<SVGGraphicsElement>('.de-board-flowchart__node-shape');
+    const shape = element.querySelector<SVGGraphicsElement>('.de-mermaid-board__node-shape');
     onEditRequest?.({
       fontSize: 14 * (matrix ? Math.hypot(matrix.a, matrix.b) : 1),
       nodeId: node.id,
@@ -627,8 +652,8 @@ export function MermaidFlowchart({
 
   if (parseError) {
     return (
-      <div className="de-board-flowchart de-board-flowchart--error" role="img" aria-label={accessibleLabel}>
-        <strong>暂时无法渲染这张流程图</strong>
+      <div className="de-mermaid-board de-mermaid-board--error" role="img" aria-label={accessibleLabel}>
+        <strong>暂时无法渲染这张图表</strong>
         <span>{parseError}</span>
       </div>
     );
@@ -637,7 +662,7 @@ export function MermaidFlowchart({
   if (!layout) {
     return (
       <div
-        className="de-board-flowchart de-board-flowchart--loading"
+        className="de-mermaid-board de-mermaid-board--loading"
         role="img"
         aria-label={accessibleLabel}
       >
@@ -664,7 +689,25 @@ export function MermaidFlowchart({
     }
   }
   if (activeEdgeRoute) routePatches.set(activeEdgeRoute.edgeId, activeEdgeRoute.route);
-  const routedEdges = routeGraphEdges(layout.nodes, layout.edges, routePatches);
+  const routedEdges = routeGraphEdges(
+    layout.nodes,
+    layout.edges,
+    routePatches,
+    measuredEdgeLabels,
+  );
+  const editedContentBounds = createdNodes.length > 0
+    ? getRenderedDiagramBounds(layout.nodes, routedEdges, 42)
+    : undefined;
+  const renderedDisplayBounds = fitPatchedBounds
+    ? getEmbeddedDiagramBounds(layout.nodes, routedEdges)
+    : editedContentBounds
+      ? boardLayout
+        ? unionDiagramBounds(
+            {height: boardLayout.height, left: 0, top: 0, width: boardLayout.width},
+            editedContentBounds,
+          )
+        : editedContentBounds
+      : displayBounds;
   const draftSource = connectionDraft ? nodesById.get(connectionDraft.sourceId) : undefined;
   const draftTarget = connectionDraft?.targetId
     ? nodesById.get(connectionDraft.targetId)
@@ -677,39 +720,30 @@ export function MermaidFlowchart({
 
   return (
     <div
-      className="de-board-flowchart"
+      className="de-mermaid-board"
       data-authored-layout={boardLayout ? 'true' : undefined}
       role="img"
       aria-label={accessibleLabel}
     >
       <svg
         ref={svgRef}
-        className="de-board-flowchart__svg"
-        viewBox={`${format(displayBounds.left)} ${format(displayBounds.top)} ${format(displayBounds.width)} ${format(displayBounds.height)}`}
+        className="de-mermaid-board__svg"
+        viewBox={`${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`}
+        preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
-        <g className="de-board-flowchart__edges">
+        <g className="de-mermaid-board__edges">
           {routedEdges.map(({edge, route}) => {
             const sourceNode = nodesById.get(edge.sourceId);
             const targetNode = nodesById.get(edge.targetId);
             if (!sourceNode || !targetNode || edge.stroke === 'invisible') return null;
             const edgeSelected = selectedEdgeId === edge.id;
-            const labelAlign = edge.labelAlign ?? 'middle';
-            const labelTextWidth = measureTextWidth(edge.label);
-            const labelPaddingX = edge.bareLabel ? 7 : 9;
-            const labelBoxWidth = labelTextWidth + labelPaddingX * 2;
-            const labelBoxX =
-              labelAlign === 'start'
-                ? -labelPaddingX
-                : labelAlign === 'end'
-                  ? -labelTextWidth - labelPaddingX
-                  : -labelBoxWidth / 2;
             const showEdgeHandles =
               editable && !panActive && (edgeSelected || hoveredEdgeId === edge.id);
             return (
               <g
                 key={edge.id}
-                className="de-board-flowchart__edge"
+                className="de-mermaid-board__edge"
                 data-de-edge-id={edge.id}
                 data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
                 data-selected={edgeSelected ? 'true' : undefined}
@@ -723,10 +757,10 @@ export function MermaidFlowchart({
                   }
                 }}
               >
-                <path d={route.path} className="de-board-flowchart__edge-hit" />
+                <path d={route.path} className="de-mermaid-board__edge-hit" />
                 <path
                   d={route.path}
-                  className="de-board-flowchart__edge-path"
+                  className="de-mermaid-board__edge-path"
                   data-edge-id={edge.id}
                   data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
                   data-source-id={edge.sourceId}
@@ -735,39 +769,12 @@ export function MermaidFlowchart({
                   data-source-side={route.sourceSide}
                   data-target-side={route.targetSide}
                 />
-                {route.arrowPoints ? (
-                  <polygon
-                    className="de-board-flowchart__arrow"
-                    data-edge-id={edge.id}
-                    data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
-                    points={route.arrowPoints}
-                  />
-                ) : null}
-                {edge.label ? (
-                  <g
-                    className="de-board-flowchart__edge-label"
-                    data-bare={edge.bareLabel ? 'true' : undefined}
-                    data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
-                    transform={`translate(${format(route.label.x)} ${format(route.label.y)})`}
-                  >
-                    <rect
-                      x={labelBoxX}
-                      y={edge.bareLabel ? -11 : -13}
-                      width={labelBoxWidth}
-                      height={edge.bareLabel ? 22 : 26}
-                      rx={edge.bareLabel ? 7 : 8}
-                    />
-                    <text textAnchor={labelAlign} dominantBaseline="central">
-                      {edge.label}
-                    </text>
-                  </g>
-                ) : null}
                 {showEdgeHandles ? (
-                  <g className="de-board-flowchart__edge-handles" aria-hidden="true">
+                  <g className="de-mermaid-board__edge-handles" aria-hidden="true">
                     {getRouteSegmentHandles(route.points).map((handle) => (
                       <g
                         key={`${edge.id}-${handle.segmentIndex}`}
-                        className="de-board-flowchart__edge-handle"
+                        className="de-mermaid-board__edge-handle"
                         data-orientation={handle.orientation}
                         transform={`translate(${format(handle.x)} ${format(handle.y)})`}
                         onPointerDown={(event) =>
@@ -777,8 +784,8 @@ export function MermaidFlowchart({
                         onPointerUp={finishEdgeRouteDrag}
                         onPointerCancel={cancelEdgeRouteDrag}
                       >
-                        <circle className="de-board-flowchart__edge-handle-hit" r="12" />
-                        <circle className="de-board-flowchart__edge-handle-dot" r="4.5" />
+                        <circle className="de-mermaid-board__edge-handle-hit" r="12" />
+                        <circle className="de-mermaid-board__edge-handle-dot" r="4.5" />
                       </g>
                     ))}
                   </g>
@@ -787,20 +794,46 @@ export function MermaidFlowchart({
             );
           })}
           {draftRoute ? (
-            <g className="de-board-flowchart__connection-preview" aria-hidden="true">
-              <path d={draftRoute.path} className="de-board-flowchart__edge-path" />
-              {draftRoute.arrowPoints ? (
-                <polygon
-                  className="de-board-flowchart__arrow"
-                  points={draftRoute.arrowPoints}
-                />
-              ) : null}
+            <g className="de-mermaid-board__connection-preview" aria-hidden="true">
+              <path d={draftRoute.path} className="de-mermaid-board__edge-path" />
             </g>
           ) : null}
         </g>
 
+        <g className="de-mermaid-board__arrows">
+          {routedEdges.map(({edge, route}) =>
+            route.arrowPoints && edge.stroke !== 'invisible' ? (
+              <polygon
+                key={edge.id}
+                className="de-mermaid-board__arrow"
+                data-edge-id={edge.id}
+                data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
+                points={route.arrowPoints}
+              />
+            ) : null,
+          )}
+          {draftRoute?.arrowPoints ? (
+            <g className="de-mermaid-board__connection-preview">
+              <polygon className="de-mermaid-board__arrow" points={draftRoute.arrowPoints} />
+            </g>
+          ) : null}
+        </g>
+
+        <g className="de-mermaid-board__edge-labels">
+          {routedEdges.map(({edge, route}) =>
+            edge.label && edge.stroke !== 'invisible' ? (
+              <BoardEdgeLabel
+                key={edge.id}
+                edge={edge}
+                onMeasure={recordEdgeLabelMeasurement}
+                route={route}
+              />
+            ) : null,
+          )}
+        </g>
+
         {guides.x !== undefined || guides.y !== undefined ? (
-          <g className="de-board-flowchart__guides">
+          <g className="de-mermaid-board__guides">
             {guides.x !== undefined ? (
               <line
                 x1={guides.x}
@@ -820,7 +853,7 @@ export function MermaidFlowchart({
           </g>
         ) : null}
 
-        <g className="de-board-flowchart__nodes">
+        <g className="de-mermaid-board__nodes">
           {layout.nodes.map((node) => {
             const selected = selectedNodeIds.includes(node.id);
             const editing = editingNodeId === node.id;
@@ -840,7 +873,7 @@ export function MermaidFlowchart({
             return (
               <g
                 key={node.id}
-                className="de-board-flowchart__node"
+                className="de-mermaid-board__node"
                 data-de-node-id={node.id}
                 data-selected={selected ? 'true' : undefined}
                 data-editing={editing ? 'true' : undefined}
@@ -852,7 +885,7 @@ export function MermaidFlowchart({
                 transform={`translate(${format(node.position.x)} ${format(node.position.y)})`}
                 role={editable ? 'button' : undefined}
                 tabIndex={editable ? 0 : undefined}
-                aria-label={editable ? `流程节点：${node.label}。拖动可移动，双击可编辑。` : undefined}
+                aria-label={editable ? `图表节点：${node.label}。拖动可移动，双击可编辑。` : undefined}
                 onPointerEnter={() => {
                   if (editable && !panActive) setHoveredNodeId(node.id);
                 }}
@@ -910,11 +943,11 @@ export function MermaidFlowchart({
               >
                 <NodeShape node={node} />
                 <text
-                  className="de-board-flowchart__node-label"
+                  className="de-mermaid-board__node-label"
                   textAnchor="middle"
                   transform={badge ? 'translate(0 8)' : undefined}
                 >
-                  {node.label.split('\n').map((line, index, lines) => (
+                  {node.textLines.map((line, index, lines) => (
                     <tspan
                       key={`${node.id}-${index}`}
                       x="0"
@@ -925,7 +958,7 @@ export function MermaidFlowchart({
                   ))}
                 </text>
                 {badge ? (
-                  <g className="de-board-flowchart__node-badge" aria-hidden="true">
+                  <g className="de-mermaid-board__node-badge" aria-hidden="true">
                     <rect
                       x={-badgeWidth / 2}
                       y={-node.height / 2 + 29}
@@ -939,13 +972,13 @@ export function MermaidFlowchart({
                   </g>
                 ) : null}
                 {showPorts ? (
-                  <g className="de-board-flowchart__ports" aria-hidden="true">
+                  <g className="de-mermaid-board__ports" aria-hidden="true">
                     {(['top', 'right', 'bottom', 'left'] as const).map((side) => {
                       const point = anchorPoint(node, side, 0, 16);
                       return (
                         <g
                           key={side}
-                          className="de-board-flowchart__port"
+                          className="de-mermaid-board__port"
                           data-side={side}
                           transform={`translate(${format(point.x - node.position.x)} ${format(point.y - node.position.y)})`}
                           onPointerEnter={() => {
@@ -969,8 +1002,8 @@ export function MermaidFlowchart({
                           onPointerUp={finishConnection}
                           onPointerCancel={cancelConnection}
                         >
-                          <circle className="de-board-flowchart__port-hit" r="13" />
-                          <circle className="de-board-flowchart__port-dot" r="5" />
+                          <circle className="de-mermaid-board__port-hit" r="13" />
+                          <circle className="de-mermaid-board__port-dot" r="5" />
                         </g>
                       );
                     })}
@@ -985,13 +1018,128 @@ export function MermaidFlowchart({
   );
 }
 
+function BoardEdgeLabel({
+  edge,
+  onMeasure,
+  route,
+}: {
+  edge: ParsedDiagramEdge;
+  onMeasure: (edgeId: string, label: string, metrics: DiagramLabelMetrics) => void;
+  route: EdgeRoute;
+}) {
+  const textRef = useRef<SVGTextElement>(null);
+  const [measuredBounds, setMeasuredBounds] = useState<{
+    height: number;
+    key: string;
+    width: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const labelAlign = edge.labelAlign ?? 'middle';
+  const naturalMetrics = measureDiagramEdgeLabel(
+    edge.label,
+    edge.bareLabel,
+    route.labelMaximumTextWidth,
+  );
+  const floating = route.labelMode === 'floating';
+  const metrics = floating
+    ? compactDiagramEdgeLabelMetrics(naturalMetrics, edge.bareLabel)
+    : naturalMetrics;
+  const naturalPaddingX = edge.bareLabel ? 7 : 9;
+  const naturalPaddingY = edge.bareLabel ? 3 : 5;
+  const labelPaddingX = floating ? 2 : naturalPaddingX;
+  const labelPaddingY = floating ? 1 : naturalPaddingY;
+  const fallbackBoxX =
+    labelAlign === 'start'
+      ? -labelPaddingX
+      : labelAlign === 'end'
+        ? -metrics.width + labelPaddingX
+        : -metrics.width / 2;
+  const linesKey = metrics.lines.join('\n');
+  const measurementKey = `${edge.label}\u0000${labelAlign}\u0000${edge.bareLabel ? 'bare' : 'pill'}\u0000${floating ? 'floating' : 'inline'}\u0000${linesKey}`;
+  const activeBounds = measuredBounds?.key === measurementKey ? measuredBounds : null;
+  const labelBoxX = activeBounds ? activeBounds.x - labelPaddingX : fallbackBoxX;
+  const labelBoxY = activeBounds ? activeBounds.y - labelPaddingY : -metrics.height / 2;
+  const labelBoxWidth = activeBounds ? activeBounds.width + labelPaddingX * 2 : metrics.width;
+  const labelBoxHeight = activeBounds ? activeBounds.height + labelPaddingY * 2 : metrics.height;
+
+  useLayoutEffect(() => {
+    let cancelled = false;
+    const measure = () => {
+      const element = textRef.current;
+      if (cancelled || !element) return;
+      const bounds = element.getBBox();
+      if (!Number.isFinite(bounds.width) || !Number.isFinite(bounds.height) || bounds.width <= 0) return;
+      const nextBounds = {
+        height: bounds.height,
+        key: measurementKey,
+        width: bounds.width,
+        x: bounds.x,
+        y: bounds.y,
+      };
+      setMeasuredBounds((current) =>
+        current?.key === nextBounds.key &&
+        Math.abs(current.width - nextBounds.width) < 0.25 &&
+        Math.abs(current.height - nextBounds.height) < 0.25 &&
+        Math.abs(current.x - nextBounds.x) < 0.25 &&
+        Math.abs(current.y - nextBounds.y) < 0.25
+          ? current
+          : nextBounds,
+      );
+      onMeasure(edge.id, edge.label, {
+        height: bounds.height + naturalPaddingY * 2,
+        lines: metrics.lines,
+        width: bounds.width + naturalPaddingX * 2,
+      });
+    };
+    measure();
+    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+    const handleFontsLoaded = () => measure();
+    fonts?.addEventListener('loadingdone', handleFontsLoaded);
+    void fonts?.ready.then(measure);
+    return () => {
+      cancelled = true;
+      fonts?.removeEventListener('loadingdone', handleFontsLoaded);
+    };
+  }, [edge.id, edge.label, labelAlign, linesKey, measurementKey, naturalPaddingX, naturalPaddingY, onMeasure]);
+
+  return (
+    <g
+      className="de-mermaid-board__edge-label"
+      data-bare={edge.bareLabel ? 'true' : undefined}
+      data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
+      data-floating={floating ? 'true' : undefined}
+      transform={`translate(${format(route.label.x)} ${format(route.label.y)})`}
+    >
+      <rect
+        x={labelBoxX}
+        y={labelBoxY}
+        width={labelBoxWidth}
+        height={labelBoxHeight}
+        rx={floating ? 3 : edge.bareLabel ? 7 : 8}
+      />
+      <text ref={textRef} textAnchor={labelAlign} dominantBaseline="central">
+        {metrics.lines.map((line, index, lines) => (
+          <tspan
+            key={`${edge.id}-label-${index}`}
+            x="0"
+            dy={index === 0 ? `${-(lines.length - 1) * 0.67}em` : '1.34em'}
+          >
+            {line || ' '}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+}
+
 function NodeShape({node}: {node: LayoutNode}) {
   const halfWidth = node.width / 2;
   const halfHeight = node.height / 2;
   if (node.shape === 'diamond') {
     return (
       <path
-        className="de-board-flowchart__node-shape"
+        className="de-mermaid-board__node-shape"
         d={roundedDiamondPath(halfWidth, halfHeight)}
       />
     );
@@ -999,7 +1147,7 @@ function NodeShape({node}: {node: LayoutNode}) {
   if (node.shape === 'circle') {
     return (
       <ellipse
-        className="de-board-flowchart__node-shape"
+        className="de-mermaid-board__node-shape"
         cx="0"
         cy="0"
         rx={halfWidth}
@@ -1009,7 +1157,7 @@ function NodeShape({node}: {node: LayoutNode}) {
   }
   return (
     <rect
-      className="de-board-flowchart__node-shape"
+      className="de-mermaid-board__node-shape"
       x={-halfWidth}
       y={-halfHeight}
       width={node.width}
@@ -1020,103 +1168,28 @@ function NodeShape({node}: {node: LayoutNode}) {
   );
 }
 
-async function parseMermaidFlowchart(source: string): Promise<ParsedFlowGraph> {
-  const resolved = resolvedGraphs.get(source);
-  if (resolved) return resolved;
-  const pending = pendingGraphs.get(source);
-  if (pending) return pending;
-
-  let resolveRequest!: (graph: ParsedFlowGraph) => void;
-  let rejectRequest!: (error: unknown) => void;
-  const request = new Promise<ParsedFlowGraph>((resolve, reject) => {
-    resolveRequest = resolve;
-    rejectRequest = reject;
-  });
-  pendingGraphs.set(source, request);
-
-  parseQueue = parseQueue
-    .catch(() => undefined)
-    .then(async () => {
-      try {
-        const module = await import('mermaid');
-        const mermaid = module.default;
-        if (!mermaidInitialized) {
-          mermaid.initialize({startOnLoad: false, securityLevel: 'strict'});
-          mermaidInitialized = true;
-        }
-        const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
-        const db = diagram.db as unknown as {
-          getDirection?: () => string | undefined;
-          getEdges?: () => Array<{
-            classes?: string[];
-            end: string;
-            id?: string;
-            labelType?: string;
-            start: string;
-            stroke?: string;
-            text?: string;
-            type?: string;
-          }>;
-          getVertices?: () => Map<
-            string,
-            {
-              classes?: string[];
-              id: string;
-              text?: string;
-              type?: string;
-            }
-          >;
-        };
-        if (!db.getVertices || !db.getEdges) {
-          throw new Error('当前仅支持 Mermaid 11 flowchart 语法');
-        }
-        const nodes = [...db.getVertices().values()].map<ParsedFlowNode>((vertex) => {
-          const classes = vertex.classes ?? [];
-          return {
-            classes,
-            id: vertex.id,
-            label: normalizeLabel(vertex.text ?? vertex.id),
-            shape: resolveShape(vertex.type),
-            tone: resolveTone(classes),
-          };
-        });
-        const edges = db.getEdges().map<ParsedFlowEdge>((edge, index) => ({
-          arrow: edge.type !== 'open',
-          id: edge.id ?? `${edge.start}-${edge.end}-${index}`,
-          label: normalizeLabel(edge.text ?? ''),
-          sourceId: edge.start,
-          stroke: resolveStroke(edge.stroke),
-          targetId: edge.end,
-        }));
-        const direction = resolveDirection(db.getDirection?.());
-        const graph = {direction, edges, nodes} satisfies ParsedFlowGraph;
-        resolvedGraphs.set(source, graph);
-        resolveRequest(graph);
-      } catch (error) {
-        rejectRequest(error);
-      } finally {
-        pendingGraphs.delete(source);
-      }
-    });
-
-  return request;
-}
-
-function layoutFlowGraph(
-  graph: ParsedFlowGraph,
+function layoutDiagramGraph(
+  graph: ParsedDiagramGraph,
   patches: Map<string, DiagramNodePatch>,
   boardLayout?: DiagramBoardLayout,
+  measuredEdgeLabels: ReadonlyMap<string, MeasuredEdgeLabel> = new Map(),
 ): LayoutGraph {
   const measuredNodes = graph.nodes.map((node) => {
     const patch = patches.get(node.id);
     const label = patch?.label ?? node.label;
     const authoredNode = boardLayout?.nodes[node.id];
-    const measured = measureNode(label, node.shape, node.classes);
+    const measured = measureNode(label, node.shape, node.classes, authoredNode?.width);
     const size = {
       height: authoredNode?.height ?? measured.height,
       width: authoredNode?.width ?? measured.width,
     };
-    return {...node, label, placeholder: node.placeholder && patch?.label === undefined, ...size};
+    return {
+      ...node,
+      label,
+      placeholder: node.placeholder && patch?.label === undefined,
+      textLines: measured.textLines,
+      ...size,
+    };
   });
   // Dotted return edges are visual feedback loops. They must not turn an
   // otherwise forward flow into a cyclic rank graph and reshuffle the cards.
@@ -1131,9 +1204,32 @@ function layoutFlowGraph(
   });
   const sortedRanks = [...groups.keys()].sort((first, second) => first - second);
   const horizontal = graph.direction === 'LR' || graph.direction === 'RL';
-  const rankGap = 106;
   const nodeGap = 62;
-  const margin = 42;
+  const primaryMargin = 42;
+  const pairLanes = assignDiagramEdgeLanes(
+    edges.map((edge) => ({
+      id: edge.id,
+      sourceId: edge.sourceId,
+      targetId: edge.targetId,
+    })),
+  );
+  const maximumPairLane = Math.max(
+    0,
+    ...[...pairLanes.values()].map((lane) => Math.abs(lane)),
+  );
+  const pairLaneOffset =
+    maximumPairLane > 0 ? pairedLaneOffset(maximumPairLane) : 0;
+  const maximumLabelCrossSize = Math.max(
+    0,
+    ...edges.map((edge) => {
+      const metrics = naturalEdgeLabelMetrics(edge, measuredEdgeLabels);
+      return horizontal ? metrics.height : metrics.width;
+    }),
+  );
+  const crossMargin = Math.max(
+    42,
+    pairLaneOffset + maximumLabelCrossSize / 2 + (maximumPairLane > 0 ? 18 : 0),
+  );
   const rankPrimarySizes = sortedRanks.map((rank) =>
     Math.max(...(groups.get(rank) ?? []).map((node) => (horizontal ? node.width : node.height))),
   );
@@ -1144,22 +1240,45 @@ function layoutFlowGraph(
       Math.max(0, group.length - 1) * nodeGap
     );
   });
+  const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
+  const rankGaps = calculateAdaptiveRankGaps(
+    sortedRanks.length,
+    horizontal,
+    edges.flatMap((edge) => {
+      const sourceRank = rankIndexes.get(ranks.get(edge.sourceId) ?? 0);
+      const targetRank = rankIndexes.get(ranks.get(edge.targetId) ?? 0);
+      if (sourceRank === undefined || targetRank === undefined) return [];
+      return [{
+        label: edge.label,
+        metrics: naturalEdgeLabelMetrics(edge, measuredEdgeLabels),
+        // Direct routes consume only anchor clearances. A paired route also owns
+        // two 22 px stubs plus the rounded corners around its carrier segment.
+        routePadding: pairLanes.has(edge.id)
+          ? PAIRED_ROUTE_LABEL_RESERVE
+          : DIRECT_ROUTE_LABEL_RESERVE,
+        sourceRank,
+        targetRank,
+      }];
+    }),
+  );
   const crossSize = Math.max(1, ...rankCrossSizes);
   const primarySize =
     rankPrimarySizes.reduce((sum, size) => sum + size, 0) +
-    Math.max(0, rankPrimarySizes.length - 1) * rankGap;
-  const automaticWidth = (horizontal ? primarySize : crossSize) + margin * 2;
-  const automaticHeight = (horizontal ? crossSize : primarySize) + margin * 2;
+    rankGaps.reduce((sum, gap) => sum + gap, 0);
+  const automaticWidth =
+    (horizontal ? primarySize + primaryMargin * 2 : crossSize + crossMargin * 2);
+  const automaticHeight =
+    (horizontal ? crossSize + crossMargin * 2 : primarySize + primaryMargin * 2);
   const width = boardLayout?.width ?? automaticWidth;
   const height = boardLayout?.height ?? automaticHeight;
   const positions = new Map<string, DiagramNodePosition>();
-  let primaryCursor = margin;
+  let primaryCursor = primaryMargin;
 
   sortedRanks.forEach((rank, rankIndex) => {
     const group = groups.get(rank) ?? [];
     const rankSize = rankPrimarySizes[rankIndex];
     const primaryCenter = primaryCursor + rankSize / 2;
-    let crossCursor = margin + (crossSize - rankCrossSizes[rankIndex]) / 2;
+    let crossCursor = crossMargin + (crossSize - rankCrossSizes[rankIndex]) / 2;
     group.forEach((node) => {
       const nodeCrossSize = horizontal ? node.height : node.width;
       const crossCenter = crossCursor + nodeCrossSize / 2;
@@ -1171,11 +1290,13 @@ function layoutFlowGraph(
       );
       crossCursor += nodeCrossSize + nodeGap;
     });
-    primaryCursor += rankSize + rankGap;
+    primaryCursor += rankSize + (rankGaps[rankIndex] ?? 0);
   });
 
   const nodes = measuredNodes.map<LayoutNode>((node) => {
-    const base = positions.get(node.id) ?? {x: margin + node.width / 2, y: margin + node.height / 2};
+    const base = positions.get(node.id) ?? (horizontal
+      ? {x: primaryMargin + node.width / 2, y: crossMargin + node.height / 2}
+      : {x: crossMargin + node.width / 2, y: primaryMargin + node.height / 2});
     const oriented =
       graph.direction === 'RL'
         ? {x: width - base.x, y: base.y}
@@ -1191,7 +1312,7 @@ function layoutFlowGraph(
   return {edges, height, nodes, width};
 }
 
-function applyBoardEdgeLayout(edges: ParsedFlowEdge[], boardLayout?: DiagramBoardLayout) {
+function applyBoardEdgeLayout(edges: ParsedDiagramEdge[], boardLayout?: DiagramBoardLayout) {
   if (!boardLayout?.edges?.length) return edges;
   return edges.map((edge) => {
     const layout = findBoardEdgeLayout(edge, boardLayout);
@@ -1206,7 +1327,7 @@ function applyBoardEdgeLayout(edges: ParsedFlowEdge[], boardLayout?: DiagramBoar
   });
 }
 
-function resolveInitialEdgePatches(edges: ParsedFlowEdge[], boardLayout?: DiagramBoardLayout) {
+function resolveInitialEdgePatches(edges: ParsedDiagramEdge[], boardLayout?: DiagramBoardLayout) {
   const patches = new Map<string, DiagramEdgeRoutePatch>();
   if (!boardLayout?.edges?.length) return patches;
   edges.forEach((edge) => {
@@ -1220,7 +1341,7 @@ function resolveInitialEdgePatches(edges: ParsedFlowEdge[], boardLayout?: Diagra
   return patches;
 }
 
-function findBoardEdgeLayout(edge: ParsedFlowEdge, boardLayout: DiagramBoardLayout) {
+function findBoardEdgeLayout(edge: ParsedDiagramEdge, boardLayout: DiagramBoardLayout) {
   return boardLayout.edges?.find(
     (layout) =>
       layout.sourceId === edge.sourceId &&
@@ -1259,7 +1380,7 @@ function appendBoardElements(
   return {
     edges: [
       ...base.edges,
-      ...createdEdges.map<ParsedFlowEdge>((edge) => ({
+      ...createdEdges.map<ParsedDiagramEdge>((edge) => ({
         arrow: true,
         id: edge.id,
         label: '',
@@ -1294,7 +1415,7 @@ function isFinitePosition(value: DiagramNodePosition | undefined): value is Diag
   return value !== undefined && Number.isFinite(value.x) && Number.isFinite(value.y);
 }
 
-function assignRanks(nodes: ParsedFlowNode[], edges: ParsedFlowEdge[]) {
+function assignRanks(nodes: ParsedDiagramNode[], edges: ParsedDiagramEdge[]) {
   const ranks = new Map(nodes.map((node) => [node.id, 0]));
   const incoming = new Map(nodes.map((node) => [node.id, 0]));
   const outgoing = new Map(nodes.map((node) => [node.id, [] as string[]]));
@@ -1351,6 +1472,7 @@ function routeDraftConnection(
       y: draft.end.y - targetVector.y * 14,
     },
     shape: 'rect',
+    textLines: [],
     tone: 'neutral',
     width: 0,
   };
@@ -1392,8 +1514,13 @@ function oppositeSide(side: AnchorSide): AnchorSide {
   return 'right';
 }
 
+function pairedLaneOffset(laneIndex: number) {
+  const lane = Math.max(1, Math.abs(laneIndex));
+  return PAIRED_LANE_BASE_OFFSET + (lane - 1) * PAIRED_LANE_STEP;
+}
+
 type RoutedEdgeCandidate = {
-  edge: ParsedFlowEdge;
+  edge: ParsedDiagramEdge;
   index: number;
   source: LayoutNode;
   sourceOffset: number;
@@ -1405,8 +1532,9 @@ type RoutedEdgeCandidate = {
 
 function routeGraphEdges(
   nodes: LayoutNode[],
-  edges: ParsedFlowEdge[],
+  edges: ParsedDiagramEdge[],
   edgePatches: Map<string, DiagramEdgeRoutePatch>,
+  measuredEdgeLabels: ReadonlyMap<string, MeasuredEdgeLabel> = new Map(),
 ) {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const candidates = edges.flatMap<RoutedEdgeCandidate>((edge, index) => {
@@ -1428,6 +1556,13 @@ function routeGraphEdges(
       },
     ];
   });
+  const pairLanes = assignDiagramEdgeLanes(
+    candidates.map(({edge}) => ({
+      id: edge.id,
+      sourceId: edge.sourceId,
+      targetId: edge.targetId,
+    })),
+  );
 
   const portGroups = new Map<
     string,
@@ -1474,7 +1609,7 @@ function routeGraphEdges(
     });
   });
 
-  return candidates.map((candidate) => ({
+  const routed = candidates.map((candidate) => ({
     edge: candidate.edge,
     route: applyEdgeRoutePatch(
       routeEdge(
@@ -1484,7 +1619,9 @@ function routeGraphEdges(
         candidate.targetSide,
         candidate.sourceOffset,
         candidate.targetOffset,
-        candidate.source.id === candidate.target.id ? candidate.index : 0,
+        candidate.source.id === candidate.target.id
+          ? candidate.index
+          : (pairLanes.get(candidate.edge.id) ?? 0),
         candidate.edge.arrow,
         nodes,
       ),
@@ -1492,6 +1629,52 @@ function routeGraphEdges(
       candidate.edge.arrow,
     ),
   }));
+  const labelPlacements = placeDiagramEdgeLabels(
+    routed.map(({edge, route}) => ({
+      align: edge.labelAlign,
+      arrow: edge.arrow,
+      bare: edge.bareLabel,
+      id: edge.id,
+      label: edge.label,
+      lockedPosition: edgePatches.get(edge.id)?.label,
+      metrics: measuredEdgeLabel(edge, measuredEdgeLabels),
+      points: route.points,
+    })),
+    nodes,
+  );
+  return routed.map(({edge, route}) => {
+    const placement = labelPlacements.get(edge.id);
+    return {
+      edge,
+      route: {
+        ...route,
+        label: placement?.position ?? route.label,
+        labelMode: placement?.mode,
+        labelMaximumTextWidth: placement?.maximumTextWidth,
+      },
+    };
+  });
+}
+
+function measuredEdgeLabel(
+  edge: ParsedDiagramEdge,
+  measurements: ReadonlyMap<string, MeasuredEdgeLabel>,
+) {
+  const measured = measurements.get(edge.id);
+  return measured?.label === edge.label ? measured : undefined;
+}
+
+function naturalEdgeLabelMetrics(
+  edge: ParsedDiagramEdge,
+  measurements: ReadonlyMap<string, MeasuredEdgeLabel>,
+) {
+  const natural = measureDiagramEdgeLabel(edge.label, edge.bareLabel);
+  const measured = measuredEdgeLabel(edge, measurements);
+  return measured && sameTextLines(measured.lines, natural.lines) ? measured : natural;
+}
+
+function sameTextLines(first: string[], second: string[]) {
+  return first.length === second.length && first.every((line, index) => line === second[index]);
 }
 
 function resolveAnchorSides(source: LayoutNode, target: LayoutNode) {
@@ -1540,7 +1723,48 @@ function routeEdge(
 
   const rawStart = anchorPoint(source, sourceSide, sourceOffset, 0);
   const rawTip = anchorPoint(target, targetSide, targetOffset, 0);
-  if (isDirectFacingRoute(rawStart, rawTip, sourceSide, targetSide)) {
+  const directFacing = isDirectFacingRoute(rawStart, rawTip, sourceSide, targetSide);
+  const directRouteClear =
+    directFacing && directFacingRouteAvoidsNodes(rawStart, rawTip, source, target, obstacles);
+  if (laneIndex !== 0 && directRouteClear) {
+    // A reverse arrow shares the logical pin. Start the outgoing shaft behind
+    // that arrow tip so it can never protrude through the opposite arrowhead.
+    const pairedSourceGap = targetGap + 3;
+    const start = anchorPoint(source, sourceSide, sourceOffset, pairedSourceGap);
+    const tip = anchorPoint(target, targetSide, targetOffset, targetGap);
+    const sourceVector = sideVector(sourceSide);
+    const targetVector = sideVector(targetSide);
+    const stubLength = 22;
+    const sourceStub = {
+      x: start.x + sourceVector.x * stubLength,
+      y: start.y + sourceVector.y * stubLength,
+    };
+    const targetStub = {
+      x: tip.x + targetVector.x * stubLength,
+      y: tip.y + targetVector.y * stubLength,
+    };
+    const laneOffset = Math.sign(laneIndex) * pairedLaneOffset(laneIndex);
+    const horizontal = sourceSide === 'left' || sourceSide === 'right';
+    const points = horizontal
+      ? [
+          start,
+          sourceStub,
+          {x: sourceStub.x, y: (sourceStub.y + targetStub.y) / 2 + laneOffset},
+          {x: targetStub.x, y: (sourceStub.y + targetStub.y) / 2 + laneOffset},
+          targetStub,
+          tip,
+        ]
+      : [
+          start,
+          sourceStub,
+          {x: (sourceStub.x + targetStub.x) / 2 + laneOffset, y: sourceStub.y},
+          {x: (sourceStub.x + targetStub.x) / 2 + laneOffset, y: targetStub.y},
+          targetStub,
+          tip,
+        ];
+    return finalizeEdgeRoute(points, arrow, sourceSide, targetSide);
+  }
+  if (directRouteClear) {
     const clearance = Math.max(0, distanceAlongSide(rawStart, rawTip, sourceSide));
     // Keep a visible shaft on close neighbouring cards while retaining a gap at
     // both anchors. Fixed 10/14 px stubs would otherwise consume the whole gap.
@@ -1560,7 +1784,7 @@ function routeEdge(
   const tip = anchorPoint(target, targetSide, targetOffset, targetGap);
   const sourceVector = sideVector(sourceSide);
   const targetVector = sideVector(targetSide);
-  const approach = 32 + (laneIndex % 3) * 5;
+  const approach = 32 + (Math.abs(laneIndex) % 3) * 5;
   const sourceStub = {
     x: start.x + sourceVector.x * approach,
     y: start.y + sourceVector.y * approach,
@@ -1577,7 +1801,7 @@ function routeEdge(
     obstacles,
     sourceSide,
     targetSide,
-    14 + (laneIndex % 3) * 3,
+    14 + (Math.abs(laneIndex) % 3) * 3,
   );
   let points: DiagramNodePosition[];
 
@@ -1685,6 +1909,25 @@ function isDirectFacingRoute(
   if (sourceSide === 'right') return Math.abs(start.y - tip.y) < 0.1 && tip.x >= start.x;
   if (sourceSide === 'top') return Math.abs(start.x - tip.x) < 0.1 && tip.y <= start.y;
   return Math.abs(start.x - tip.x) < 0.1 && tip.y >= start.y;
+}
+
+function directFacingRouteAvoidsNodes(
+  start: DiagramNodePosition,
+  end: DiagramNodePosition,
+  source: LayoutNode,
+  target: LayoutNode,
+  nodes: LayoutNode[],
+) {
+  const clearance = 8;
+  const obstacles = nodes
+    .filter((node) => node.id !== source.id && node.id !== target.id)
+    .map<RouteRectangle>((node) => ({
+      bottom: node.position.y + node.height / 2 + clearance,
+      left: node.position.x - node.width / 2 - clearance,
+      right: node.position.x + node.width / 2 + clearance,
+      top: node.position.y - node.height / 2 - clearance,
+    }));
+  return segmentAvoidsRectangles(start, end, obstacles);
 }
 
 function distanceAlongSide(start: DiagramNodePosition, end: DiagramNodePosition, side: AnchorSide) {
@@ -2243,11 +2486,90 @@ function getLayoutBounds(nodes: LayoutNode[], padding: number) {
   return {height: bottom - top, left, top, width: right - left};
 }
 
-function measureNode(label: string, shape: FlowNodeShape, classes: string[] = []) {
+function getRenderedDiagramBounds(
+  nodes: LayoutNode[],
+  routedEdges: Array<{edge: ParsedDiagramEdge; route: EdgeRoute}>,
+  padding: number,
+) {
+  const rectangles = nodes.map((node) => ({
+    bottom: node.position.y + node.height / 2,
+    left: node.position.x - node.width / 2,
+    right: node.position.x + node.width / 2,
+    top: node.position.y - node.height / 2,
+  }));
+  routedEdges.forEach(({edge, route}) => {
+    route.points.forEach((point) => {
+      rectangles.push({bottom: point.y, left: point.x, right: point.x, top: point.y});
+    });
+    if (!edge.label) return;
+    const naturalMetrics = measureDiagramEdgeLabel(
+      edge.label,
+      edge.bareLabel,
+      route.labelMaximumTextWidth,
+    );
+    const metrics = route.labelMode === 'floating'
+      ? compactDiagramEdgeLabelMetrics(naturalMetrics, edge.bareLabel)
+      : naturalMetrics;
+    const labelPaddingX = route.labelMode === 'floating' ? 2 : edge.bareLabel ? 7 : 9;
+    const left =
+      edge.labelAlign === 'start'
+        ? route.label.x - labelPaddingX
+        : edge.labelAlign === 'end'
+          ? route.label.x - metrics.width + labelPaddingX
+          : route.label.x - metrics.width / 2;
+    rectangles.push({
+      bottom: route.label.y + metrics.height / 2,
+      left,
+      right: left + metrics.width,
+      top: route.label.y - metrics.height / 2,
+    });
+  });
+  if (rectangles.length === 0) return {height: 120, left: 0, top: 0, width: 320};
+  const left = Math.min(...rectangles.map((rectangle) => rectangle.left)) - padding;
+  const right = Math.max(...rectangles.map((rectangle) => rectangle.right)) + padding;
+  const top = Math.min(...rectangles.map((rectangle) => rectangle.top)) - padding;
+  const bottom = Math.max(...rectangles.map((rectangle) => rectangle.bottom)) + padding;
+  return {height: bottom - top, left, top, width: right - left};
+}
+
+function getEmbeddedDiagramBounds(
+  nodes: LayoutNode[],
+  routedEdges: Array<{edge: ParsedDiagramEdge; route: EdgeRoute}>,
+) {
+  const content = getRenderedDiagramBounds(nodes, routedEdges, 0);
+  const shortestContentAxis = Math.min(content.width, content.height);
+  const padding = clamp(shortestContentAxis * 0.055, 24, 36);
+  return {
+    height: content.height + padding * 2,
+    left: content.left - padding,
+    top: content.top - padding,
+    width: content.width + padding * 2,
+  };
+}
+
+function unionDiagramBounds(
+  first: {height: number; left: number; top: number; width: number},
+  second: {height: number; left: number; top: number; width: number},
+) {
+  const left = Math.min(first.left, second.left);
+  const top = Math.min(first.top, second.top);
+  const right = Math.max(first.left + first.width, second.left + second.width);
+  const bottom = Math.max(first.top + first.height, second.top + second.height);
+  return {height: bottom - top, left, top, width: right - left};
+}
+
+function measureNode(
+  label: string,
+  shape: DiagramNodeShape,
+  classes: string[] = [],
+  authoredWidth?: number,
+) {
   const detailLabel = hasBoardClass(classes, 'deBoardDetail');
   const gate = resolveNodeBadge(classes);
   const wideCard = hasBoardClass(classes, 'deBoardWide');
-  const lines = label.split('\n');
+  const horizontalPadding = detailLabel ? 46 : 38;
+  const maximumTextWidth = Math.max(36, Math.min(202, (authoredWidth ?? 240) - horizontalPadding));
+  const lines = wrapDiagramText(label, maximumTextWidth);
   const contentWidth = Math.max(
     ...lines.map((line, index) => measureTextWidth(line) * (detailLabel && index > 0 ? 0.86 : 1)),
     36,
@@ -2256,11 +2578,11 @@ function measureNode(label: string, shape: FlowNodeShape, classes: string[] = []
   const baseWidth = Math.max(minimumWidth, Math.min(240, contentWidth + (detailLabel ? 46 : 38)));
   const baseHeight = gate ? 140 : Math.max(detailLabel ? 82 : 54, lines.length * 20 + (detailLabel ? 34 : 24));
   if (shape === 'circle' || shape === 'diamond') {
-    if (shape === 'diamond' && gate) return {height: baseHeight, width: baseWidth};
+    if (shape === 'diamond' && gate) return {height: baseHeight, textLines: lines, width: baseWidth};
     const diameter = Math.max(baseWidth, baseHeight + 22);
-    return {height: diameter, width: diameter};
+    return {height: diameter, textLines: lines, width: diameter};
   }
-  return {height: baseHeight, width: baseWidth};
+  return {height: baseHeight, textLines: lines, width: baseWidth};
 }
 
 function roundedDiamondPath(halfWidth: number, halfHeight: number) {
@@ -2301,15 +2623,12 @@ function measureBadgeWidth(value: string) {
   return Math.max(68, Math.ceil(textWidth + 24));
 }
 
-function isFeedbackEdge(edge: ParsedFlowEdge) {
+function isFeedbackEdge(edge: ParsedDiagramEdge) {
   return edge.stroke === 'dotted' && /复测|反馈|回流|迭代/.test(edge.label);
 }
 
 function measureTextWidth(value: string) {
-  return [...value].reduce((width, character) => {
-    const codePoint = character.codePointAt(0) ?? 0;
-    return width + (codePoint > 0xff ? 14 : /[A-Z0-9]/.test(character) ? 8.2 : 7.2);
-  }, 0);
+  return measureDiagramTextWidth(value);
 }
 
 function clientPointToSvg(svg: SVGSVGElement | null, clientX: number, clientY: number) {
@@ -2319,48 +2638,6 @@ function clientPointToSvg(svg: SVGSVGElement | null, clientX: number, clientY: n
   point.x = clientX;
   point.y = clientY;
   return point.matrixTransform(matrix.inverse());
-}
-
-function normalizeLabel(value: string) {
-  const withBreaks = value.replace(/<br\s*\/?\s*>/gi, '\n');
-  const withoutMarkup = withBreaks
-    .replace(/<[^>]+>/g, '')
-    .replace(/[`*_~]/g, '')
-    .replace(/^['"]|['"]$/g, '');
-  if (typeof document === 'undefined') return withoutMarkup.trim();
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = withoutMarkup;
-  return textarea.value.trim();
-}
-
-function resolveDirection(value: string | undefined): FlowDirection {
-  return value === 'RL' || value === 'TB' || value === 'TD' || value === 'BT'
-    ? value === 'TD'
-      ? 'TB'
-      : value
-    : 'LR';
-}
-
-function resolveShape(value: string | undefined): FlowNodeShape {
-  if (value === 'diamond' || value === 'diam') return 'diamond';
-  if (value === 'circle' || value === 'doublecircle' || value === 'ellipse') return 'circle';
-  if (value === 'stadium' || value === 'terminal') return 'stadium';
-  if (value === 'round' || value === 'rounded') return 'round';
-  return 'rect';
-}
-
-function resolveTone(classes: string[]): FlowNodeTone {
-  const value = classes.join(' ').toLowerCase();
-  if (value.includes('purple')) return 'purple';
-  if (value.includes('teal')) return 'teal';
-  if (value.includes('green')) return 'green';
-  if (value.includes('orange')) return 'orange';
-  if (value.includes('blue')) return 'blue';
-  return 'neutral';
-}
-
-function resolveStroke(value: string | undefined): ParsedFlowEdge['stroke'] {
-  return value === 'thick' || value === 'dotted' || value === 'invisible' ? value : 'normal';
 }
 
 function clamp(value: number, minimum: number, maximum: number) {

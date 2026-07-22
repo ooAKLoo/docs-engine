@@ -1,0 +1,4 @@
+interface:
+  display_name: "专业技术文档创作"
+  short_description: "用语义结构、公式、表格与图表创作清晰一致且易维护的专业技术文档"
+  default_prompt: "使用 $author-technical-docs 将这份内容重构为结构清晰、语义准确且易于维护的技术文档。"

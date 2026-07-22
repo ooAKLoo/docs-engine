@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
-import { type DiagramBoardLayout, type DiagramCreatedEdge, type DiagramCreatedNode, type DiagramEdgeRoutePatch, type DiagramNodeChange, type DiagramNodePosition } from './MermaidFlowchart.js';
-export type { DiagramAnchorSide, DiagramBoardEdgeLayout, DiagramBoardLayout, DiagramBoardNodeLayout, DiagramCreatedEdge, DiagramCreatedNode, DiagramEdgeRouteChange, DiagramEdgeRoutePatch, DiagramNodeChange, DiagramNodeChangeReason, DiagramNodeShape, DiagramNodeTone, DiagramNodePosition, } from './MermaidFlowchart.js';
+import { type DiagramBoardLayout, type DiagramCreatedEdge, type DiagramCreatedNode, type DiagramEdgeRoutePatch, type DiagramNodeChange, type DiagramNodePosition } from './MermaidBoard.js';
+export type { DiagramAnchorSide, DiagramBoardEdgeLayout, DiagramBoardLayout, DiagramBoardNodeLayout, DiagramCreatedEdge, DiagramCreatedNode, DiagramEdgeRouteChange, DiagramEdgeRoutePatch, DiagramNodeChange, DiagramNodeChangeReason, DiagramNodeShape, DiagramNodeTone, DiagramNodePosition, } from './MermaidBoard.js';
 export type DiagramBoardMode = 'view' | 'edit';
 export type DiagramStructureChange = {
     edge: DiagramCreatedEdge;
@@ -30,7 +30,7 @@ export type DiagramFrameProps = HTMLAttributes<HTMLElement> & {
     grid?: boolean;
     /** Mode used when the board opens. Edit mode falls back to view when editable is false. */
     initialMode?: DiagramBoardMode;
-    /** Mermaid 11 flowchart source parsed into the native Board renderer. */
+    /** Mermaid source normalized into the single editable Board renderer. */
     mermaidSource?: string;
     /** Optional host-owned transform for a non-Mermaid image or SVG placed on the Board. */
     mediaTransform?: Partial<DiagramMediaTransform>;

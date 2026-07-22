@@ -5,7 +5,7 @@ import { AnimatePresence, domMax, LazyMotion, m, useReducedMotion } from 'motion
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { joinClassNames } from '../classnames.js';
-import { MermaidFlowchart, } from './MermaidFlowchart.js';
+import { MermaidBoard, } from './MermaidBoard.js';
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
@@ -112,7 +112,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
         const stage = stageRef.current;
         if (!canvas || !stage)
             return null;
-        const diagramElements = Array.from(stage.querySelectorAll('svg .de-board-flowchart__node, svg .de-board-flowchart__edge-label, svg .node, svg .edgeLabel'));
+        const diagramElements = Array.from(stage.querySelectorAll('svg .de-mermaid-board__node, svg .de-mermaid-board__edge-label, svg .node, svg .edgeLabel'));
         const candidates = diagramElements.length > 0
             ? diagramElements
             : Array.from(stage.querySelectorAll('.de-diagram-media-item, img, svg'));
@@ -741,7 +741,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
                             openViewer(canEdit ? 'edit' : 'view');
                         }, children: _jsx(Maximize2, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 }) })] })) : null, _jsx("div", { ref: inlineCanvasRef, className: "de-diagram-inline-canvas", children: _jsx("div", { className: "de-diagram-inline-stage", style: {
                         transform: `translate3d(${inlineViewport.x}px, ${inlineViewport.y}px, 0) scale(${inlineViewport.scale})`,
-                    }, children: mermaidSource ? (_jsx(MermaidFlowchart, { accessibleLabel: accessibleTitle, boardLayout: boardLayout, createdEdges: createdEdgesRef.current, createdNodes: createdNodesRef.current, edgePatches: edgePatchesRef.current, editable: false, fitPatchedBounds: true, panActive: false, patches: nodePatchesRef.current, revision: diagramRevision, source: mermaidSource })) : (children) }) })] }));
+                    }, children: mermaidSource ? (_jsx(MermaidBoard, { accessibleLabel: accessibleTitle, boardLayout: boardLayout, createdEdges: createdEdgesRef.current, createdNodes: createdNodesRef.current, edgePatches: edgePatchesRef.current, editable: false, fitPatchedBounds: true, panActive: false, patches: nodePatchesRef.current, revision: diagramRevision, source: mermaidSource })) : (children) }) })] }));
     const canvasStyle = {
         '--de-diagram-grid-size': `${22 * viewport.scale}px`,
         '--de-diagram-grid-x': `${viewport.x}px`,
@@ -758,7 +758,7 @@ export function DiagramFrame({ className, children, boardLayout, editable = fals
                                                                 setModeMenuOpen(false);
                                                             }, children: [_jsx(Eye, { "aria-hidden": "true", size: 17 }), _jsxs("span", { children: [_jsx("strong", { children: "\u6D4F\u89C8" }), _jsx("small", { children: "\u4EC5\u7F29\u653E\u548C\u5E73\u79FB\u753B\u5E03" })] })] })] })) : null })] }), _jsxs("nav", { className: "de-diagram-board-tools de-diagram-board-float", "aria-label": "\u753B\u677F\u5DE5\u5177", children: [editModeActive ? (_jsx("button", { type: "button", "aria-label": "\u9009\u62E9\u5DE5\u5177", "aria-pressed": boardTool === 'select', title: "\u9009\u62E9", onClick: () => setBoardTool('select'), children: _jsx(MousePointer2, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })) : null, _jsx("button", { type: "button", "aria-label": "\u624B\u578B\u79FB\u52A8\u5DE5\u5177", "aria-keyshortcuts": "H", "aria-pressed": boardTool === 'hand', title: "\u79FB\u52A8\u753B\u5E03\uFF08H\uFF09", onClick: () => setBoardTool(boardTool === 'hand' ? 'select' : 'hand'), children: _jsx(Hand, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })] }), _jsxs(m.div, { ref: canvasRef, className: "de-diagram-viewer-canvas", "data-grid": grid ? 'true' : undefined, "data-pan-active": canvasPanActive ? 'true' : undefined, "data-panning": isPanning ? 'true' : undefined, "data-selecting": marqueeRect ? 'true' : undefined, style: canvasStyle, onContextMenu: (event) => event.preventDefault(), onPointerDown: handleCanvasPointerDown, onPointerMove: handleCanvasPointerMove, onPointerUp: finishCanvasInteraction, onPointerCancel: (event) => finishCanvasInteraction(event, true), children: [_jsxs("div", { ref: stageRef, className: "de-diagram-viewer-stage", style: {
                                                     transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`,
-                                                }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: mermaidSource ? (_jsx(MermaidFlowchart, { accessibleLabel: accessibleTitle, boardLayout: boardLayout, createdEdges: createdEdgesRef.current, createdNodes: createdNodesRef.current, edgePatches: edgePatchesRef.current, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: () => {
+                                                }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: mermaidSource ? (_jsx(MermaidBoard, { accessibleLabel: accessibleTitle, boardLayout: boardLayout, createdEdges: createdEdgesRef.current, createdNodes: createdNodesRef.current, edgePatches: edgePatchesRef.current, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: () => {
                                                                 if (!hasFittedRef.current)
                                                                     requestAnimationFrame(fitView);
                                                             }, onSelectNode: handleSelectNode, onSelectEdge: handleSelectEdge, panActive: canvasPanActive, patches: nodePatchesRef.current, revision: diagramRevision, selectedEdgeId: selectedEdgeId, selectedNodeIds: selectedNodeIds, source: mermaidSource })) : (_jsxs("div", { ref: mediaItemRef, className: "de-diagram-media-item", "data-de-media-item": "true", "data-selected": mediaSelected ? 'true' : undefined, style: {

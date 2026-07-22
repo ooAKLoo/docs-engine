@@ -3,6 +3,7 @@ export { Callout } from './components/Callout.js';
 export { CodeBlock } from './components/CodeBlock.js';
 export { DiagramFrame, } from './components/DiagramFrame.js';
 export { DocumentContent } from './components/DocumentContent.js';
+export { Formula } from './components/Formula.js';
 export { Priority } from './components/Priority.js';
 export { ResourceLink } from './components/ResourceLink.js';
 export { RiskGrid, RiskItem } from './components/RiskGrid.js';

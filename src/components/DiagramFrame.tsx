@@ -25,7 +25,6 @@ import {useCallback, useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {joinClassNames} from '../classnames.js';
 import {
-  MermaidFlowchart,
   type DiagramConnectRequest,
   type DiagramConnectionDropRequest,
   type DiagramBoardLayout,
@@ -38,7 +37,8 @@ import {
   type DiagramNodePosition,
   type DiagramNodeShape,
   type MermaidEditRequest,
-} from './MermaidFlowchart.js';
+  MermaidBoard,
+} from './MermaidBoard.js';
 
 export type {
   DiagramAnchorSide,
@@ -54,7 +54,7 @@ export type {
   DiagramNodeShape,
   DiagramNodeTone,
   DiagramNodePosition,
-} from './MermaidFlowchart.js';
+} from './MermaidBoard.js';
 
 export type DiagramBoardMode = 'view' | 'edit';
 
@@ -161,7 +161,7 @@ export type DiagramFrameProps = HTMLAttributes<HTMLElement> & {
   grid?: boolean;
   /** Mode used when the board opens. Edit mode falls back to view when editable is false. */
   initialMode?: DiagramBoardMode;
-  /** Mermaid 11 flowchart source parsed into the native Board renderer. */
+  /** Mermaid source normalized into the single editable Board renderer. */
   mermaidSource?: string;
   /** Optional host-owned transform for a non-Mermaid image or SVG placed on the Board. */
   mediaTransform?: Partial<DiagramMediaTransform>;
@@ -308,7 +308,7 @@ export function DiagramFrame({
     if (!canvas || !stage) return null;
     const diagramElements = Array.from(
       stage.querySelectorAll<Element>(
-        'svg .de-board-flowchart__node, svg .de-board-flowchart__edge-label, svg .node, svg .edgeLabel',
+        'svg .de-mermaid-board__node, svg .de-mermaid-board__edge-label, svg .node, svg .edgeLabel',
       ),
     );
     const candidates =
@@ -1051,7 +1051,7 @@ export function DiagramFrame({
           }}
         >
           {mermaidSource ? (
-            <MermaidFlowchart
+            <MermaidBoard
               accessibleLabel={accessibleTitle}
               boardLayout={boardLayout}
               createdEdges={createdEdgesRef.current}
@@ -1269,7 +1269,7 @@ export function DiagramFrame({
                             {...props}
                           >
                             {mermaidSource ? (
-                              <MermaidFlowchart
+                              <MermaidBoard
                                 accessibleLabel={accessibleTitle}
                                 boardLayout={boardLayout}
                                 createdEdges={createdEdgesRef.current}

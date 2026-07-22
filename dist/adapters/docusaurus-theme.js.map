@@ -1,0 +1,1 @@
+{"version":3,"file":"docusaurus-theme.js","sourceRoot":"","sources":["../../src/adapters/docusaurus-theme.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AACH,MAAM,CAAC,OAAO,UAAU,yBAAyB;IAC/C,OAAO;QACL,IAAI,EAAE,sCAAsC;QAC5C,YAAY;YACV,OAAO,qBAAqB,CAAC;QAC/B,CAAC;KACF,CAAC;AACJ,CAAC"}

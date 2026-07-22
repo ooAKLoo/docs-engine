@@ -5,6 +5,7 @@ import {
   CodeBlock,
   DiagramFrame,
   DocumentContent,
+  Formula,
   Priority,
   ResourceLink,
   RiskGrid,
@@ -36,7 +37,16 @@ const mermaidSource = `flowchart LR
     class agent dePurple
     class tts deOrange`;
 
-const mixedLabelMermaidSource = `flowchart LR
+const sequenceMermaidSource = `sequenceDiagram
+    participant Child as 孩子
+    participant Lula as Lula 设备
+    participant Agent as Companion Agent
+    Child->>Lula: 说话
+    Lula->>Agent: 识别文本与上下文
+    Agent-->>Lula: 回复文本
+    Lula-->>Child: 播放语音`;
+
+const urbanUberMermaidSource = `flowchart LR
     phone[智能手机普及] --> gps[GPS 普及]
     gps --> payment[移动支付普及]
     payment --> city[城市出行效率低]
@@ -66,8 +76,8 @@ const unifiedBoardMermaidSource = `flowchart LR
     class retention deBoardGateOne
     class payment deBoardGateTwo`;
 
-// The old SVG was designed, not auto-laid-out. Keep Mermaid as the semantic source,
-// then give the native Board the same authored starting geometry and return routes.
+// Keep Mermaid as the semantic source and give the same Board renderer an authored
+// starting geometry when a designed scene must retain its exact composition.
 const unifiedBoardLayout = {
   width: 1280,
   height: 470,
@@ -204,6 +214,7 @@ export function Gallery() {
 
       <nav className="showcase-nav" aria-label="样式目录">
         <a href="#typography">基础排版</a>
+        <a href="#formula">KaTeX 公式</a>
         <a href="#summary">摘要与判断</a>
         <a href="#callout">Callout</a>
         <a href="#badge">状态与优先级</a>
@@ -240,8 +251,19 @@ export function Gallery() {
           />
         </section>
 
+        <section className="showcase-section" id="formula">
+          <h2>二、KaTeX 公式</h2>
+          <p>
+            数学关系和概念模型由文档作者显式写成 LaTeX，Docs Engine 只负责统一渲染，不根据等号、乘号或引用块猜测语义。
+          </p>
+          <Formula
+            aria-label="用户体验等于跨渠道连续性乘以上下文相关性乘以记忆可靠度乘以用户控制权"
+            latex={String.raw`\text{用户体验} = \text{跨渠道连续性} \times \text{上下文相关性} \times \text{记忆可靠度} \times \text{用户控制权}`}
+          />
+        </section>
+
         <section className="showcase-section" id="summary">
-          <h2>二、摘要与关键判断</h2>
+          <h2>三、摘要与关键判断</h2>
           <SummaryPanel>
             <h2>整体结论</h2>
             <p>SummaryPanel 用于文档级摘要；标题、正文和背景都由共享引擎维护。</p>
@@ -253,19 +275,17 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="callout">
-          <h2>三、Callout</h2>
-          <p>颜色使用飞书高亮块的浅色填充，不显示描边，正文保持统一深色。</p>
-          <Callout variant="red">红色 Callout 用于错误、阻塞或必须立即关注的信息。</Callout>
-          <Callout variant="orange">橙色 Callout 用于风险、截止时间或操作提醒。</Callout>
-          <Callout variant="yellow">黄色 Callout 用于提示、建议和容易遗漏的细节。</Callout>
-          <Callout variant="green">绿色 Callout 用于成功结果、已验证结论和推荐方案。</Callout>
-          <Callout variant="blue">蓝色 Callout 用于背景信息、口径和阅读说明。</Callout>
-          <Callout variant="purple">紫色 Callout 用于品牌信息或需要适度强调的补充内容。</Callout>
-          <Callout variant="neutral">灰色 Callout 用于普通备注和次要说明。</Callout>
+          <h2>四、Callout</h2>
+          <p>Callout 与状态、优先级共用同一套低饱和语义色，不显示描边。</p>
+          <Callout variant="green">已完成：用于已验证结论、达成结果和推荐方案。</Callout>
+          <Callout variant="blue">进行中：用于背景信息、当前口径和推进说明。</Callout>
+          <Callout variant="neutral">待处理 / P2：用于普通备注、未设置状态和次要说明。</Callout>
+          <Callout variant="red">P0：用于错误、阻塞或必须立即处理的信息。</Callout>
+          <Callout variant="orange">P1：用于风险、截止时间或下一顺位的操作提醒。</Callout>
         </section>
 
         <section className="showcase-section" id="badge">
-          <h2>四、状态与优先级</h2>
+          <h2>五、状态与优先级</h2>
           <p>状态与优先级是 Table 中的独立属性，统一采用低饱和、无边框语义标签。</p>
           <Table>
             <thead>
@@ -292,7 +312,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="table">
-          <h2>五、Table</h2>
+          <h2>六、Table</h2>
           <p>所有 Table 统一透明背景、无外框、无纵线、无阴影，只保留横向分隔线。</p>
           <Table>
             <thead>
@@ -338,7 +358,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="transition">
-          <h2>六、转换关系</h2>
+          <h2>七、转换关系</h2>
           <Transition>
             <TransitionCard>
               <TransitionLabel>原方案 · 竞争拥挤</TransitionLabel>
@@ -355,7 +375,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="check-grid">
-          <h2>七、检查项网格</h2>
+          <h2>八、检查项网格</h2>
           <RiskGrid>
             <RiskItem>内容必须是可判断的风险、约束或验收条件。</RiskItem>
             <RiskItem>使用中性灰背景，不增加边框和阴影。</RiskItem>
@@ -365,7 +385,7 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="timeline">
-          <h2>八、交互时间轴</h2>
+          <h2>九、交互时间轴</h2>
           <p>
             Timeline 复刻阶段式项目视图：拖动阶段条或两端时会实时变化，并自动吸附到日期刻度和其他阶段边界；双击轨道空白处新增，单击阶段选中后按 Del 删除。
           </p>
@@ -373,10 +393,10 @@ export function Gallery() {
         </section>
 
         <section className="showcase-section" id="diagram">
-          <h2>九、图表</h2>
-          <h3>Mermaid 流程图</h3>
+          <h2>十、图表</h2>
+          <h3>统一 Mermaid Board</h3>
           <p>
-            Mermaid 用于工程流程、状态机和时序关系。下面的语音链路同时用于检查多行节点文案、英文下行字母和边标签的位置，颜色只编码节点角色。
+            Mermaid 只负责提供结构化文本。所有受支持语法都会转换成同一种 Board 节点与连线，并交给同一个可编辑渲染器；不存在按图表类型切换的 SVG 渲染分支。下面的语音链路同时用于检查多行节点文案、英文下行字母和边标签的位置。
           </p>
           <DiagramFrame
             editable
@@ -386,16 +406,23 @@ export function Gallery() {
           <p>
             正文预览按图形内容和安全留白自适应高度；鼠标停在正文图表内即可滚轮平移，按住 ⌘ / Ctrl + 滚轮以指针为中心缩放；单击图表会直接进入无边画板。全屏选择工具下，从空白处拖动可框选多个节点，再拖动任一已选节点即可整组移动；Space + 左键、右键或手型工具用于平移。节点支持保持原样式的双击编辑。hover 节点会显示四向连接点，可拖到已有节点建立连线，或拖到空白处选择新图形；新增连线不会推动既有节点，同侧锚点共享起点。选中连线后可拖动两个中段控制点，手工调整圆角正交路径。
           </p>
-          <h3>中英文混排节点</h3>
-          <p>这张图用于回归检查“GPS 普及”等中英文混排标签，所有文字必须完整显示。</p>
+          <h3>时序语法，同一 Board</h3>
+          <p>输入是 <code>sequenceDiagram</code>，输出仍然是相同的可选中、可拖动、可编辑 Board 对象。</p>
           <DiagramFrame
             editable
-            mermaidSource={mixedLabelMermaidSource}
-            aria-label="中英文混排节点回归图"
+            mermaidSource={sequenceMermaidSource}
+            aria-label="孩子、Lula 设备和 Companion Agent 的时序交互图"
           />
-          <h3>统一画板对象</h3>
+          <h3>Urban / Uber 因果链路</h3>
+          <p>保留原先的 Urban/Uber Demo，用于检查“GPS 普及”等中英文混排标签和连续因果链路。</p>
+          <DiagramFrame
+            editable
+            mermaidSource={urbanUberMermaidSource}
+            aria-label="智能手机、GPS、移动支付与 Uber 出现的因果链路"
+          />
+          <h3>设计布局，同一 Board</h3>
           <p>
-            这张图保留原市场验证图的内容、分支和配色，但不再使用独立 SVG 图片。它由原生 Board 节点与连线构成：正文内可滚轮平移、⌘ / Ctrl + 滚轮缩放；打开画板后可选中、拖动、双击原地编辑，并从锚点创建或调整连线。
+            这张图通过 <code>boardLayout</code> 保留市场验证图的精确构图，但没有独立渲染器。它仍由同一个 Board 的节点与连线构成：正文内可滚轮平移、⌘ / Ctrl + 滚轮缩放；打开画板后可选中、拖动、双击原地编辑，并从锚点创建或调整连线。
           </p>
           <DiagramFrame
             boardLayout={unifiedBoardLayout}

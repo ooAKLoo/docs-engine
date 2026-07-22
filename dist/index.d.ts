@@ -3,6 +3,7 @@ export { Callout, type CalloutProps } from './components/Callout.js';
 export { CodeBlock, type CodeBlockProps } from './components/CodeBlock.js';
 export { DiagramFrame, type DiagramBoardMode, type DiagramAnchorSide, type DiagramBoardEdgeLayout, type DiagramBoardLayout, type DiagramBoardNodeLayout, type DiagramCreatedEdge, type DiagramCreatedNode, type DiagramEdgeRouteChange, type DiagramEdgeRoutePatch, type DiagramFrameProps, type DiagramMediaChange, type DiagramMediaTransform, type DiagramNodeChange, type DiagramNodeChangeReason, type DiagramNodePosition, type DiagramNodeShape, type DiagramNodeTone, type DiagramStructureChange, } from './components/DiagramFrame.js';
 export { DocumentContent, type DocumentContentProps } from './components/DocumentContent.js';
+export { Formula, type FormulaProps } from './components/Formula.js';
 export { Priority, type PriorityLevel, type PriorityProps } from './components/Priority.js';
 export { ResourceLink, type ResourceLinkProps } from './components/ResourceLink.js';
 export { RiskGrid, RiskItem, type RiskGridProps, type RiskItemProps } from './components/RiskGrid.js';

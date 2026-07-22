@@ -1,6 +1,6 @@
 {
   "name": "@ooakloo/docs-engine",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": false,
   "type": "module",
   "description": "Shared document semantics, React primitives and visual system for ooAKLoo projects.",
@@ -10,6 +10,7 @@
   ],
   "files": [
     "dist",
+    "skills",
     "styles",
     "README.md"
   ],
@@ -28,6 +29,11 @@
       "types": "./dist/adapters/docusaurus.d.ts",
       "import": "./dist/adapters/docusaurus.js",
       "default": "./dist/adapters/docusaurus.js"
+    },
+    "./adapters/docusaurus-theme": {
+      "types": "./dist/adapters/docusaurus-theme.d.ts",
+      "import": "./dist/adapters/docusaurus-theme.js",
+      "default": "./dist/adapters/docusaurus-theme.js"
     },
     "./model": {
       "types": "./dist/model.d.ts",
@@ -65,7 +71,7 @@
   "packageManager": "pnpm@9.12.0",
   "dependencies": {
     "lucide-react": "^1.24.0",
-    "mermaid": "^11.16.0",
+    "katex": "^0.16.47",
     "motion": "^12.23.24"
   }
 }

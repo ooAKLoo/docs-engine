@@ -1,3 +1,5 @@
+import { type DiagramAnchorSide, type DiagramNodeShape, type DiagramNodeTone } from './MermaidBoardParser.js';
+export type { DiagramAnchorSide, DiagramNodeShape, DiagramNodeTone, } from './MermaidBoardParser.js';
 export type DiagramNodeChangeReason = 'label' | 'position';
 export type DiagramNodePosition = {
     x: number;
@@ -50,9 +52,6 @@ export type MermaidEditRequest = {
     position: DiagramNodePosition;
     rect: DOMRect;
 };
-export type DiagramNodeShape = 'rect' | 'round' | 'stadium' | 'circle' | 'diamond';
-export type DiagramNodeTone = 'blue' | 'purple' | 'teal' | 'green' | 'orange' | 'neutral';
-export type DiagramAnchorSide = 'top' | 'right' | 'bottom' | 'left';
 export type DiagramCreatedNode = {
     id: string;
     label: string;
@@ -87,7 +86,7 @@ export type DiagramConnectionDropRequest = {
     targetSide: DiagramAnchorSide;
     tone: DiagramNodeTone;
 };
-export type MermaidFlowchartProps = {
+export type MermaidBoardProps = {
     accessibleLabel: string;
     boardLayout?: DiagramBoardLayout;
     createdEdges?: DiagramCreatedEdge[];
@@ -111,5 +110,5 @@ export type MermaidFlowchartProps = {
     selectedNodeIds?: readonly string[];
     source: string;
 };
-export declare function MermaidFlowchart({ accessibleLabel, boardLayout, createdEdges, createdNodes, edgePatches, editable, editingNodeId, fitPatchedBounds, onChange, onConnect, onConnectionDrop, onEdgeRouteChange, onEditRequest, onReady, onSelectNode, onSelectEdge, panActive, patches, revision, selectedEdgeId, selectedNodeIds, source, }: MermaidFlowchartProps): import("react/jsx-runtime").JSX.Element;
-//# sourceMappingURL=MermaidFlowchart.d.ts.map
+export declare function MermaidBoard({ accessibleLabel, boardLayout, createdEdges, createdNodes, edgePatches, editable, editingNodeId, fitPatchedBounds, onChange, onConnect, onConnectionDrop, onEdgeRouteChange, onEditRequest, onReady, onSelectNode, onSelectEdge, panActive, patches, revision, selectedEdgeId, selectedNodeIds, source, }: MermaidBoardProps): import("react/jsx-runtime").JSX.Element;
+//# sourceMappingURL=MermaidBoard.d.ts.map
