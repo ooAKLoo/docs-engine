@@ -1660,9 +1660,9 @@
 }
 
 .de-board__group rect {
-  fill: none;
-  stroke: #dfe3ec;
-  stroke-width: 1.2px;
+  fill: #fff;
+  stroke: none;
+  stroke-width: 0;
   vector-effect: non-scaling-stroke;
 }
 
