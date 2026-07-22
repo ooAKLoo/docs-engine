@@ -2,7 +2,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Check, Copy } from 'lucide-react';
 import { Children, isValidElement, useEffect, useRef, useState, } from 'react';
-import { joinClassNames } from '../classnames.js';
 function readText(node) {
     if (typeof node === 'string' || typeof node === 'number')
         return String(node);
@@ -40,7 +39,6 @@ async function copyText(value) {
 export function CodeBlock({ children, className, code, copiedLabel = '已复制', copyLabel = '复制代码', language, onCopy, tabIndex = 0, ...props }) {
     const [copied, setCopied] = useState(false);
     const resetTimerRef = useRef();
-    const content = code === undefined ? children : _jsx("code", { children: code });
     const codeText = code ?? readText(children).replace(/\n$/, '');
     const languageLabel = language ?? inferLanguage(children, className) ?? 'Code';
     useEffect(() => () => {
@@ -55,6 +53,6 @@ export function CodeBlock({ children, className, code, copiedLabel = '已复制'
             clearTimeout(resetTimerRef.current);
         resetTimerRef.current = setTimeout(() => setCopied(false), 1800);
     };
-    return (_jsxs("div", { className: "de-code-block", "data-language": languageLabel.toLowerCase(), children: [_jsxs("div", { className: "de-code-block__toolbar", children: [_jsx("span", { className: "de-code-block__language", children: languageLabel }), _jsxs("button", { "aria-label": copied ? copiedLabel : copyLabel, className: "de-code-block__copy", onClick: handleCopy, type: "button", children: [copied ? _jsx(Check, { "aria-hidden": "true", size: 14 }) : _jsx(Copy, { "aria-hidden": "true", size: 14 }), _jsx("span", { "aria-live": "polite", children: copied ? copiedLabel : copyLabel })] })] }), _jsx("pre", { className: joinClassNames('de-code-block__pre', className), tabIndex: tabIndex, ...props, children: content })] }));
+    return (_jsxs("div", { className: "de-code-block", "data-language": languageLabel.toLowerCase(), children: [_jsxs("div", { className: "de-code-block__toolbar", children: [_jsx("span", { className: "de-code-block__language", children: languageLabel }), _jsxs("button", { "aria-label": copied ? copiedLabel : copyLabel, className: "de-code-block__copy", onClick: handleCopy, type: "button", children: [copied ? _jsx(Check, { "aria-hidden": "true", size: 14 }) : _jsx(Copy, { "aria-hidden": "true", size: 14 }), _jsx("span", { "aria-live": "polite", children: copied ? copiedLabel : copyLabel })] })] }), _jsx("pre", { className: "de-code-block__pre", tabIndex: tabIndex, ...props, children: _jsx("code", { children: codeText }) })] }));
 }
 //# sourceMappingURL=CodeBlock.js.map

@@ -256,9 +256,33 @@
 }
 
 .de-root.de-prose .de-code-block .de-code-block__pre {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 16px !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+  color: var(--de-code-ink) !important;
+  font: 0.875rem/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace !important;
+  text-align: left !important;
+  white-space: pre !important;
+}
+
+.de-root.de-prose .de-code-block > .de-code-block__pre > code {
+  display: block !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  line-height: inherit !important;
+  text-shadow: none !important;
+  white-space: inherit !important;
 }
 
 :where(.de-prose) .de-formula {

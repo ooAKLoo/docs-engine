@@ -10,6 +10,10 @@ const docusaurusAdapter = await readFile(
   new URL('../src/adapters/docusaurus.ts', import.meta.url),
   'utf8',
 );
+const docusaurusMdxComponents = await readFile(
+  new URL('../src/docusaurus-theme/MDXComponents/index.tsx', import.meta.url),
+  'utf8',
+);
 const showcase = await readFile(new URL('../showcase/src/Gallery.tsx', import.meta.url), 'utf8');
 const model = await readFile(new URL('../src/model.ts', import.meta.url), 'utf8');
 
@@ -69,10 +73,17 @@ test('exports a ChatGPT-style code block with language and copy controls', async
   assert.match(codeBlock, /de-code-block__toolbar/);
   assert.match(codeBlock, /navigator\.clipboard/);
   assert.match(codeBlock, /copyLabel = '复制代码'/);
+  assert.match(codeBlock, /<code>\{codeText\}<\/code>/);
+  assert.doesNotMatch(codeBlock, /\{content\}/);
+  assert.match(model, /type:\s*'code';\s*code:\s*string;\s*language\?:\s*string/);
+  assert.doesNotMatch(docusaurusMdxComponents, /@theme\/MDXComponents\/Code/);
+  assert.match(docusaurusMdxComponents, /code:\s*Code/);
   assert.match(styles, /\.de-code-block__pre/);
   assert.match(styles, /--de-code-background/);
   assert.match(styles, /:not\(pre\) > code/);
   assert.match(styles, /\.de-code-block \.de-code-block__pre/);
+  assert.match(styles, /> \.de-code-block__pre > code/);
+  assert.match(styles, /background:\s*transparent !important/);
   assert.match(styles, /!important/);
 });
 

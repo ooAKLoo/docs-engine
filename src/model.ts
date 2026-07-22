@@ -28,6 +28,7 @@ export type DocBlock =
   | {type: 'heading'; level: 1 | 2 | 3; text: string}
   | {type: 'paragraph'; text: string; tone?: 'muted'}
   | {type: 'list'; items: Array<{text: string; muted?: boolean; strong?: boolean}>}
+  | {type: 'code'; code: string; language?: string}
   | {type: 'formula'; lines: string[]; compact?: boolean}
   | {type: 'image'; src: string; alt: string; caption?: string}
   | {type: 'imageGrid'; images: Array<{src: string; alt: string; caption?: string}>}

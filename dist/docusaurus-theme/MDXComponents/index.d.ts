@@ -1,4 +1,6 @@
+import type { ComponentProps } from 'react';
 import Mermaid from '../Mermaid/index.js';
+declare function Code(props: ComponentProps<'code'>): import("react/jsx-runtime").JSX.Element;
 /**
  * Docusaurus' theme-original alias points back to this file when Docs Engine is
  * the only custom theme. Compose the classic primitives explicitly instead.
@@ -28,7 +30,7 @@ declare const _default: {
     Head: import("react").ComponentType<Record<string, unknown>>;
     details: import("react").ComponentType<Record<string, unknown>>;
     Details: import("react").ComponentType<Record<string, unknown>>;
-    code: import("react").ComponentType<Record<string, unknown>>;
+    code: typeof Code;
     a: import("react").ComponentType<Record<string, unknown>>;
     img: import("react").ComponentType<Record<string, unknown>>;
     li: import("react").ComponentType<Record<string, unknown>>;

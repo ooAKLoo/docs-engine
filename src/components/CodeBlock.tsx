@@ -10,8 +10,6 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from 'react';
-import {joinClassNames} from '../classnames.js';
-
 export type CodeBlockProps = Omit<HTMLAttributes<HTMLPreElement>, 'children'> & {
   children?: ReactNode;
   code?: string;
@@ -74,7 +72,6 @@ export function CodeBlock({
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const content = code === undefined ? children : <code>{code}</code>;
   const codeText = code ?? readText(children).replace(/\n$/, '');
   const languageLabel = language ?? inferLanguage(children, className) ?? 'Code';
 
@@ -107,8 +104,8 @@ export function CodeBlock({
           <span aria-live="polite">{copied ? copiedLabel : copyLabel}</span>
         </button>
       </div>
-      <pre className={joinClassNames('de-code-block__pre', className)} tabIndex={tabIndex} {...props}>
-        {content}
+      <pre className="de-code-block__pre" tabIndex={tabIndex} {...props}>
+        <code>{codeText}</code>
       </pre>
     </div>
   );

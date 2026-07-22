@@ -26,6 +26,10 @@ export type DocBlock = {
         strong?: boolean;
     }>;
 } | {
+    type: 'code';
+    code: string;
+    language?: string;
+} | {
     type: 'formula';
     lines: string[];
     compact?: boolean;

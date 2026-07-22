@@ -56,6 +56,8 @@ pnpm showcase
 - oVita 保留 Next.js、Markdown 文件读取、业务 DocBlock、状态编辑和写回 API。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
+标准 Markdown 代码围栏在两类宿主中都归一为 Docs Engine 的 `CodeBlock`；目录树这类纯文本结构使用 `text` 语言即可，不需要依赖方增加目录图组件、Prism 包装器或代码块 CSS。
+
 ### Board-first 图表架构
 
 `BoardDocument` 是渲染、编辑和持久化唯一认可的图表模型，完整包含节点、连线、锚点、路线、位置与画布尺寸。`BoardCanvas` 只读取 `BoardDocument`，不读取 Mermaid 文本，也不存在第二套按语法类型分流的 SVG 渲染器。
