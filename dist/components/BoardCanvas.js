@@ -790,6 +790,26 @@ function layoutGroupedDiagramGraph(measuredNodes, edges, groups, direction, patc
         if (!changed)
             break;
     }
+    const layoutEdges = edges.map((edge) => {
+        const sourceId = unitByNode.get(edge.sourceId);
+        const targetId = unitByNode.get(edge.targetId);
+        if (!sourceId || !targetId || sourceId === targetId)
+            return edge;
+        const source = unitById.get(sourceId);
+        const target = unitById.get(targetId);
+        if (!source || !target)
+            return edge;
+        const sourceRank = ranks.get(sourceId) ?? 0;
+        const targetRank = ranks.get(targetId) ?? 0;
+        const forward = sourceRank < targetRank ||
+            (sourceRank === targetRank && source.index < target.index);
+        const sides = groupedFlowSides(direction, forward);
+        return {
+            ...edge,
+            sourceSide: edge.sourceSide ?? sides.source,
+            targetSide: edge.targetSide ?? sides.target,
+        };
+    });
     const nodeGap = 34;
     const groupGap = 46;
     const groupHorizontalPadding = 24;
@@ -819,7 +839,7 @@ function layoutGroupedDiagramGraph(measuredNodes, edges, groups, direction, patc
             Math.max(0, rankUnits.length - 1) * groupGap;
     });
     const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
-    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, edges.flatMap((edge) => {
+    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, layoutEdges.flatMap((edge) => {
         const sourceUnit = unitByNode.get(edge.sourceId);
         const targetUnit = unitByNode.get(edge.targetId);
         const sourceRank = sourceUnit === undefined ? undefined : rankIndexes.get(ranks.get(sourceUnit) ?? 0);
@@ -876,12 +896,32 @@ function layoutGroupedDiagramGraph(measuredNodes, edges, groups, direction, patc
         };
     });
     return {
-        edges,
+        edges: layoutEdges,
         groups: layoutBoardGroups(groups, nodes),
         height,
         nodes,
         width,
     };
+}
+function groupedFlowSides(direction, forward) {
+    if (direction === 'RL') {
+        return forward
+            ? { source: 'left', target: 'right' }
+            : { source: 'right', target: 'left' };
+    }
+    if (direction === 'TB') {
+        return forward
+            ? { source: 'bottom', target: 'top' }
+            : { source: 'top', target: 'bottom' };
+    }
+    if (direction === 'BT') {
+        return forward
+            ? { source: 'top', target: 'bottom' }
+            : { source: 'bottom', target: 'top' };
+    }
+    return forward
+        ? { source: 'right', target: 'left' }
+        : { source: 'left', target: 'right' };
 }
 function layoutSequenceDiagramGraph(measuredNodes, edges, groups, boardLayout, measuredEdgeLabels) {
     const marginX = 56;
@@ -1293,7 +1333,14 @@ function routeEdge(source, target, sourceSide, targetSide, sourceOffset, targetO
     };
     const sourceHorizontal = sourceSide === 'left' || sourceSide === 'right';
     const targetHorizontal = targetSide === 'left' || targetSide === 'right';
-    const obstacleRoute = findObstacleAvoidingRoute(sourceStub, targetStub, obstacles, sourceSide, targetSide, 14 + (Math.abs(laneIndex) % 3) * 3);
+    const routeObstacles = obstacles.filter((node) => node.id !== source.id && node.id !== target.id);
+    if (laneIndex !== 0 && sourceHorizontal === targetHorizontal) {
+        const pairedRoute = pairedObstacleLaneRoute(start, sourceStub, targetStub, tip, source, target, routeObstacles, sourceHorizontal, laneIndex);
+        if (pairedRoute) {
+            return finalizeEdgeRoute(pairedRoute, arrow, sourceSide, targetSide);
+        }
+    }
+    const obstacleRoute = findObstacleAvoidingRoute(sourceStub, targetStub, routeObstacles, sourceSide, targetSide, 14 + (Math.abs(laneIndex) % 3) * 3);
     let points;
     if (obstacleRoute) {
         points = [start, ...obstacleRoute, tip];
@@ -1386,6 +1433,49 @@ function routeEdge(source, target, sourceSide, targetSide, sourceOffset, targetO
         }
     }
     return finalizeEdgeRoute(points, arrow, sourceSide, targetSide);
+}
+function pairedObstacleLaneRoute(start, sourceStub, targetStub, tip, source, target, obstacles, horizontal, laneIndex) {
+    const laneClearance = 28 + Math.max(0, Math.abs(laneIndex) - 1) * 12;
+    if (horizontal) {
+        const left = Math.min(source.position.x, target.position.x) - 180;
+        const right = Math.max(source.position.x, target.position.x) + 180;
+        const local = [source, target, ...obstacles.filter((node) => {
+                const nodeLeft = node.position.x - node.width / 2;
+                const nodeRight = node.position.x + node.width / 2;
+                return nodeRight >= left && nodeLeft <= right &&
+                    Math.abs(node.position.y - (source.position.y + target.position.y) / 2) <= 180;
+            })];
+        const laneY = laneIndex < 0
+            ? Math.min(...local.map((node) => node.position.y - node.height / 2)) - laneClearance
+            : Math.max(...local.map((node) => node.position.y + node.height / 2)) + laneClearance;
+        return [
+            start,
+            sourceStub,
+            { x: sourceStub.x, y: laneY },
+            { x: targetStub.x, y: laneY },
+            targetStub,
+            tip,
+        ];
+    }
+    const top = Math.min(source.position.y, target.position.y) - 180;
+    const bottom = Math.max(source.position.y, target.position.y) + 180;
+    const local = [source, target, ...obstacles.filter((node) => {
+            const nodeTop = node.position.y - node.height / 2;
+            const nodeBottom = node.position.y + node.height / 2;
+            return nodeBottom >= top && nodeTop <= bottom &&
+                Math.abs(node.position.x - (source.position.x + target.position.x) / 2) <= 180;
+        })];
+    const laneX = laneIndex < 0
+        ? Math.min(...local.map((node) => node.position.x - node.width / 2)) - laneClearance
+        : Math.max(...local.map((node) => node.position.x + node.width / 2)) + laneClearance;
+    return [
+        start,
+        sourceStub,
+        { x: laneX, y: sourceStub.y },
+        { x: laneX, y: targetStub.y },
+        targetStub,
+        tip,
+    ];
 }
 function isDirectFacingRoute(start, tip, sourceSide, targetSide) {
     if (oppositeSide(sourceSide) !== targetSide)

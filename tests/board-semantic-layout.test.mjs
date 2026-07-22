@@ -102,3 +102,41 @@ test('renders sequence participants on one header row and messages on distinct t
   assert.equal(new Set(messageRows).size, 5);
   assert.deepEqual(messageRows, [...messageRows].sort((a, b) => a - b));
 });
+
+test('keeps cross-group flow off internal anchors and separates a bidirectional branch', async () => {
+  const document = await importMermaid(`flowchart LR
+    subgraph Source[资产事实源]
+      validate{Schema 通过？}
+      collections[(运行集合)]
+      review[人工修正]
+    end
+    subgraph Product[产品语义]
+      catalog[目录 Port]
+      selection[体验选择]
+    end
+    validate --> collections
+    validate -- 退回 --> review
+    review --> validate
+    collections --> catalog
+    catalog --> selection`);
+  const markup = renderDocument(document);
+  const edgeMarkup = (id) => markup.match(
+    new RegExp(`<g class="de-board__edge" data-de-edge-id="${id}"[\\s\\S]*?<\\/g>`),
+  )?.[0] ?? '';
+  const path = (id) => edgeMarkup(id).match(
+    /<path d="([^"]+)" class="de-board__edge-path"/u,
+  )?.[1] ?? '';
+  const crossGroup = edgeMarkup('flow:3:collections:catalog');
+  const validateX = Number(markup.match(
+    /data-de-node-id="validate"[^>]*transform="translate\(([-\d.]+)/u,
+  )?.[1]);
+  const routeXCoordinates = (value) => [...value.matchAll(/[ML] ([-\d.]+) [-\d.]+/gu)]
+    .map((match) => Number(match[1]));
+  const leftLaneX = routeXCoordinates(path('flow:1:validate:review'));
+  const rightLaneX = routeXCoordinates(path('flow:2:review:validate'));
+
+  assert.match(crossGroup, /data-source-side="right"/u);
+  assert.match(crossGroup, /data-target-side="left"/u);
+  assert.ok(Math.min(...leftLaneX) < validateX);
+  assert.ok(Math.max(...rightLaneX) > validateX);
+});

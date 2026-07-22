@@ -1441,6 +1441,24 @@ function layoutGroupedDiagramGraph(
     });
     if (!changed) break;
   }
+  const layoutEdges = edges.map((edge) => {
+    const sourceId = unitByNode.get(edge.sourceId);
+    const targetId = unitByNode.get(edge.targetId);
+    if (!sourceId || !targetId || sourceId === targetId) return edge;
+    const source = unitById.get(sourceId);
+    const target = unitById.get(targetId);
+    if (!source || !target) return edge;
+    const sourceRank = ranks.get(sourceId) ?? 0;
+    const targetRank = ranks.get(targetId) ?? 0;
+    const forward = sourceRank < targetRank ||
+      (sourceRank === targetRank && source.index < target.index);
+    const sides = groupedFlowSides(direction, forward);
+    return {
+      ...edge,
+      sourceSide: edge.sourceSide ?? sides.source,
+      targetSide: edge.targetSide ?? sides.target,
+    };
+  });
 
   const nodeGap = 34;
   const groupGap = 46;
@@ -1479,7 +1497,7 @@ function layoutGroupedDiagramGraph(
   const rankGaps = calculateAdaptiveRankGaps(
     sortedRanks.length,
     horizontal,
-    edges.flatMap((edge) => {
+    layoutEdges.flatMap((edge) => {
       const sourceUnit = unitByNode.get(edge.sourceId);
       const targetUnit = unitByNode.get(edge.targetId);
       const sourceRank = sourceUnit === undefined ? undefined : rankIndexes.get(ranks.get(sourceUnit) ?? 0);
@@ -1537,12 +1555,33 @@ function layoutGroupedDiagramGraph(
     };
   });
   return {
-    edges,
+    edges: layoutEdges,
     groups: layoutBoardGroups(groups, nodes),
     height,
     nodes,
     width,
   };
+}
+
+function groupedFlowSides(direction: BoardDocument['direction'], forward: boolean) {
+  if (direction === 'RL') {
+    return forward
+      ? {source: 'left' as const, target: 'right' as const}
+      : {source: 'right' as const, target: 'left' as const};
+  }
+  if (direction === 'TB') {
+    return forward
+      ? {source: 'bottom' as const, target: 'top' as const}
+      : {source: 'top' as const, target: 'bottom' as const};
+  }
+  if (direction === 'BT') {
+    return forward
+      ? {source: 'top' as const, target: 'bottom' as const}
+      : {source: 'bottom' as const, target: 'top' as const};
+  }
+  return forward
+    ? {source: 'right' as const, target: 'left' as const}
+    : {source: 'left' as const, target: 'right' as const};
 }
 
 function layoutSequenceDiagramGraph(
@@ -2083,10 +2122,29 @@ function routeEdge(
   };
   const sourceHorizontal = sourceSide === 'left' || sourceSide === 'right';
   const targetHorizontal = targetSide === 'left' || targetSide === 'right';
+  const routeObstacles = obstacles.filter(
+    (node) => node.id !== source.id && node.id !== target.id,
+  );
+  if (laneIndex !== 0 && sourceHorizontal === targetHorizontal) {
+    const pairedRoute = pairedObstacleLaneRoute(
+      start,
+      sourceStub,
+      targetStub,
+      tip,
+      source,
+      target,
+      routeObstacles,
+      sourceHorizontal,
+      laneIndex,
+    );
+    if (pairedRoute) {
+      return finalizeEdgeRoute(pairedRoute, arrow, sourceSide, targetSide);
+    }
+  }
   const obstacleRoute = findObstacleAvoidingRoute(
     sourceStub,
     targetStub,
-    obstacles,
+    routeObstacles,
     sourceSide,
     targetSide,
     14 + (Math.abs(laneIndex) % 3) * 3,
@@ -2184,6 +2242,60 @@ function routeEdge(
   }
 
   return finalizeEdgeRoute(points, arrow, sourceSide, targetSide);
+}
+
+function pairedObstacleLaneRoute(
+  start: DiagramNodePosition,
+  sourceStub: DiagramNodePosition,
+  targetStub: DiagramNodePosition,
+  tip: DiagramNodePosition,
+  source: LayoutNode,
+  target: LayoutNode,
+  obstacles: LayoutNode[],
+  horizontal: boolean,
+  laneIndex: number,
+) {
+  const laneClearance = 28 + Math.max(0, Math.abs(laneIndex) - 1) * 12;
+  if (horizontal) {
+    const left = Math.min(source.position.x, target.position.x) - 180;
+    const right = Math.max(source.position.x, target.position.x) + 180;
+    const local = [source, target, ...obstacles.filter((node) => {
+      const nodeLeft = node.position.x - node.width / 2;
+      const nodeRight = node.position.x + node.width / 2;
+      return nodeRight >= left && nodeLeft <= right &&
+        Math.abs(node.position.y - (source.position.y + target.position.y) / 2) <= 180;
+    })];
+    const laneY = laneIndex < 0
+      ? Math.min(...local.map((node) => node.position.y - node.height / 2)) - laneClearance
+      : Math.max(...local.map((node) => node.position.y + node.height / 2)) + laneClearance;
+    return [
+      start,
+      sourceStub,
+      {x: sourceStub.x, y: laneY},
+      {x: targetStub.x, y: laneY},
+      targetStub,
+      tip,
+    ];
+  }
+  const top = Math.min(source.position.y, target.position.y) - 180;
+  const bottom = Math.max(source.position.y, target.position.y) + 180;
+  const local = [source, target, ...obstacles.filter((node) => {
+    const nodeTop = node.position.y - node.height / 2;
+    const nodeBottom = node.position.y + node.height / 2;
+    return nodeBottom >= top && nodeTop <= bottom &&
+      Math.abs(node.position.x - (source.position.x + target.position.x) / 2) <= 180;
+  })];
+  const laneX = laneIndex < 0
+    ? Math.min(...local.map((node) => node.position.x - node.width / 2)) - laneClearance
+    : Math.max(...local.map((node) => node.position.x + node.width / 2)) + laneClearance;
+  return [
+    start,
+    sourceStub,
+    {x: laneX, y: sourceStub.y},
+    {x: laneX, y: targetStub.y},
+    targetStub,
+    tip,
+  ];
 }
 
 function isDirectFacingRoute(

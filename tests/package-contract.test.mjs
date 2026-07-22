@@ -222,6 +222,7 @@ test('uses BoardDocument as the only editable diagram model', async () => {
   assert.doesNotMatch(boardCanvas, /markerEnd/);
   assert.match(styles, /\.de-diagram-inline-toolbar/);
   assert.match(styles, /\.de-board__group rect/);
+  assert.match(styles, /\.de-board__group rect\s*\{[^}]*fill:\s*none/su);
   assert.match(styles, /\.de-board__lifelines line/);
   assert.match(styles, /\.de-diagram-inline-stage/);
   assert.match(styles, /\.de-board__edge-label\[data-floating='true'\] rect/);
