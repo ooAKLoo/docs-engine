@@ -212,6 +212,7 @@ test('uses one editable Board renderer for every supported Mermaid diagram', asy
   assert.match(mermaidBoard, /const renderedDisplayBounds = fitPatchedBounds/);
   assert.match(mermaidBoard, /preserveAspectRatio="xMidYMid meet"/);
   assert.match(mermaidBoard, /compactDiagramEdgeLabelMetrics/);
+  assert.match(mermaidBoard, /previous\?\.label === label && !sameTextLines\(previous\.lines, metrics\.lines\)/);
   assert.match(mermaidBoard, /labelMode: placement\?\.mode/);
   assert.match(mermaidBoard, /data-floating=\{floating \? 'true'/);
   assert.match(mermaidBoard, /de-mermaid-board__edge-labels/);

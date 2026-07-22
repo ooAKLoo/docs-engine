@@ -280,6 +280,13 @@ export function MermaidBoard({
     (edgeId: string, label: string, metrics: DiagramLabelMetrics) => {
       setMeasuredEdgeLabels((current) => {
         const previous = current.get(edgeId);
+        // The measured box feeds auto-layout, which can in turn choose another
+        // wrapping width for this same label. Keep the first measured wrapping
+        // stable for a source label so a short carrier cannot oscillate between
+        // two line-break strategies and trigger nested React updates.
+        if (previous?.label === label && !sameTextLines(previous.lines, metrics.lines)) {
+          return current;
+        }
         if (
           previous?.label === label &&
           Math.abs(previous.width - metrics.width) < 0.25 &&
