@@ -1,4 +1,8 @@
-/** Shared MDX component map: code, tables, formulas and document primitives. */
+import Mermaid from '../Mermaid/index.js';
+/**
+ * Docusaurus' theme-original alias points back to this file when Docs Engine is
+ * the only custom theme. Compose the classic primitives explicitly instead.
+ */
 declare const _default: {
     Annotation: typeof import("../../index.js").Annotation;
     Callout: typeof import("../../index.js").Callout;
@@ -21,6 +25,23 @@ declare const _default: {
     TransitionCopy: typeof import("../../index.js").TransitionCopy;
     TransitionLabel: typeof import("../../index.js").TransitionLabel;
     TransitionTitle: typeof import("../../index.js").TransitionTitle;
+    Head: import("react").ComponentType<Record<string, unknown>>;
+    details: import("react").ComponentType<Record<string, unknown>>;
+    Details: import("react").ComponentType<Record<string, unknown>>;
+    code: import("react").ComponentType<Record<string, unknown>>;
+    a: import("react").ComponentType<Record<string, unknown>>;
+    img: import("react").ComponentType<Record<string, unknown>>;
+    li: import("react").ComponentType<Record<string, unknown>>;
+    ul: import("react").ComponentType<Record<string, unknown>>;
+    h1: (props: Record<string, unknown>) => import("react/jsx-runtime").JSX.Element;
+    h2: (props: Record<string, unknown>) => import("react/jsx-runtime").JSX.Element;
+    h3: (props: Record<string, unknown>) => import("react/jsx-runtime").JSX.Element;
+    h4: (props: Record<string, unknown>) => import("react/jsx-runtime").JSX.Element;
+    h5: (props: Record<string, unknown>) => import("react/jsx-runtime").JSX.Element;
+    h6: (props: Record<string, unknown>) => import("react/jsx-runtime").JSX.Element;
+    admonition: import("react").ComponentType<Record<string, unknown>>;
+    mermaid: typeof Mermaid;
+    Pre: import("react").ComponentType<Record<string, unknown>>;
 };
 export default _default;
 //# sourceMappingURL=index.d.ts.map
