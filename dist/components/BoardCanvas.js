@@ -2,13 +2,17 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { assignDiagramEdgeLanes, calculateAdaptiveRankGaps, compactDiagramEdgeLabelMetrics, measureDiagramEdgeLabel, measureDiagramTextWidth, placeDiagramEdgeLabels, wrapDiagramText, } from './BoardAutoLayout.js';
+import { detectBoardFeedbackEdgeIds, } from './BoardModel.js';
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 const DIRECT_ROUTE_LABEL_RESERVE = 47;
 const PAIRED_ROUTE_LABEL_RESERVE = 108;
 const PAIRED_LANE_BASE_OFFSET = 32;
 const PAIRED_LANE_STEP = 30;
-const EDGE_PORT_GAP = 5;
+const EDGE_SOURCE_PORT_GAP = 10;
+const EDGE_TARGET_PORT_GAP = 16;
 const MICRO_JOG_THRESHOLD = 16;
+const FAN_IN_TRUNK_LENGTH = 42;
+const FEEDBACK_LANE_GAP = 24;
 export function BoardCanvas({ accessibleLabel, document: boardDocument, editable, editingNodeId, fitContent = false, onChange, onConnect, onConnectionDrop, onEdgeRouteChange, onEditRequest, onReady, onSelectNode, onSelectEdge, panActive, selectedEdgeId = null, selectedNodeIds = [], }) {
     const svgRef = useRef(null);
     const dragRef = useRef(null);
@@ -377,7 +381,9 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
     }
     if (activeEdgeRoute)
         routePatches.set(activeEdgeRoute.edgeId, activeEdgeRoute.route);
-    const routedEdges = routeGraphEdges(layout.nodes, layout.edges, routePatches, measuredEdgeLabels, boardDocument.diagramKind);
+    const routedGraph = routeGraphEdges(layout.nodes, layout.edges, routePatches, measuredEdgeLabels, boardDocument.diagramKind, boardDocument.direction);
+    const routedEdges = routedGraph.edges;
+    const routedTrunks = routedGraph.trunks;
     const editedContentBounds = getRenderedDiagramBounds(layout.nodes, routedEdges, 42, layout.groups);
     const renderedDisplayBounds = fitContent
         ? getEmbeddedDiagramBounds(layout.nodes, routedEdges, layout.groups)
@@ -392,7 +398,7 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
         ? routeDraftConnection(draftSource, draftTarget, connectionDraft, layout.nodes)
         : null;
     const guideBounds = getLayoutBounds(layout.nodes, 34, layout.groups);
-    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [layout.groups.length > 0 ? (_jsx("g", { className: "de-board__groups", children: layout.groups.map((group) => (_jsxs("g", { className: "de-board__group", "data-de-group-id": group.id, "data-tone": group.tone ?? 'neutral', children: [_jsx("rect", { x: group.bounds.left, y: group.bounds.top, width: group.bounds.right - group.bounds.left, height: group.bounds.bottom - group.bounds.top, rx: "18", ry: "18" }), _jsx("text", { x: group.bounds.left + 18, y: group.bounds.top + 24, children: group.label })] }, group.id))) })) : null, boardDocument.diagramKind === 'sequence' ? (_jsx("g", { className: "de-board__lifelines", children: layout.nodes.map((node) => (_jsx("line", { x1: node.position.x, x2: node.position.x, y1: node.position.y + node.height / 2 + 10, y2: layout.height - 28 }, `${node.id}:lifeline`))) })) : null, _jsxs("g", { className: "de-board__edges", children: [routedEdges.map(({ edge, route }) => {
+    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [layout.groups.length > 0 ? (_jsx("g", { className: "de-board__groups", children: layout.groups.map((group) => (_jsxs("g", { className: "de-board__group", "data-de-group-id": group.id, "data-tone": group.tone ?? 'neutral', children: [_jsx("rect", { x: group.bounds.left, y: group.bounds.top, width: group.bounds.right - group.bounds.left, height: group.bounds.bottom - group.bounds.top, rx: "18", ry: "18" }), _jsx("text", { x: group.bounds.left + 18, y: group.bounds.top + 24, children: group.label })] }, group.id))) })) : null, boardDocument.diagramKind === 'sequence' ? (_jsx("g", { className: "de-board__lifelines", children: layout.nodes.map((node) => (_jsx("line", { x1: node.position.x, x2: node.position.x, y1: node.position.y + node.height / 2 + 10, y2: layout.height - 28 }, `${node.id}:lifeline`))) })) : null, _jsxs("g", { className: "de-board__edges", children: [routedTrunks.map((trunk) => (_jsx("g", { className: "de-board__edge-trunk", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), children: _jsx("path", { d: trunk.path, className: "de-board__edge-path", "data-stroke": trunk.stroke }) }, trunk.key))), routedEdges.map(({ edge, route }) => {
                             const sourceNode = nodesById.get(edge.sourceId);
                             const targetNode = nodesById.get(edge.targetId);
                             if (!sourceNode || !targetNode || edge.stroke === 'invisible')
@@ -407,7 +413,7 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
                                         setHoveredEdgeId((current) => (current === edge.id ? null : current));
                                     }
                                 }, children: [_jsx("path", { d: route.path, className: "de-board__edge-hit" }), _jsx("path", { d: route.path, className: "de-board__edge-path", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-source-id": edge.sourceId, "data-target-id": edge.targetId, "data-stroke": edge.stroke, "data-source-side": route.sourceSide, "data-target-side": route.targetSide }), showEdgeHandles ? (_jsx("g", { className: "de-board__edge-handles", "aria-hidden": "true", children: getRouteSegmentHandles(route.points).map((handle) => (_jsxs("g", { className: "de-board__edge-handle", "data-orientation": handle.orientation, transform: `translate(${format(handle.x)} ${format(handle.y)})`, onPointerDown: (event) => beginEdgeRouteDrag(event, edge.id, handle, route.points), onPointerMove: moveEdgeRouteDrag, onPointerUp: finishEdgeRouteDrag, onPointerCancel: cancelEdgeRouteDrag, children: [_jsx("circle", { className: "de-board__edge-handle-hit", r: "12" }), _jsx("circle", { className: "de-board__edge-handle-dot", r: "4.5" })] }, `${edge.id}-${handle.segmentIndex}`))) })) : null] }, edge.id));
-                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
+                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
                         const selected = selectedNodeIds.includes(node.id);
                         const editing = editingNodeId === node.id;
                         const badge = resolveNodeBadge(node.classes);
@@ -575,6 +581,7 @@ function documentLayout(document) {
     const edges = document.edges.flatMap((edge) => edge.points?.length || edge.labelPosition || edge.sourceSide || edge.targetSide
         ? [{
                 bareLabel: edge.bareLabel,
+                id: edge.id,
                 label: edge.label,
                 labelAlign: edge.labelAlign,
                 labelPosition: edge.labelPosition,
@@ -612,16 +619,24 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
             ...size,
         };
     });
-    // Dotted return edges are visual feedback loops. They must not turn an
-    // otherwise forward flow into a cyclic rank graph and reshuffle the cards.
-    const edges = applyBoardEdgeLayout(graph.edges, boardLayout);
+    const feedbackEdgeIds = graph.diagramKind === 'flowchart'
+        ? detectBoardFeedbackEdgeIds(graph.edges)
+        : new Set();
+    const semanticEdges = graph.edges.map((edge) => ({
+        ...edge,
+        role: edge.role ?? (feedbackEdgeIds.has(edge.id) ? 'feedback' : 'flow'),
+    }));
+    // Cycle-closing edges are routed outside the main flow and must not reshuffle
+    // the forward rank graph.
+    const edges = applyBoardEdgeLayout(semanticEdges, boardLayout);
     if (graph.diagramKind === 'sequence') {
         return layoutSequenceDiagramGraph(measuredNodes, edges, graph.groups ?? [], boardLayout, measuredEdgeLabels);
     }
     if (hasGroupLayout(graph.groups ?? [], measuredNodes)) {
         return layoutGroupedDiagramGraph(measuredNodes, edges, graph.groups ?? [], graph.direction, patches, boardLayout, measuredEdgeLabels);
     }
-    const ranks = assignRanks(measuredNodes, edges.filter((edge) => !edge.manual && !isFeedbackEdge(edge)));
+    const flowEdges = edges.filter((edge) => !isFeedbackEdge(edge));
+    const ranks = assignRanks(measuredNodes, flowEdges.filter((edge) => !edge.manual));
     const groups = new Map();
     measuredNodes.forEach((node) => {
         const rank = ranks.get(node.id) ?? 0;
@@ -641,14 +656,14 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
     const horizontal = graph.direction === 'LR' || graph.direction === 'RL';
     const nodeGap = 62;
     const primaryMargin = 42;
-    const pairLanes = assignDiagramEdgeLanes(edges.map((edge) => ({
+    const pairLanes = assignDiagramEdgeLanes(flowEdges.map((edge) => ({
         id: edge.id,
         sourceId: edge.sourceId,
         targetId: edge.targetId,
     })));
     const maximumPairLane = Math.max(0, ...[...pairLanes.values()].map((lane) => Math.abs(lane)));
     const pairLaneOffset = maximumPairLane > 0 ? pairedLaneOffset(maximumPairLane) : 0;
-    const maximumLabelCrossSize = Math.max(0, ...edges.map((edge) => {
+    const maximumLabelCrossSize = Math.max(0, ...flowEdges.map((edge) => {
         const metrics = naturalEdgeLabelMetrics(edge, measuredEdgeLabels);
         return horizontal ? metrics.height : metrics.width;
     }));
@@ -660,7 +675,7 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
             Math.max(0, group.length - 1) * nodeGap);
     });
     const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
-    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, edges.flatMap((edge) => {
+    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, flowEdges.flatMap((edge) => {
         const sourceRank = rankIndexes.get(ranks.get(edge.sourceId) ?? 0);
         const targetRank = rankIndexes.get(ranks.get(edge.targetId) ?? 0);
         if (sourceRank === undefined || targetRank === undefined)
@@ -793,6 +808,8 @@ function layoutGroupedDiagramGraph(measuredNodes, edges, groups, direction, patc
             break;
     }
     const layoutEdges = edges.map((edge) => {
+        if (isFeedbackEdge(edge))
+            return edge;
         const sourceId = unitByNode.get(edge.sourceId);
         const targetId = unitByNode.get(edge.targetId);
         if (!sourceId || !targetId || sourceId === targetId)
@@ -841,7 +858,7 @@ function layoutGroupedDiagramGraph(measuredNodes, edges, groups, direction, patc
             Math.max(0, rankUnits.length - 1) * groupGap;
     });
     const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
-    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, layoutEdges.flatMap((edge) => {
+    const rankGaps = calculateAdaptiveRankGaps(sortedRanks.length, horizontal, layoutEdges.filter((edge) => !isFeedbackEdge(edge)).flatMap((edge) => {
         const sourceUnit = unitByNode.get(edge.sourceId);
         const targetUnit = unitByNode.get(edge.targetId);
         const sourceRank = sourceUnit === undefined ? undefined : rankIndexes.get(ranks.get(sourceUnit) ?? 0);
@@ -956,8 +973,9 @@ function layoutSequenceDiagramGraph(measuredNodes, edges, groups, boardLayout, m
 function applyBoardEdgeLayout(edges, boardLayout) {
     if (!boardLayout?.edges?.length)
         return edges;
+    const layouts = matchBoardEdgeLayouts(edges, boardLayout);
     return edges.map((edge) => {
-        const layout = findBoardEdgeLayout(edge, boardLayout);
+        const layout = layouts.get(edge.id);
         if (!layout)
             return edge;
         return {
@@ -973,8 +991,9 @@ function resolveInitialEdgePatches(edges, boardLayout) {
     const patches = new Map();
     if (!boardLayout?.edges?.length)
         return patches;
+    const layouts = matchBoardEdgeLayouts(edges, boardLayout);
     edges.forEach((edge) => {
-        const layout = findBoardEdgeLayout(edge, boardLayout);
+        const layout = layouts.get(edge.id);
         if (!layout?.points?.length && !layout?.labelPosition)
             return;
         patches.set(edge.id, {
@@ -984,10 +1003,35 @@ function resolveInitialEdgePatches(edges, boardLayout) {
     });
     return patches;
 }
-function findBoardEdgeLayout(edge, boardLayout) {
-    return boardLayout.edges?.find((layout) => layout.sourceId === edge.sourceId &&
-        layout.targetId === edge.targetId &&
-        (layout.label === undefined || layout.label === edge.label));
+function matchBoardEdgeLayouts(edges, boardLayout) {
+    const layouts = boardLayout.edges ?? [];
+    const matched = new Map();
+    const used = new Set();
+    edges.forEach((edge) => {
+        const index = layouts.findIndex((layout, layoutIndex) => !used.has(layoutIndex) && layout.id !== undefined && layout.id === edge.id);
+        if (index < 0)
+            return;
+        matched.set(edge.id, layouts[index]);
+        used.add(index);
+    });
+    edges.forEach((edge) => {
+        if (matched.has(edge.id))
+            return;
+        const candidates = layouts.flatMap((layout, index) => !used.has(index) &&
+            layout.id === undefined &&
+            layout.sourceId === edge.sourceId &&
+            layout.targetId === edge.targetId
+            ? [{ index, layout }]
+            : []);
+        const selected = candidates.find(({ layout }) => layout.label === edge.label) ??
+            candidates.find(({ layout }) => layout.label === undefined) ??
+            candidates[0];
+        if (!selected)
+            return;
+        matched.set(edge.id, selected.layout);
+        used.add(selected.index);
+    });
+    return matched;
 }
 function ensureLayoutNodePositions(graph) {
     let repairedNodes = 0;
@@ -1086,9 +1130,12 @@ function pairedLaneOffset(laneIndex) {
     const lane = Math.max(1, Math.abs(laneIndex));
     return PAIRED_LANE_BASE_OFFSET + (lane - 1) * PAIRED_LANE_STEP;
 }
-function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map(), diagramKind) {
+function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map(), diagramKind, direction = 'LR') {
     if (diagramKind === 'sequence') {
-        return routeSequenceGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels);
+        return {
+            edges: routeSequenceGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels),
+            trunks: [],
+        };
     }
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
     const candidates = edges.flatMap((edge, index) => {
@@ -1098,10 +1145,14 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
         const target = nodesById.get(edge.targetId);
         if (!source || !target)
             return [];
-        const sides = resolveAnchorSides(source, target);
+        const feedback = isFeedbackEdge(edge);
+        const sides = feedback
+            ? feedbackAnchorSides(direction)
+            : resolveAnchorSides(source, target);
         return [
             {
                 edge,
+                feedback,
                 index,
                 source,
                 sourceOffset: 0,
@@ -1112,7 +1163,9 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             },
         ];
     });
-    const pairLanes = assignDiagramEdgeLanes(candidates.map(({ edge }) => ({
+    rerouteBlockedFacingCandidates(candidates, nodes, edgePatches);
+    const fanInBundles = assignFanInBundles(candidates, edgePatches);
+    const pairLanes = assignDiagramEdgeLanes(candidates.filter(({ feedback }) => !feedback).map(({ edge }) => ({
         id: edge.id,
         sourceId: edge.sourceId,
         targetId: edge.targetId,
@@ -1132,7 +1185,9 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
     };
     candidates.forEach((candidate) => {
         addPort(candidate, candidate.source, candidate.target, candidate.sourceSide, 'source');
-        addPort(candidate, candidate.target, candidate.source, candidate.targetSide, 'target');
+        if (!candidate.bundleKey) {
+            addPort(candidate, candidate.target, candidate.source, candidate.targetSide, 'target');
+        }
     });
     portGroups.forEach((ports) => {
         const first = ports[0];
@@ -1144,10 +1199,8 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             else
                 port.candidate.targetOffset = offset;
         };
-        // Authored routes keep their original centre anchors. Moving one endpoint
-        // would make the persisted orthogonal points diagonal and discard the patch.
-        const containsAuthoredRoute = ports.some(({ candidate }) => (edgePatches.get(candidate.edge.id)?.points.length ?? 0) >= 2);
-        if (ports.length === 1 || containsAuthoredRoute) {
+        const authoredPorts = ports.filter(({ candidate }) => (edgePatches.get(candidate.edge.id)?.points.length ?? 0) >= 2);
+        if (ports.length === 1) {
             ports.forEach((port) => setOffset(port, 0));
             return;
         }
@@ -1155,7 +1208,29 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             ? first.node.position.x
             : first.node.position.y;
         const limit = portOffsetLimit(first.node, first.side);
-        const gap = Math.min(EDGE_PORT_GAP, (limit * 2) / Math.max(1, ports.length - 1));
+        const preferredGap = ports.some(({ candidate, role }) => role === 'target' && candidate.edge.arrow)
+            ? EDGE_TARGET_PORT_GAP
+            : EDGE_SOURCE_PORT_GAP;
+        if (authoredPorts.length > 0) {
+            // Persisted orthogonal routes own the centre pin. Keep them fixed, but
+            // still move automatic neighbours away from that pin instead of resetting
+            // the entire group to zero and recreating an overpainted shaft.
+            authoredPorts.forEach((port) => setOffset(port, 0));
+            const automatic = ports
+                .filter((port) => !authoredPorts.includes(port))
+                .map((port) => ({
+                desired: clamp(port.projection - axisCenter, -limit, limit),
+                port,
+            }))
+                .sort((firstPort, secondPort) => firstPort.desired - secondPort.desired ||
+                firstPort.port.candidate.index - secondPort.port.candidate.index);
+            const offsets = distributePortOffsetsAroundFixedCenter(automatic.map(({ desired }) => desired), limit, preferredGap);
+            automatic.forEach(({ port }, index) => {
+                setOffset(port, offsets[index] ?? 0);
+            });
+            return;
+        }
+        const gap = Math.min(preferredGap, (limit * 2) / Math.max(1, ports.length - 1));
         const ordered = ports
             .map((port) => ({
             desired: clamp(port.projection - axisCenter, -limit, limit),
@@ -1171,7 +1246,7 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
     const portGroupSize = (node, side) => portGroups.get(`${node.id}:${side}`)?.length ?? 0;
     candidates.forEach((candidate) => {
         const patch = edgePatches.get(candidate.edge.id);
-        if ((patch?.points.length ?? 0) >= 2)
+        if ((patch?.points.length ?? 0) >= 2 || candidate.bundleKey)
             return;
         if (oppositeSide(candidate.sourceSide) !== candidate.targetSide)
             return;
@@ -1183,21 +1258,12 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             return;
         const sourceCount = portGroupSize(candidate.source, candidate.sourceSide);
         const targetCount = portGroupSize(candidate.target, candidate.targetSide);
+        if (sourceCount !== 1 || targetCount !== 1)
+            return;
         let sourceOffset = candidate.sourceOffset;
         let targetOffset = candidate.targetOffset;
-        if (sourceCount <= 1 && targetCount <= 1) {
-            sourceOffset += delta / 2;
-            targetOffset -= delta / 2;
-        }
-        else if (sourceCount <= 1) {
-            sourceOffset += delta;
-        }
-        else if (targetCount <= 1) {
-            targetOffset -= delta;
-        }
-        else {
-            return;
-        }
+        sourceOffset += delta / 2;
+        targetOffset -= delta / 2;
         const sourceLimit = portOffsetLimit(candidate.source, candidate.sourceSide);
         const targetLimit = portOffsetLimit(candidate.target, candidate.targetSide);
         sourceOffset = clamp(sourceOffset, -sourceLimit, sourceLimit);
@@ -1214,23 +1280,47 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             candidate.targetOffset = targetOffset;
         }
     });
-    const routed = candidates.map((candidate) => ({
-        edge: candidate.edge,
-        route: applyEdgeRoutePatch(routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, candidate.source.id === candidate.target.id
+    const bundlesByKey = new Map(fanInBundles.map((bundle) => [bundle.key, bundle]));
+    const feedbackLaneIndexes = new Map(candidates
+        .filter(({ feedback }) => feedback)
+        .map((candidate, index) => [candidate.edge.id, index]));
+    const routed = candidates.map((candidate) => {
+        const laneIndex = candidate.source.id === candidate.target.id
             ? candidate.index
-            : (pairLanes.get(candidate.edge.id) ?? 0), candidate.edge.arrow, nodes), edgePatches.get(candidate.edge.id), candidate.edge.arrow),
-    }));
-    const labelPlacements = placeDiagramEdgeLabels(routed.map(({ edge, route }) => ({
-        align: edge.labelAlign,
-        arrow: edge.arrow,
-        bare: edge.bareLabel,
-        id: edge.id,
-        label: edge.label,
-        lockedPosition: edgePatches.get(edge.id)?.label,
-        metrics: measuredEdgeLabel(edge, measuredEdgeLabels),
-        points: route.points,
-    })), nodes);
-    return routed.map(({ edge, route }) => {
+            : (pairLanes.get(candidate.edge.id) ?? 0);
+        const bundle = candidate.bundleKey
+            ? bundlesByKey.get(candidate.bundleKey)
+            : undefined;
+        const automatic = bundle
+            ? routeFanInBranch(candidate, bundle, laneIndex, nodes)
+            : candidate.feedback
+                ? routeFeedbackEdge(candidate, feedbackLaneIndexes.get(candidate.edge.id) ?? 0, nodes, direction)
+                : routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, laneIndex, candidate.edge.arrow, nodes);
+        return {
+            edge: candidate.edge,
+            route: applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), bundle ? false : candidate.edge.arrow),
+        };
+    });
+    const trunks = fanInBundles.map(createFanInTrunk);
+    const labelPlacements = placeDiagramEdgeLabels([
+        ...routed.map(({ edge, route }) => ({
+            align: edge.labelAlign,
+            arrow: Boolean(route.arrowPoints),
+            bare: edge.bareLabel,
+            id: edge.id,
+            label: edge.label,
+            lockedPosition: edgePatches.get(edge.id)?.label,
+            metrics: measuredEdgeLabel(edge, measuredEdgeLabels),
+            points: route.points,
+        })),
+        ...trunks.map((trunk) => ({
+            arrow: true,
+            id: trunk.key,
+            label: '',
+            points: trunk.points,
+        })),
+    ], nodes);
+    const routedEdges = routed.map(({ edge, route }) => {
         const placement = labelPlacements.get(edge.id);
         return {
             edge,
@@ -1242,12 +1332,216 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             },
         };
     });
+    return { edges: routedEdges, trunks };
+}
+function rerouteBlockedFacingCandidates(candidates, nodes, edgePatches) {
+    candidates.forEach((candidate) => {
+        if (candidate.feedback ||
+            candidate.edge.manual ||
+            candidate.edge.sourceSide ||
+            candidate.edge.targetSide ||
+            (edgePatches.get(candidate.edge.id)?.points.length ?? 0) >= 2) {
+            return;
+        }
+        const start = anchorPoint(candidate.source, candidate.sourceSide, 0, 0);
+        const tip = anchorPoint(candidate.target, candidate.targetSide, 0, 0);
+        if (!isDirectFacingRoute(start, tip, candidate.sourceSide, candidate.targetSide))
+            return;
+        if (directFacingRouteAvoidsNodes(start, tip, candidate.source, candidate.target, nodes)) {
+            return;
+        }
+        // When another node occupies the direct corridor, changing both anchors to
+        // one outer side produces a clean bypass. This also keeps the blocked edge
+        // away from the local target port group instead of drawing a U-turn inside
+        // the intervening card. Top/left are reserved for these forward detours;
+        // feedback routes use bottom/right.
+        const vertical = candidate.sourceSide === 'top' || candidate.sourceSide === 'bottom';
+        const outerSide = vertical ? 'left' : 'top';
+        candidate.sourceSide = outerSide;
+        candidate.targetSide = outerSide;
+    });
+}
+function feedbackAnchorSides(direction) {
+    return direction === 'LR' || direction === 'RL'
+        ? { source: 'bottom', target: 'bottom' }
+        : { source: 'right', target: 'right' };
+}
+function assignFanInBundles(candidates, edgePatches) {
+    const groups = new Map();
+    candidates.forEach((candidate) => {
+        if (candidate.feedback)
+            return;
+        // A shared collector works naturally for left/right fan-in because each
+        // branch can join a vertical bus without crossing nodes in the same rank.
+        // Top/bottom fan-in is usually produced by stacked nodes; forcing a
+        // horizontal collector there can make an earlier branch loop around the
+        // later source node. Those ports are separated locally instead.
+        if (candidate.targetSide !== 'left' && candidate.targetSide !== 'right')
+            return;
+        const key = `${candidate.target.id}:${candidate.targetSide}`;
+        const group = groups.get(key) ?? [];
+        group.push(candidate);
+        groups.set(key, group);
+    });
+    const bundles = [];
+    groups.forEach((members, groupKey) => {
+        if (members.length < 2)
+            return;
+        const sourceIds = new Set(members.map(({ source }) => source.id));
+        const strokes = new Set(members.map(({ edge }) => edge.stroke));
+        const eligible = sourceIds.size === members.length &&
+            strokes.size === 1 &&
+            members.every(({ edge, source, target }) => edge.arrow &&
+                !edge.manual &&
+                source.id !== target.id &&
+                (edgePatches.get(edge.id)?.points.length ?? 0) < 2);
+        if (!eligible)
+            return;
+        const first = members[0];
+        if (!first)
+            return;
+        const bundle = {
+            key: `fan-in:${groupKey}`,
+            members,
+            stroke: first.edge.stroke,
+            target: first.target,
+            targetSide: first.targetSide,
+        };
+        members.forEach((candidate) => {
+            candidate.bundleKey = bundle.key;
+            candidate.targetOffset = 0;
+        });
+        bundles.push(bundle);
+    });
+    return bundles;
+}
+function fanInCollectorCenter(bundle) {
+    const tip = anchorPoint(bundle.target, bundle.targetSide, 0, 14);
+    const vector = sideVector(bundle.targetSide);
+    return {
+        x: tip.x + vector.x * FAN_IN_TRUNK_LENGTH,
+        y: tip.y + vector.y * FAN_IN_TRUNK_LENGTH,
+    };
+}
+function fanInBranchJoin(candidate, bundle) {
+    const collector = fanInCollectorCenter(bundle);
+    const start = anchorPoint(candidate.source, candidate.sourceSide, candidate.sourceOffset, 10);
+    return bundle.targetSide === 'left' || bundle.targetSide === 'right'
+        ? { x: collector.x, y: start.y }
+        : { x: start.x, y: collector.y };
+}
+function routeFanInBranch(candidate, bundle, laneIndex, obstacles) {
+    const join = fanInBranchJoin(candidate, bundle);
+    const virtualTarget = {
+        classes: [],
+        height: 0,
+        id: `__fan-in:${candidate.edge.id}`,
+        label: '',
+        position: join,
+        shape: 'rect',
+        textLines: [],
+        tone: 'neutral',
+        width: 0,
+    };
+    const automatic = routeEdge(candidate.source, virtualTarget, candidate.sourceSide, bundle.targetSide, candidate.sourceOffset, 0, laneIndex, false, obstacles);
+    const points = automatic.points.length > 1
+        ? [...automatic.points.slice(0, -1), join]
+        : automatic.points;
+    return finalizeEdgeRoute(points, false, candidate.sourceSide, bundle.targetSide);
+}
+function createFanInTrunk(bundle) {
+    const collector = fanInCollectorCenter(bundle);
+    const joins = bundle.members.map((candidate) => fanInBranchJoin(candidate, bundle));
+    const horizontalTarget = bundle.targetSide === 'left' || bundle.targetSide === 'right';
+    const collectorStart = horizontalTarget
+        ? { x: collector.x, y: Math.min(collector.y, ...joins.map(({ y }) => y)) }
+        : { x: Math.min(collector.x, ...joins.map(({ x }) => x)), y: collector.y };
+    const collectorEnd = horizontalTarget
+        ? { x: collector.x, y: Math.max(collector.y, ...joins.map(({ y }) => y)) }
+        : { x: Math.max(collector.x, ...joins.map(({ x }) => x)), y: collector.y };
+    const tip = anchorPoint(bundle.target, bundle.targetSide, 0, 14);
+    const trunk = finalizeEdgeRoute([collector, tip], true, oppositeSide(bundle.targetSide), bundle.targetSide);
+    const collectorPath = Math.hypot(collectorEnd.x - collectorStart.x, collectorEnd.y - collectorStart.y) >= 0.1
+        ? orthogonalPath([collectorStart, collectorEnd])
+        : '';
+    return {
+        arrowPoints: trunk.arrowPoints,
+        edgeIds: bundle.members.map(({ edge }) => edge.id),
+        key: bundle.key,
+        path: [collectorPath, trunk.path].filter(Boolean).join(' '),
+        points: [collector, tip],
+        stroke: bundle.stroke,
+    };
+}
+function routeFeedbackEdge(candidate, laneIndex, nodes, direction) {
+    if (candidate.source.id === candidate.target.id) {
+        return routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, candidate.index, candidate.edge.arrow, nodes);
+    }
+    const horizontalMain = direction === 'LR' || direction === 'RL';
+    const outerSide = horizontalMain ? 'bottom' : 'right';
+    if (candidate.sourceSide !== outerSide || candidate.targetSide !== outerSide) {
+        return routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, laneIndex, candidate.edge.arrow, nodes);
+    }
+    const start = anchorPoint(candidate.source, candidate.sourceSide, candidate.sourceOffset, 10);
+    const tip = anchorPoint(candidate.target, candidate.targetSide, candidate.targetOffset, 14);
+    const sourceVector = sideVector(candidate.sourceSide);
+    const targetVector = sideVector(candidate.targetSide);
+    const sourceStub = {
+        x: start.x + sourceVector.x * 24,
+        y: start.y + sourceVector.y * 24,
+    };
+    const targetStub = {
+        x: tip.x + targetVector.x * 24,
+        y: tip.y + targetVector.y * 24,
+    };
+    const lane = horizontalMain
+        ? Math.max(...nodes.map((node) => node.position.y + node.height / 2)) +
+            34 +
+            laneIndex * FEEDBACK_LANE_GAP
+        : Math.max(...nodes.map((node) => node.position.x + node.width / 2)) +
+            34 +
+            laneIndex * FEEDBACK_LANE_GAP;
+    const points = horizontalMain
+        ? [
+            start,
+            sourceStub,
+            { x: sourceStub.x, y: lane },
+            { x: targetStub.x, y: lane },
+            targetStub,
+            tip,
+        ]
+        : [
+            start,
+            sourceStub,
+            { x: lane, y: sourceStub.y },
+            { x: lane, y: targetStub.y },
+            targetStub,
+            tip,
+        ];
+    return finalizeEdgeRoute(points, candidate.edge.arrow, candidate.sourceSide, candidate.targetSide);
 }
 /**
  * Fit sorted port projections to the node boundary while preserving their
  * minimum gap. Isotonic regression centres coincident projections instead of
  * always pushing the later edge in one direction.
  */
+function distributePortOffsetsAroundFixedCenter(desired, limit, preferredGap) {
+    if (desired.length === 0 || limit <= 0)
+        return desired.map(() => 0);
+    const sideCapacityNeeded = Math.max(1, Math.ceil(desired.length / 2));
+    const gap = Math.min(preferredGap, limit / sideCapacityNeeded);
+    const sideCapacity = Math.max(1, Math.floor(limit / Math.max(gap, 0.1)));
+    const negativeDesired = desired.filter((offset) => offset < -0.1).length;
+    const centredDesired = desired.filter((offset) => Math.abs(offset) <= 0.1).length;
+    const minimumNegative = Math.max(0, desired.length - sideCapacity);
+    const maximumNegative = Math.min(desired.length, sideCapacity);
+    const negativeCount = clamp(negativeDesired + Math.ceil(centredDesired / 2), minimumNegative, maximumNegative);
+    const positiveCount = desired.length - negativeCount;
+    return [
+        ...Array.from({ length: negativeCount }, (_, index) => -(negativeCount - index) * gap),
+        ...Array.from({ length: positiveCount }, (_, index) => (index + 1) * gap),
+    ];
+}
 function distributePortOffsets(desired, limit, gap) {
     if (desired.length <= 1)
         return desired.map((offset) => clamp(offset, -limit, limit));
@@ -2269,7 +2563,7 @@ function measureBadgeWidth(value) {
     return Math.max(68, Math.ceil(textWidth + 24));
 }
 function isFeedbackEdge(edge) {
-    return edge.stroke === 'dotted' && /复测|反馈|回流|迭代/.test(edge.label);
+    return edge.role === 'feedback';
 }
 function measureTextWidth(value) {
     return measureDiagramTextWidth(value);

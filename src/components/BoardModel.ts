@@ -2,6 +2,7 @@ export type BoardDirection = 'LR' | 'RL' | 'TB' | 'BT';
 export type BoardAnchorSide = 'top' | 'right' | 'bottom' | 'left';
 export type BoardNodeShape = 'rect' | 'round' | 'stadium' | 'circle' | 'diamond';
 export type BoardNodeTone = 'blue' | 'purple' | 'teal' | 'green' | 'orange' | 'neutral';
+export type BoardEdgeRole = 'flow' | 'feedback';
 
 export type BoardDiagramKind =
   | 'flowchart'
@@ -51,6 +52,8 @@ export type BoardEdge = {
   /** User-created relationship; excluded from automatic rank calculation. */
   manual?: boolean;
   points?: BoardPoint[];
+  /** Routing semantics. Feedback edges close a cycle and use an outer lane. */
+  role?: BoardEdgeRole;
   sourceId: string;
   sourceSide?: BoardAnchorSide;
   stroke: 'normal' | 'thick' | 'dotted' | 'invisible';
@@ -85,6 +88,7 @@ export type BoardImportNodeLayout = {
 
 export type BoardImportEdgeLayout = {
   bareLabel?: boolean;
+  id?: string;
   label?: string;
   labelAlign?: 'start' | 'middle' | 'end';
   labelPosition?: BoardPoint;
@@ -129,6 +133,53 @@ export type BoardOperation =
   | {edge: BoardEdge; type: 'create-edge'}
   | {edge: BoardEdge; node: BoardNode; type: 'create-node-and-edge'}
   | {edgeId: string; labelPosition?: BoardPoint; points: BoardPoint[]; type: 'update-edge-route'};
+
+type FeedbackDetectableEdge = Pick<
+  BoardEdge,
+  'id' | 'manual' | 'role' | 'sourceId' | 'stroke' | 'targetId'
+>;
+
+/**
+ * Detect cycle-closing edges in source order. Explicit roles win; inferred
+ * feedback edges are excluded from the main adjacency so one return path does
+ * not cause every later forward edge to be classified as feedback.
+ */
+export function detectBoardFeedbackEdgeIds(edges: readonly FeedbackDetectableEdge[]) {
+  const adjacency = new Map<string, Set<string>>();
+  const feedback = new Set<string>();
+
+  const reaches = (from: string, target: string) => {
+    const stack = [from];
+    const visited = new Set<string>();
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) continue;
+      if (current === target) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      adjacency.get(current)?.forEach((next) => stack.push(next));
+    }
+    return false;
+  };
+
+  edges.forEach((edge) => {
+    if (edge.stroke === 'invisible') return;
+    if (edge.role === 'feedback') {
+      feedback.add(edge.id);
+      return;
+    }
+    if (edge.manual) return;
+    if (edge.role !== 'flow' && reaches(edge.targetId, edge.sourceId)) {
+      feedback.add(edge.id);
+      return;
+    }
+    const targets = adjacency.get(edge.sourceId) ?? new Set<string>();
+    targets.add(edge.targetId);
+    adjacency.set(edge.sourceId, targets);
+  });
+
+  return feedback;
+}
 
 /** Pure reducer used by every Board editing surface and suitable for host-side persistence. */
 export function applyBoardOperation(

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {applyBoardOperation} from '../dist/components/BoardModel.js';
+import {
+  applyBoardOperation,
+  detectBoardFeedbackEdgeIds,
+} from '../dist/components/BoardModel.js';
 
 const document = {
   direction: 'LR',
@@ -72,4 +75,43 @@ test('persists created objects and manual routes in the canonical document', () 
   assert.equal(routed.nodes.at(-1)?.id, 'c');
   assert.deepEqual(routed.edges.at(-1)?.points, [{x: 260, y: 80}, {x: 420, y: 80}]);
   assert.deepEqual(routed.edges.at(-1)?.labelPosition, {x: 330, y: 60});
+});
+
+test('detects cycle-closing edges while preserving explicit routing roles', () => {
+  const detected = detectBoardFeedbackEdgeIds([
+    {
+      id: 'a-b',
+      sourceId: 'a',
+      stroke: 'normal',
+      targetId: 'b',
+    },
+    {
+      id: 'b-c',
+      sourceId: 'b',
+      stroke: 'normal',
+      targetId: 'c',
+    },
+    {
+      id: 'c-a',
+      sourceId: 'c',
+      stroke: 'normal',
+      targetId: 'a',
+    },
+    {
+      id: 'explicit-flow',
+      role: 'flow',
+      sourceId: 'c',
+      stroke: 'normal',
+      targetId: 'b',
+    },
+    {
+      id: 'explicit-feedback',
+      role: 'feedback',
+      sourceId: 'x',
+      stroke: 'normal',
+      targetId: 'y',
+    },
+  ]);
+
+  assert.deepEqual([...detected], ['c-a', 'explicit-feedback']);
 });

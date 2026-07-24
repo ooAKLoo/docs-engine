@@ -37,6 +37,26 @@ test('parses labelled feedback edges and chained flowchart edges', async () => {
   );
 });
 
+test('detects cycle-closing flowchart edges structurally instead of from their labels', async () => {
+  const graph = await importMermaid(`flowchart LR
+    cases[建立多轮评测集] --> experiment[调整参数]
+    experiment --> release{达到门槛？}
+    release -->|否| experiment
+    release --> online[上线]
+    online -.形成新案例.-> cases`);
+
+  assert.deepEqual(
+    graph.edges.map(({id, role}) => ({id, role})),
+    [
+      {id: 'flow:0:cases:experiment', role: 'flow'},
+      {id: 'flow:1:experiment:release', role: 'flow'},
+      {id: 'flow:2:release:experiment', role: 'feedback'},
+      {id: 'flow:3:release:online', role: 'flow'},
+      {id: 'flow:4:online:cases', role: 'feedback'},
+    ],
+  );
+});
+
 test('preserves Mermaid subgraphs as native Board groups', async () => {
   const document = await importMermaid(`flowchart LR
     subgraph Access[接入与装配]
@@ -200,4 +220,58 @@ test('applies authored geometry during import and returns only a canonical Board
   assert.deepEqual(document.canvas, {height: 240, width: 480});
   assert.deepEqual(document.nodes.find((node) => node.id === 'a')?.position, {x: 80, y: 120});
   assert.equal('source' in document, false);
+});
+
+test('matches authored parallel-edge geometry by edge id before legacy endpoints', async () => {
+  const firstPoints = [{x: 120, y: 90}, {x: 240, y: 90}];
+  const secondPoints = [{x: 120, y: 130}, {x: 240, y: 130}];
+  const document = await importMermaid(`flowchart LR
+    a[来源] -->|第一条| b[目标]
+    a -->|第二条| b`, {
+    layout: {
+      edges: [
+        {
+          id: 'flow:1:a:b',
+          label: '第二条',
+          points: secondPoints,
+          sourceId: 'a',
+          targetId: 'b',
+        },
+        {
+          id: 'flow:0:a:b',
+          label: '第一条',
+          points: firstPoints,
+          sourceId: 'a',
+          targetId: 'b',
+        },
+      ],
+      height: 220,
+      nodes: {},
+      width: 420,
+    },
+  });
+
+  assert.deepEqual(document.edges[0].points, firstPoints);
+  assert.deepEqual(document.edges[1].points, secondPoints);
+});
+
+test('consumes each id-less legacy layout at most once for parallel edges', async () => {
+  const firstPoints = [{x: 100, y: 80}, {x: 220, y: 80}];
+  const secondPoints = [{x: 100, y: 120}, {x: 220, y: 120}];
+  const document = await importMermaid(`flowchart LR
+    a[来源] --> b[目标]
+    a --> b`, {
+    layout: {
+      edges: [
+        {points: firstPoints, sourceId: 'a', targetId: 'b'},
+        {points: secondPoints, sourceId: 'a', targetId: 'b'},
+      ],
+      height: 200,
+      nodes: {},
+      width: 360,
+    },
+  });
+
+  assert.deepEqual(document.edges[0].points, firstPoints);
+  assert.deepEqual(document.edges[1].points, secondPoints);
 });

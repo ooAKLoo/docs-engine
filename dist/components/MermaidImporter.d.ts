@@ -1,4 +1,4 @@
-import type { BoardAnchorSide, BoardDiagramKind, BoardDirection, BoardDocument, BoardGroup, BoardImportLayout, BoardNodeShape, BoardNodeTone } from './BoardModel.js';
+import type { BoardAnchorSide, BoardDiagramKind, BoardDirection, BoardDocument, BoardEdgeRole, BoardGroup, BoardImportLayout, BoardNodeShape, BoardNodeTone } from './BoardModel.js';
 type DiagramDirection = BoardDirection;
 type DiagramAnchorSide = BoardAnchorSide;
 type DiagramNodeShape = BoardNodeShape;
@@ -18,6 +18,7 @@ export type ParsedDiagramEdge = {
     id: string;
     label: string;
     labelAlign?: 'start' | 'middle' | 'end';
+    role?: BoardEdgeRole;
     sourceSide?: DiagramAnchorSide;
     sourceId: string;
     stroke: 'normal' | 'thick' | 'dotted' | 'invisible';

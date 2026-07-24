@@ -1,3 +1,4 @@
+import { detectBoardFeedbackEdgeIds } from './BoardModel.js';
 const diagramTones = ['blue', 'teal', 'purple', 'orange', 'green', 'neutral'];
 export async function importMermaid(source, options = {}) {
     const kind = detectMermaidDiagramKind(source);
@@ -22,10 +23,16 @@ export async function importMermaid(source, options = {}) {
         graph = parsePie(source);
     else
         throw new Error('当前 Mermaid 语法尚未接入画板导入器');
+    const feedbackEdgeIds = graph.kind === 'flowchart'
+        ? detectBoardFeedbackEdgeIds(graph.edges)
+        : new Set();
     return applyImportLayout({
         diagramKind: graph.kind,
         direction: graph.direction,
-        edges: graph.edges,
+        edges: graph.edges.map((edge) => ({
+            ...edge,
+            role: edge.role ?? (feedbackEdgeIds.has(edge.id) ? 'feedback' : 'flow'),
+        })),
         groups: graph.groups,
         nodes: graph.nodes,
         version: 1,
@@ -58,11 +65,12 @@ export function detectMermaidDiagramKind(source) {
 function applyImportLayout(document, layout) {
     if (!layout)
         return document;
+    const edgeLayouts = matchImportEdgeLayouts(document.edges, layout.edges ?? []);
     return {
         ...document,
         canvas: { height: layout.height, width: layout.width },
         edges: document.edges.map((edge) => {
-            const authored = layout.edges?.find((candidate) => candidate.sourceId === edge.sourceId && candidate.targetId === edge.targetId);
+            const authored = edgeLayouts.get(edge.id);
             if (!authored)
                 return edge;
             return {
@@ -81,6 +89,35 @@ function applyImportLayout(document, layout) {
             return authored ? { ...node, ...authored } : node;
         }),
     };
+}
+function matchImportEdgeLayouts(edges, layouts) {
+    const matched = new Map();
+    const used = new Set();
+    edges.forEach((edge) => {
+        const index = layouts.findIndex((layout, layoutIndex) => !used.has(layoutIndex) && layout.id !== undefined && layout.id === edge.id);
+        if (index < 0)
+            return;
+        matched.set(edge.id, layouts[index]);
+        used.add(index);
+    });
+    edges.forEach((edge) => {
+        if (matched.has(edge.id))
+            return;
+        const candidates = layouts.flatMap((layout, index) => !used.has(index) &&
+            layout.id === undefined &&
+            layout.sourceId === edge.sourceId &&
+            layout.targetId === edge.targetId
+            ? [{ index, layout }]
+            : []);
+        const selected = candidates.find(({ layout }) => layout.label === edge.label) ??
+            candidates.find(({ layout }) => layout.label === undefined) ??
+            candidates[0];
+        if (!selected)
+            return;
+        matched.set(edge.id, selected.layout);
+        used.add(selected.index);
+    });
+    return matched;
 }
 function parseFlowchart(source) {
     const lines = sourceLines(source).map((line) => line.trim());

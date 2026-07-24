@@ -2,6 +2,7 @@ export type BoardDirection = 'LR' | 'RL' | 'TB' | 'BT';
 export type BoardAnchorSide = 'top' | 'right' | 'bottom' | 'left';
 export type BoardNodeShape = 'rect' | 'round' | 'stadium' | 'circle' | 'diamond';
 export type BoardNodeTone = 'blue' | 'purple' | 'teal' | 'green' | 'orange' | 'neutral';
+export type BoardEdgeRole = 'flow' | 'feedback';
 export type BoardDiagramKind = 'flowchart' | 'sequence' | 'state' | 'class' | 'er' | 'gantt' | 'git' | 'timeline' | 'mindmap' | 'pie';
 export type BoardPoint = {
     x: number;
@@ -36,6 +37,8 @@ export type BoardEdge = {
     /** User-created relationship; excluded from automatic rank calculation. */
     manual?: boolean;
     points?: BoardPoint[];
+    /** Routing semantics. Feedback edges close a cycle and use an outer lane. */
+    role?: BoardEdgeRole;
     sourceId: string;
     sourceSide?: BoardAnchorSide;
     stroke: 'normal' | 'thick' | 'dotted' | 'invisible';
@@ -66,6 +69,7 @@ export type BoardImportNodeLayout = {
 };
 export type BoardImportEdgeLayout = {
     bareLabel?: boolean;
+    id?: string;
     label?: string;
     labelAlign?: 'start' | 'middle' | 'end';
     labelPosition?: BoardPoint;
@@ -114,6 +118,14 @@ export type BoardOperation = {
     points: BoardPoint[];
     type: 'update-edge-route';
 };
+type FeedbackDetectableEdge = Pick<BoardEdge, 'id' | 'manual' | 'role' | 'sourceId' | 'stroke' | 'targetId'>;
+/**
+ * Detect cycle-closing edges in source order. Explicit roles win; inferred
+ * feedback edges are excluded from the main adjacency so one return path does
+ * not cause every later forward edge to be classified as feedback.
+ */
+export declare function detectBoardFeedbackEdgeIds(edges: readonly FeedbackDetectableEdge[]): Set<string>;
 /** Pure reducer used by every Board editing surface and suitable for host-side persistence. */
 export declare function applyBoardOperation(document: BoardDocument, operation: BoardOperation): BoardDocument;
+export {};
 //# sourceMappingURL=BoardModel.d.ts.map

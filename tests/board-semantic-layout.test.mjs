@@ -22,6 +22,18 @@ function edgePath(markup, id) {
   return edge.match(/<path d="([^"]+)" class="de-board__edge-path"/u)?.[1] ?? '';
 }
 
+function edgeMarkup(markup, id) {
+  return markup.match(
+    new RegExp(`<g class="de-board__edge" data-de-edge-id="${id}"[\\s\\S]*?<\\/g>`),
+  )?.[0] ?? '';
+}
+
+function linePoints(path) {
+  return [...path.matchAll(
+    /[ML] (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/gu,
+  )].map((match) => ({x: Number(match[1]), y: Number(match[2])}));
+}
+
 function pathEndpoint(path) {
   const coordinates = (path.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
   return {
@@ -221,8 +233,8 @@ test('distributes coincident same-side ports instead of overpainting one shared 
   const secondEndpoint = pathEndpoint(edgePath(markup, 'second-target'));
 
   assert.equal(firstEndpoint.x, secondEndpoint.x);
-  assert.equal(firstEndpoint.y, 157.5);
-  assert.equal(secondEndpoint.y, 162.5);
+  assert.equal(firstEndpoint.y, 155);
+  assert.equal(secondEndpoint.y, 165);
 });
 
 test('snaps nearly aligned automatic endpoints onto one truly straight axis', () => {
@@ -327,4 +339,182 @@ test('keeps authored orthogonal routes unchanged by automatic near-axis snapping
 
   assert.match(path, / 140(?: |$)/u);
   assert.equal(pathEndpoint(path).y, 108);
+});
+
+test('keeps authored centre pins fixed while separating automatic neighbours', () => {
+  const document = {
+    version: 1,
+    direction: 'LR',
+    diagramKind: 'flowchart',
+    nodes: [
+      {
+        classes: [],
+        height: 80,
+        id: 'authored-source',
+        label: '手工来源',
+        position: {x: 80, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 100,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'automatic-source',
+        label: '自动来源',
+        position: {x: 250, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 100,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'target',
+        label: '共同目标',
+        position: {x: 500, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+    ],
+    edges: [
+      {
+        arrow: false,
+        id: 'authored',
+        label: '',
+        points: [
+          {x: 140, y: 160},
+          {x: 180, y: 160},
+          {x: 180, y: 190},
+          {x: 426, y: 190},
+          {x: 426, y: 160},
+        ],
+        sourceId: 'authored-source',
+        sourceSide: 'right',
+        stroke: 'normal',
+        targetId: 'target',
+        targetSide: 'left',
+      },
+      {
+        arrow: false,
+        id: 'automatic',
+        label: '',
+        sourceId: 'automatic-source',
+        sourceSide: 'right',
+        stroke: 'normal',
+        targetId: 'target',
+        targetSide: 'left',
+      },
+    ],
+  };
+  const markup = renderDocument(document);
+
+  assert.equal(pathEndpoint(edgePath(markup, 'authored')).y, 160);
+  assert.equal(pathEndpoint(edgePath(markup, 'automatic')).y, 150);
+});
+
+test('bundles the Lula fan-in into one shared trunk and keeps blocked vertical flow outside nodes', async () => {
+  const document = await importMermaid(`flowchart LR
+    subgraph facts[儿童事实]
+        memory[(长期记忆与画像)]
+    end
+    subgraph session[当前连接]
+        conversation[(真实已播短期上下文)]
+        activity[(当前活动与播放状态)]
+    end
+    subgraph experience[陪伴体验]
+        selector[按当前话题选择上下文]
+        context[Companion Context Pack]
+        prompt[稳定人格与交流原则]
+        agent[Companion Agent]
+    end
+    memory -->|相关事实| selector
+    conversation -->|最近对话| selector
+    activity -->|正在做什么| selector
+    selector --> context
+    context --> agent
+    prompt --> agent
+    agent --> plan[Generation Plan]`);
+  const markup = renderDocument(document);
+  const trunk = markup.match(
+    /<g class="de-board__edge-trunk"[^>]*data-de-bundle-key="fan-in:selector:left"[^>]*data-edge-ids="([^"]+)"[^>]*>([\s\S]*?)<\/g>/u,
+  );
+
+  assert.ok(trunk, '三条 selector 输入应生成共享主干');
+  assert.equal(
+    trunk[1],
+    'flow:0:memory:selector flow:1:conversation:selector flow:2:activity:selector',
+  );
+  assert.equal((markup.match(/class="de-board__edge-trunk"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/data-de-bundle-key="fan-in:selector:left"/gu) ?? []).length, 2);
+  for (const id of [
+    'flow:0:memory:selector',
+    'flow:1:conversation:selector',
+    'flow:2:activity:selector',
+  ]) {
+    assert.doesNotMatch(markup, new RegExp(`<polygon[^>]*data-edge-id="${id}"`, 'u'));
+  }
+
+  const branchEndpoints = [
+    edgePath(markup, 'flow:0:memory:selector'),
+    edgePath(markup, 'flow:1:conversation:selector'),
+    edgePath(markup, 'flow:2:activity:selector'),
+  ].map(pathEndpoint);
+  assert.equal(new Set(branchEndpoints.map(({x}) => x)).size, 1);
+  assert.equal(new Set(branchEndpoints.map(({y}) => y)).size, 3);
+
+  const blocked = edgeMarkup(markup, 'flow:4:context:agent');
+  const direct = edgePath(markup, 'flow:5:prompt:agent');
+  assert.match(blocked, /data-source-side="left"/u);
+  assert.match(blocked, /data-target-side="left"/u);
+  assert.match(direct, /^M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+$/u);
+});
+
+test('routes structurally detected Lula feedback edges on distinct outer lanes', async () => {
+  const document = await importMermaid(`flowchart LR
+    dialogue[收集并脱敏优秀对话] --> principle[提炼交流原则]
+    principle --> cases[建立多轮评测集]
+    cases --> experiment[调整 Prompt、Context Policy 或模型参数]
+    experiment --> batch[批量运行候选版本]
+    batch --> review[人工抽检儿童视角与自然度]
+    review --> release{达到发布门槛？}
+    release -->|是| online[按 Prompt 版本上线]
+    release -->|否| experiment
+    online --> observe[观察连续性、打断与重复回答]
+    observe -.形成新案例.-> cases`);
+  const markup = renderDocument(document);
+  const firstFeedback = edgeMarkup(markup, 'flow:7:release:experiment');
+  const secondFeedback = edgeMarkup(markup, 'flow:9:observe:cases');
+
+  for (const edge of [firstFeedback, secondFeedback]) {
+    assert.match(edge, /data-feedback="true"/u);
+    assert.match(edge, /data-source-side="bottom"/u);
+    assert.match(edge, /data-target-side="bottom"/u);
+  }
+
+  const firstLane = Math.max(
+    ...linePoints(edgePath(markup, 'flow:7:release:experiment')).map(({y}) => y),
+  );
+  const secondLane = Math.max(
+    ...linePoints(edgePath(markup, 'flow:9:observe:cases')).map(({y}) => y),
+  );
+  assert.equal(secondLane - firstLane, 24);
+
+  for (const id of [
+    'flow:0:dialogue:principle',
+    'flow:1:principle:cases',
+    'flow:2:cases:experiment',
+    'flow:3:experiment:batch',
+    'flow:4:batch:review',
+    'flow:5:review:release',
+    'flow:6:release:online',
+    'flow:8:online:observe',
+  ]) {
+    assert.match(
+      edgePath(markup, id),
+      /^M [-\d.]+ (-?\d+(?:\.\d+)?) L [-\d.]+ \1$/u,
+      `${id} 应保持单条水平主流程`,
+    );
+  }
 });
