@@ -1,6 +1,6 @@
 {
   "name": "@ooakloo/docs-engine",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "private": false,
   "type": "module",
   "description": "Shared document semantics, React primitives and visual system for ooAKLoo projects.",

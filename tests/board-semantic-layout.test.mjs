@@ -15,6 +15,21 @@ function renderDocument(document) {
   }));
 }
 
+function edgePath(markup, id) {
+  const edge = markup.match(
+    new RegExp(`<g class="de-board__edge" data-de-edge-id="${id}"[\\s\\S]*?<\\/g>`),
+  )?.[0] ?? '';
+  return edge.match(/<path d="([^"]+)" class="de-board__edge-path"/u)?.[1] ?? '';
+}
+
+function pathEndpoint(path) {
+  const coordinates = (path.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
+  return {
+    x: coordinates.at(-2),
+    y: coordinates.at(-1),
+  };
+}
+
 function groupRectangles(markup) {
   return [...markup.matchAll(
     /<g class="de-board__group" data-de-group-id="([^"]+)"[^>]*><rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"/gu,
@@ -139,4 +154,177 @@ test('keeps cross-group flow off internal anchors and separates a bidirectional 
   assert.match(crossGroup, /data-target-side="left"/u);
   assert.ok(Math.min(...leftLaneX) < validateX);
   assert.ok(Math.max(...rightLaneX) > validateX);
+});
+
+test('distributes coincident same-side ports instead of overpainting one shared shaft', () => {
+  const document = {
+    version: 1,
+    direction: 'LR',
+    diagramKind: 'flowchart',
+    nodes: [
+      {
+        classes: [],
+        height: 80,
+        id: 'first',
+        label: '第一来源',
+        position: {x: 80, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 100,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'second',
+        label: '第二来源',
+        position: {x: 250, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 100,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'target',
+        label: '共同目标',
+        position: {x: 500, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+    ],
+    edges: [
+      {
+        arrow: false,
+        id: 'first-target',
+        label: '',
+        sourceId: 'first',
+        sourceSide: 'right',
+        stroke: 'normal',
+        targetId: 'target',
+        targetSide: 'left',
+      },
+      {
+        arrow: false,
+        id: 'second-target',
+        label: '',
+        sourceId: 'second',
+        sourceSide: 'right',
+        stroke: 'normal',
+        targetId: 'target',
+        targetSide: 'left',
+      },
+    ],
+  };
+  const markup = renderDocument(document);
+  const firstEndpoint = pathEndpoint(edgePath(markup, 'first-target'));
+  const secondEndpoint = pathEndpoint(edgePath(markup, 'second-target'));
+
+  assert.equal(firstEndpoint.x, secondEndpoint.x);
+  assert.equal(firstEndpoint.y, 157.5);
+  assert.equal(secondEndpoint.y, 162.5);
+});
+
+test('snaps nearly aligned automatic endpoints onto one truly straight axis', () => {
+  const document = {
+    version: 1,
+    direction: 'LR',
+    diagramKind: 'flowchart',
+    nodes: [
+      {
+        classes: [],
+        height: 80,
+        id: 'source',
+        label: '来源',
+        position: {x: 100, y: 100},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'target',
+        label: '目标',
+        position: {x: 320, y: 108},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+    ],
+    edges: [
+      {
+        arrow: false,
+        id: 'near-axis',
+        label: '',
+        sourceId: 'source',
+        sourceSide: 'right',
+        stroke: 'normal',
+        targetId: 'target',
+        targetSide: 'left',
+      },
+    ],
+  };
+  const path = edgePath(renderDocument(document), 'near-axis');
+  const direct = path.match(
+    /^M (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?) L (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)$/u,
+  );
+
+  assert.ok(direct, `近轴边应只有一条直线，实际为：${path}`);
+  assert.equal(Number(direct[2]), 104);
+  assert.equal(Number(direct[4]), 104);
+});
+
+test('keeps authored orthogonal routes unchanged by automatic near-axis snapping', () => {
+  const document = {
+    version: 1,
+    direction: 'LR',
+    diagramKind: 'flowchart',
+    nodes: [
+      {
+        classes: [],
+        height: 80,
+        id: 'source',
+        label: '来源',
+        position: {x: 100, y: 100},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'target',
+        label: '目标',
+        position: {x: 320, y: 108},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+    ],
+    edges: [
+      {
+        arrow: false,
+        id: 'authored-route',
+        label: '',
+        points: [
+          {x: 170, y: 100},
+          {x: 200, y: 100},
+          {x: 200, y: 140},
+          {x: 230, y: 140},
+          {x: 230, y: 108},
+          {x: 246, y: 108},
+        ],
+        sourceId: 'source',
+        sourceSide: 'right',
+        stroke: 'normal',
+        targetId: 'target',
+        targetSide: 'left',
+      },
+    ],
+  };
+  const path = edgePath(renderDocument(document), 'authored-route');
+
+  assert.match(path, / 140(?: |$)/u);
+  assert.equal(pathEndpoint(path).y, 108);
 });

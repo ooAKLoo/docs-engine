@@ -172,6 +172,8 @@ const DIRECT_ROUTE_LABEL_RESERVE = 47;
 const PAIRED_ROUTE_LABEL_RESERVE = 108;
 const PAIRED_LANE_BASE_OFFSET = 32;
 const PAIRED_LANE_STEP = 30;
+const EDGE_PORT_GAP = 5;
+const MICRO_JOG_THRESHOLD = 16;
 
 export type DiagramCreatedNode = {
   id: string;
@@ -1870,13 +1872,118 @@ function routeGraphEdges(
     addPort(candidate, candidate.target, candidate.source, candidate.targetSide, 'target');
   });
 
-  // A Board anchor is a shared pin. Parallel edges intentionally leave from the
-  // exact same point instead of gaining per-edge padding along the node boundary.
   portGroups.forEach((ports) => {
-    ports.forEach((port) => {
-      if (port.role === 'source') port.candidate.sourceOffset = 0;
-      else port.candidate.targetOffset = 0;
+    const first = ports[0];
+    if (!first) return;
+    const setOffset = (port: (typeof ports)[number], offset: number) => {
+      if (port.role === 'source') port.candidate.sourceOffset = offset;
+      else port.candidate.targetOffset = offset;
+    };
+
+    // Authored routes keep their original centre anchors. Moving one endpoint
+    // would make the persisted orthogonal points diagonal and discard the patch.
+    const containsAuthoredRoute = ports.some(
+      ({candidate}) => (edgePatches.get(candidate.edge.id)?.points.length ?? 0) >= 2,
+    );
+    if (ports.length === 1 || containsAuthoredRoute) {
+      ports.forEach((port) => setOffset(port, 0));
+      return;
+    }
+
+    const axisCenter =
+      first.side === 'top' || first.side === 'bottom'
+        ? first.node.position.x
+        : first.node.position.y;
+    const limit = portOffsetLimit(first.node, first.side);
+    const gap = Math.min(EDGE_PORT_GAP, (limit * 2) / Math.max(1, ports.length - 1));
+    const ordered = ports
+      .map((port) => ({
+        desired: clamp(port.projection - axisCenter, -limit, limit),
+        port,
+      }))
+      .sort(
+        (firstPort, secondPort) =>
+          firstPort.desired - secondPort.desired ||
+          firstPort.port.candidate.index - secondPort.port.candidate.index,
+      );
+    const offsets = distributePortOffsets(
+      ordered.map(({desired}) => desired),
+      limit,
+      gap,
+    );
+    ordered.forEach(({port}, index) => {
+      setOffset(port, offsets[index] ?? 0);
     });
+  });
+
+  const portGroupSize = (node: LayoutNode, side: AnchorSide) =>
+    portGroups.get(`${node.id}:${side}`)?.length ?? 0;
+
+  candidates.forEach((candidate) => {
+    const patch = edgePatches.get(candidate.edge.id);
+    if ((patch?.points.length ?? 0) >= 2) return;
+    if (oppositeSide(candidate.sourceSide) !== candidate.targetSide) return;
+
+    const horizontal =
+      candidate.sourceSide === 'left' || candidate.sourceSide === 'right';
+    const start = anchorPoint(
+      candidate.source,
+      candidate.sourceSide,
+      candidate.sourceOffset,
+      0,
+    );
+    const end = anchorPoint(
+      candidate.target,
+      candidate.targetSide,
+      candidate.targetOffset,
+      0,
+    );
+    const delta = horizontal ? end.y - start.y : end.x - start.x;
+    if (Math.abs(delta) > MICRO_JOG_THRESHOLD) return;
+
+    const sourceCount = portGroupSize(candidate.source, candidate.sourceSide);
+    const targetCount = portGroupSize(candidate.target, candidate.targetSide);
+    let sourceOffset = candidate.sourceOffset;
+    let targetOffset = candidate.targetOffset;
+
+    if (sourceCount <= 1 && targetCount <= 1) {
+      sourceOffset += delta / 2;
+      targetOffset -= delta / 2;
+    } else if (sourceCount <= 1) {
+      sourceOffset += delta;
+    } else if (targetCount <= 1) {
+      targetOffset -= delta;
+    } else {
+      return;
+    }
+
+    const sourceLimit = portOffsetLimit(candidate.source, candidate.sourceSide);
+    const targetLimit = portOffsetLimit(candidate.target, candidate.targetSide);
+    sourceOffset = clamp(sourceOffset, -sourceLimit, sourceLimit);
+    targetOffset = clamp(targetOffset, -targetLimit, targetLimit);
+
+    const alignedStart = anchorPoint(
+      candidate.source,
+      candidate.sourceSide,
+      sourceOffset,
+      0,
+    );
+    const alignedEnd = anchorPoint(
+      candidate.target,
+      candidate.targetSide,
+      targetOffset,
+      0,
+    );
+    const remaining = horizontal
+      ? alignedEnd.y - alignedStart.y
+      : alignedEnd.x - alignedStart.x;
+
+    // Commit only a genuinely orthogonal result; a tolerance alone would turn
+    // the unwanted micro jog into a slightly diagonal SVG segment.
+    if (Math.abs(remaining) < 0.1) {
+      candidate.sourceOffset = sourceOffset;
+      candidate.targetOffset = targetOffset;
+    }
   });
 
   const routed = candidates.map((candidate) => ({
@@ -1924,6 +2031,47 @@ function routeGraphEdges(
       },
     };
   });
+}
+
+/**
+ * Fit sorted port projections to the node boundary while preserving their
+ * minimum gap. Isotonic regression centres coincident projections instead of
+ * always pushing the later edge in one direction.
+ */
+function distributePortOffsets(desired: number[], limit: number, gap: number) {
+  if (desired.length <= 1) return desired.map((offset) => clamp(offset, -limit, limit));
+  const blocks = desired.map((offset, index) => ({
+    count: 1,
+    end: index,
+    start: index,
+    sum: clamp(offset, -limit, limit) - index * gap,
+  }));
+  for (let index = 1; index < blocks.length;) {
+    const previous = blocks[index - 1];
+    const current = blocks[index];
+    if (previous.sum / previous.count <= current.sum / current.count) {
+      index += 1;
+      continue;
+    }
+    blocks.splice(index - 1, 2, {
+      count: previous.count + current.count,
+      end: current.end,
+      start: previous.start,
+      sum: previous.sum + current.sum,
+    });
+    index = Math.max(1, index - 1);
+  }
+
+  const transformed = new Array<number>(desired.length);
+  const minimum = -limit;
+  const maximum = limit - (desired.length - 1) * gap;
+  blocks.forEach((block) => {
+    const value = clamp(block.sum / block.count, minimum, maximum);
+    for (let index = block.start; index <= block.end; index += 1) {
+      transformed[index] = value;
+    }
+  });
+  return transformed.map((offset, index) => offset + index * gap);
 }
 
 function routeSequenceGraphEdges(
