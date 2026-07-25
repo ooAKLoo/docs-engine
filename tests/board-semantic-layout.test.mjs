@@ -505,10 +505,16 @@ test('rounds fan-in endpoint turns while preserving the central T junction', asy
   const trunkPath = markup.match(
     /<g class="de-board__edge-trunk"[^>]*data-de-bundle-key="fan-in:entity:PlayableContentCatalogPort:left"[^>]*><path d="([^"]+)"/u,
   )?.[1] ?? '';
+  const dependencyLabel = [...markup.matchAll(
+    /<g class="de-board__edge-label"([^>]*)>([\s\S]*?)<\/g>/gu,
+  )].find(([, , body]) => body.replace(/<[^>]+>/gu, '') === '只依赖合同');
 
   assert.match(upperBranch, / A \d+(?:\.\d+)? \d+(?:\.\d+)? /u);
   assert.match(lowerBranch, / A \d+(?:\.\d+)? \d+(?:\.\d+)? /u);
   assert.equal((trunkPath.match(/M /gu) ?? []).length, 2);
+  assert.ok(dependencyLabel, '短关系标签必须保留为一行');
+  assert.doesNotMatch(dependencyLabel[1], /data-floating/u);
+  assert.equal((dependencyLabel[2].match(/<tspan/gu) ?? []).length, 1);
   assert.doesNotMatch(
     edgePath(markup, 'entity:2:entity:ContentLibraryAdapter:entity:ContentAssetRegistry'),
     / A /u,

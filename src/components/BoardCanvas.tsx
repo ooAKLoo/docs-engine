@@ -178,6 +178,7 @@ const EDGE_SOURCE_PORT_GAP = 10;
 const EDGE_TARGET_PORT_GAP = 16;
 const MICRO_JOG_THRESHOLD = 16;
 const FAN_IN_TRUNK_LENGTH = 42;
+const FAN_IN_ROUTE_LABEL_RESERVE = DIRECT_ROUTE_LABEL_RESERVE + FAN_IN_TRUNK_LENGTH;
 const ORTHOGONAL_CORNER_RADIUS = 10;
 const FAN_IN_CORNER_LEG = ORTHOGONAL_CORNER_RADIUS * 2;
 const FEEDBACK_LANE_GAP = 24;
@@ -1315,6 +1316,7 @@ function layoutDiagramGraph(
   );
   const pairLaneOffset =
     maximumPairLane > 0 ? pairedLaneOffset(maximumPairLane) : 0;
+  const fanInEdgeIds = fanInEdgeIdsForRankSpacing(flowEdges, graph.direction);
   const maximumLabelCrossSize = Math.max(
     0,
     ...flowEdges.map((edge) => {
@@ -1349,9 +1351,13 @@ function layoutDiagramGraph(
         metrics: naturalEdgeLabelMetrics(edge, measuredEdgeLabels),
         // Direct routes consume only anchor clearances. A paired route also owns
         // two 22 px stubs plus the rounded corners around its carrier segment.
+        // Fan-in routes additionally give part of the rank gap to their shared
+        // collector, so labels must reserve that trunk before nodes are placed.
         routePadding: pairLanes.has(edge.id)
           ? PAIRED_ROUTE_LABEL_RESERVE
-          : DIRECT_ROUTE_LABEL_RESERVE,
+          : fanInEdgeIds.has(edge.id)
+            ? FAN_IN_ROUTE_LABEL_RESERVE
+            : DIRECT_ROUTE_LABEL_RESERVE,
         sourceRank,
         targetRank,
       }];
@@ -2299,6 +2305,39 @@ function assignFanInBundles(
     bundles.push(bundle);
   });
   return bundles;
+}
+
+function fanInEdgeIdsForRankSpacing(
+  edges: ParsedDiagramEdge[],
+  direction: BoardDocument['direction'],
+) {
+  if (direction !== 'LR' && direction !== 'RL') return new Set<string>();
+  const automaticTargetSide = direction === 'RL' ? 'right' : 'left';
+  const groups = new Map<string, ParsedDiagramEdge[]>();
+  edges.forEach((edge) => {
+    if (
+      !edge.arrow ||
+      edge.manual ||
+      edge.sourceId === edge.targetId ||
+      (edge.points?.length ?? 0) >= 2
+    ) return;
+    const targetSide = edge.targetSide ?? automaticTargetSide;
+    if (targetSide !== 'left' && targetSide !== 'right') return;
+    const key = `${edge.targetId}:${targetSide}`;
+    const group = groups.get(key) ?? [];
+    group.push(edge);
+    groups.set(key, group);
+  });
+
+  const ids = new Set<string>();
+  groups.forEach((group) => {
+    if (group.length < 2) return;
+    const sourceIds = new Set(group.map((edge) => edge.sourceId));
+    const strokes = new Set(group.map((edge) => edge.stroke));
+    if (sourceIds.size !== group.length || strokes.size !== 1) return;
+    group.forEach((edge) => ids.add(edge.id));
+  });
+  return ids;
 }
 
 function fanInCollectorCenter(bundle: FanInBundle) {
