@@ -101,6 +101,48 @@ themes: ['@ooakloo/docs-engine/adapters/docusaurus-theme'],
 
 设计师精确编排的 Mermaid 可把 `layout` 放进 `importSource`，导入器会把坐标、尺寸、锚点和路线直接合并进新文档。之后这些几何信息与 Mermaid 无关，仍可由同一个 Board 继续编辑。已有独立交互的内容可显式设置 `zoomable={false}`。
 
+### Agent authored layout
+
+复杂架构图不应把最终构图完全交给通用 DAG 自动排版。自动布局负责没有几何信息时生成可用底稿；Codex 等 Agent 可以从 `@ooakloo/docs-engine/agent` 导入无 React 的作者接口，在理解部署边界、主链、辅助关系和外部参与者后提供精确布局：
+
+```ts
+import {
+  assertBoardLayout,
+  importMermaid,
+  type BoardImportLayout,
+} from '@ooakloo/docs-engine/agent';
+
+const layout = {
+  width: 1280,
+  height: 640,
+  nodes: {
+    gateway: {position: {x: 320, y: 240}, width: 180, height: 72},
+    realtime: {position: {x: 600, y: 240}, width: 180, height: 72},
+  },
+  edges: [
+    {
+      sourceId: 'gateway',
+      targetId: 'realtime',
+      sourceSide: 'right',
+      targetSide: 'left',
+      points: [{x: 410, y: 240}, {x: 510, y: 240}],
+    },
+  ],
+} satisfies BoardImportLayout;
+
+const document = await importMermaid(source, {layout});
+assertBoardLayout(document);
+```
+
+`validateBoardLayout()` 返回结构化诊断，检查节点重叠与最小间距、缺失几何、非正交路径、线路穿过节点、线路交叉或共线重叠以及画布越界。需要所有连线都由 Agent 明确编排时，传入 `{requireEdgeRoutes: true}`；否则未提供路径的边仍由 Board 自动补全。
+
+推荐的职责边界是：
+
+- Agent 决定语义构图：节点分层、边界归属、主次关系、锚点和独立轨道。
+- Docs Engine 测量、校验、渲染和持久化统一 `BoardDocument`。
+- 自动布局只为缺失几何生成底稿，不覆盖已有 authored geometry。
+- SVG 或 PNG 只是导出结果，不作为可编辑图表的持久化源。
+
 ### 交互式项目时间轴
 
 `Timeline` 用于阶段式项目视图，视觉上采用日期虚线网格、错层圆角阶段条和阶段事项列表。编辑模式下，阶段条会在拖动或缩放过程中实时变化，并自动吸附到日期刻度及其他阶段边界；双击轨道空白处可新增阶段，单击阶段选中后按 `Del` 删除。键盘方向键用于逐日移动，`Shift + 方向键` 调整结束日期。组件只负责交互和视觉，持久化仍由宿主通过回调完成：

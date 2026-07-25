@@ -1,6 +1,6 @@
 {
   "name": "@ooakloo/docs-engine",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "private": false,
   "type": "module",
   "description": "Shared document semantics, React primitives and visual system for ooAKLoo projects.",
@@ -24,6 +24,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent.d.ts",
+      "import": "./dist/agent.js",
+      "default": "./dist/agent.js"
     },
     "./adapters/docusaurus": {
       "types": "./dist/adapters/docusaurus.d.ts",

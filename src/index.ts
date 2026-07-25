@@ -9,6 +9,15 @@ export {
   type BoardProps,
 } from './components/Board.js';
 export {importMermaid, detectMermaidDiagramKind} from './components/MermaidImporter.js';
+export {
+  applyBoardLayout,
+  assertBoardLayout,
+  validateBoardLayout,
+  type BoardLayoutDiagnostic,
+  type BoardLayoutDiagnosticCode,
+  type BoardLayoutDiagnosticSeverity,
+  type BoardLayoutValidationOptions,
+} from './components/BoardLayout.js';
 export {applyBoardOperation} from './components/BoardModel.js';
 export type {
   BoardAnchorSide,

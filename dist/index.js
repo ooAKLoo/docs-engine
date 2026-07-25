@@ -3,6 +3,7 @@ export { Callout } from './components/Callout.js';
 export { CodeBlock } from './components/CodeBlock.js';
 export { Board, } from './components/Board.js';
 export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImporter.js';
+export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
 export { applyBoardOperation } from './components/BoardModel.js';
 export { DocumentContent } from './components/DocumentContent.js';
 export { Formula } from './components/Formula.js';

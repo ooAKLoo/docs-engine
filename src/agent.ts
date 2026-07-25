@@ -1,0 +1,34 @@
+/**
+ * Headless authoring entry point for Codex and other document agents.
+ *
+ * This entry deliberately excludes React components. Agents can parse semantic
+ * Mermaid, apply exact geometry, validate the result and persist one canonical
+ * BoardDocument before a host renders it.
+ */
+export {detectMermaidDiagramKind, importMermaid} from './components/MermaidImporter.js';
+export {
+  applyBoardLayout,
+  assertBoardLayout,
+  validateBoardLayout,
+  type BoardLayoutDiagnostic,
+  type BoardLayoutDiagnosticCode,
+  type BoardLayoutDiagnosticSeverity,
+  type BoardLayoutValidationOptions,
+} from './components/BoardLayout.js';
+export type {
+  BoardAnchorSide,
+  BoardCanvasSize,
+  BoardDiagramKind,
+  BoardDirection,
+  BoardDocument,
+  BoardEdge,
+  BoardEdgeRole,
+  BoardGroup,
+  BoardImportEdgeLayout,
+  BoardImportLayout,
+  BoardImportNodeLayout,
+  BoardNode,
+  BoardNodeShape,
+  BoardNodeTone,
+  BoardPoint,
+} from './components/BoardModel.js';

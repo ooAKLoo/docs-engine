@@ -16,12 +16,14 @@ const docusaurusMdxComponents = await readFile(
 );
 const showcase = await readFile(new URL('../showcase/src/Gallery.tsx', import.meta.url), 'utf8');
 const model = await readFile(new URL('../src/model.ts', import.meta.url), 'utf8');
+const agent = await readFile(new URL('../src/agent.ts', import.meta.url), 'utf8');
 
 test('publishes stable package entry points', () => {
   assert.ok(packageJson.exports['.']);
   assert.equal(packageJson.exports['./styles.css'], './styles/index.css');
   assert.ok(packageJson.exports['./adapters/docusaurus']);
   assert.ok(packageJson.exports['./adapters/docusaurus-theme']);
+  assert.ok(packageJson.exports['./agent']);
   assert.ok(packageJson.files.includes('skills'));
   assert.equal(packageJson.peerDependencies.react, '>=18 <20');
   assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
@@ -252,6 +254,11 @@ test('uses BoardDocument as the only editable diagram model', async () => {
   assert.match(index, /BoardDocumentChange/);
   assert.match(index, /BoardImportSource/);
   assert.match(index, /importMermaid/);
+  assert.match(index, /validateBoardLayout/);
+  assert.match(agent, /applyBoardLayout/);
+  assert.match(agent, /assertBoardLayout/);
+  assert.match(agent, /validateBoardLayout/);
+  assert.doesNotMatch(agent, /Board\.js/);
   assert.doesNotMatch(index, /DiagramFrame|DiagramBoardLayout/);
 });
 
