@@ -471,6 +471,50 @@ test('bundles the Lula fan-in into one shared trunk and keeps blocked vertical f
   assert.match(direct, /^M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+$/u);
 });
 
+test('rounds fan-in endpoint turns while preserving the central T junction', async () => {
+  const document = await importMermaid(`classDiagram
+    class ChildExperience {
+        +选择下一段内容()
+    }
+    class PlayableContentCatalogPort {
+        <<interface>>
+        +列出内容集合()
+        +按身份查找()
+        +搜索候选()
+    }
+    class ContentLibraryAdapter {
+        +列出内容集合()
+        +按身份查找()
+        +搜索候选()
+    }
+    class ContentAssetRegistry {
+        +读取受治理目录()
+    }
+    ChildExperience --> PlayableContentCatalogPort : 只依赖合同
+    ContentLibraryAdapter ..|> PlayableContentCatalogPort : 实现合同
+    ContentLibraryAdapter --> ContentAssetRegistry : 读取事实`);
+  const markup = renderDocument(document);
+  const upperBranch = edgePath(
+    markup,
+    'entity:0:entity:ChildExperience:entity:PlayableContentCatalogPort',
+  );
+  const lowerBranch = edgePath(
+    markup,
+    'entity:1:entity:ContentLibraryAdapter:entity:PlayableContentCatalogPort',
+  );
+  const trunkPath = markup.match(
+    /<g class="de-board__edge-trunk"[^>]*data-de-bundle-key="fan-in:entity:PlayableContentCatalogPort:left"[^>]*><path d="([^"]+)"/u,
+  )?.[1] ?? '';
+
+  assert.match(upperBranch, / A \d+(?:\.\d+)? \d+(?:\.\d+)? /u);
+  assert.match(lowerBranch, / A \d+(?:\.\d+)? \d+(?:\.\d+)? /u);
+  assert.equal((trunkPath.match(/M /gu) ?? []).length, 2);
+  assert.doesNotMatch(
+    edgePath(markup, 'entity:2:entity:ContentLibraryAdapter:entity:ContentAssetRegistry'),
+    / A /u,
+  );
+});
+
 test('routes structurally detected Lula feedback edges on distinct outer lanes', async () => {
   const document = await importMermaid(`flowchart LR
     dialogue[收集并脱敏优秀对话] --> principle[提炼交流原则]

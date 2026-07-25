@@ -178,6 +178,8 @@ const EDGE_SOURCE_PORT_GAP = 10;
 const EDGE_TARGET_PORT_GAP = 16;
 const MICRO_JOG_THRESHOLD = 16;
 const FAN_IN_TRUNK_LENGTH = 42;
+const ORTHOGONAL_CORNER_RADIUS = 10;
+const FAN_IN_CORNER_LEG = ORTHOGONAL_CORNER_RADIUS * 2;
 const FEEDBACK_LANE_GAP = 24;
 
 export type DiagramCreatedNode = {
@@ -2321,6 +2323,48 @@ function fanInBranchJoin(candidate: RoutedEdgeCandidate, bundle: FanInBundle) {
     : {x: start.x, y: collector.y};
 }
 
+function fanInCollectorGeometry(bundle: FanInBundle) {
+  const collector = fanInCollectorCenter(bundle);
+  const joins = bundle.members.map((candidate) => ({
+    candidate,
+    point: fanInBranchJoin(candidate, bundle),
+  }));
+  const horizontalTarget = bundle.targetSide === 'left' || bundle.targetSide === 'right';
+  const axisValue = (point: DiagramNodePosition) =>
+    horizontalTarget ? point.y : point.x;
+  const collectorAxis = axisValue(collector);
+  const joinAxes = joins.map(({point}) => axisValue(point));
+  const minimumJoinAxis = Math.min(...joinAxes);
+  const maximumJoinAxis = Math.max(...joinAxes);
+  const minimumAxis = Math.min(collectorAxis, minimumJoinAxis);
+  const maximumAxis = Math.max(collectorAxis, maximumJoinAxis);
+  const minimumCornerLeg =
+    minimumJoinAxis < collectorAxis
+      ? Math.min(FAN_IN_CORNER_LEG, collectorAxis - minimumJoinAxis)
+      : 0;
+  const maximumCornerLeg =
+    maximumJoinAxis > collectorAxis
+      ? Math.min(FAN_IN_CORNER_LEG, maximumJoinAxis - collectorAxis)
+      : 0;
+  const pointAtAxis = (point: DiagramNodePosition, axis: number) =>
+    horizontalTarget ? {...point, y: axis} : {...point, x: axis};
+
+  return {
+    axisValue,
+    collector,
+    collectorAxis,
+    collectorEnd: pointAtAxis(collector, maximumAxis - maximumCornerLeg),
+    collectorStart: pointAtAxis(collector, minimumAxis + minimumCornerLeg),
+    horizontalTarget,
+    joins,
+    maximumCornerLeg,
+    maximumJoinAxis,
+    minimumCornerLeg,
+    minimumJoinAxis,
+    pointAtAxis,
+  };
+}
+
 function routeFanInBranch(
   candidate: RoutedEdgeCandidate,
   bundle: FanInBundle,
@@ -2328,6 +2372,7 @@ function routeFanInBranch(
   obstacles: LayoutNode[],
 ) {
   const join = fanInBranchJoin(candidate, bundle);
+  const geometry = fanInCollectorGeometry(bundle);
   const virtualTarget: LayoutNode = {
     classes: [],
     height: 0,
@@ -2353,8 +2398,17 @@ function routeFanInBranch(
   const points = automatic.points.length > 1
     ? [...automatic.points.slice(0, -1), join]
     : automatic.points;
+  const joinAxis = geometry.axisValue(join);
+  const collectorContinuation =
+    Math.abs(joinAxis - geometry.minimumJoinAxis) < 0.1 &&
+    geometry.minimumCornerLeg > 0
+      ? geometry.pointAtAxis(join, joinAxis + geometry.minimumCornerLeg)
+      : Math.abs(joinAxis - geometry.maximumJoinAxis) < 0.1 &&
+          geometry.maximumCornerLeg > 0
+        ? geometry.pointAtAxis(join, joinAxis - geometry.maximumCornerLeg)
+        : undefined;
   return finalizeEdgeRoute(
-    points,
+    collectorContinuation ? [...points, collectorContinuation] : points,
     false,
     candidate.sourceSide,
     bundle.targetSide,
@@ -2362,23 +2416,24 @@ function routeFanInBranch(
 }
 
 function createFanInTrunk(bundle: FanInBundle): RoutedEdgeTrunk {
-  const collector = fanInCollectorCenter(bundle);
-  const joins = bundle.members.map((candidate) => fanInBranchJoin(candidate, bundle));
-  const horizontalTarget = bundle.targetSide === 'left' || bundle.targetSide === 'right';
-  const collectorStart = horizontalTarget
-    ? {x: collector.x, y: Math.min(collector.y, ...joins.map(({y}) => y))}
-    : {x: Math.min(collector.x, ...joins.map(({x}) => x)), y: collector.y};
-  const collectorEnd = horizontalTarget
-    ? {x: collector.x, y: Math.max(collector.y, ...joins.map(({y}) => y))}
-    : {x: Math.max(collector.x, ...joins.map(({x}) => x)), y: collector.y};
+  const geometry = fanInCollectorGeometry(bundle);
+  const {collector, collectorAxis, collectorEnd, collectorStart} = geometry;
   const tip = anchorPoint(bundle.target, bundle.targetSide, 0, 14);
+  const collectorBeforeJoins = collectorAxis < geometry.minimumJoinAxis;
+  const collectorAfterJoins = collectorAxis > geometry.maximumJoinAxis;
   const trunk = finalizeEdgeRoute(
-    [collector, tip],
+    collectorBeforeJoins
+      ? [collectorEnd, collector, tip]
+      : collectorAfterJoins
+        ? [collectorStart, collector, tip]
+        : [collector, tip],
     true,
     oppositeSide(bundle.targetSide),
     bundle.targetSide,
   );
   const collectorPath =
+    !collectorBeforeJoins &&
+    !collectorAfterJoins &&
     Math.hypot(collectorEnd.x - collectorStart.x, collectorEnd.y - collectorStart.y) >= 0.1
       ? orthogonalPath([collectorStart, collectorEnd])
       : '';
@@ -2387,7 +2442,7 @@ function createFanInTrunk(bundle: FanInBundle): RoutedEdgeTrunk {
     edgeIds: bundle.members.map(({edge}) => edge.id),
     key: bundle.key,
     path: [collectorPath, trunk.path].filter(Boolean).join(' '),
-    points: [collector, tip],
+    points: trunk.points,
     stroke: bundle.stroke,
   };
 }
@@ -3409,7 +3464,11 @@ function orthogonalPath(points: DiagramNodePosition[]) {
     const next = points[index + 1];
     const incomingLength = Math.hypot(corner.x - previous.x, corner.y - previous.y);
     const outgoingLength = Math.hypot(next.x - corner.x, next.y - corner.y);
-    const radius = Math.min(10, incomingLength / 2, outgoingLength / 2);
+    const radius = Math.min(
+      ORTHOGONAL_CORNER_RADIUS,
+      incomingLength / 2,
+      outgoingLength / 2,
+    );
     if (radius < 0.5) {
       commands.push(`L ${format(corner.x)} ${format(corner.y)}`);
       continue;
