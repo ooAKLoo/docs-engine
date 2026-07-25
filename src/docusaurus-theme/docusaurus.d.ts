@@ -56,8 +56,28 @@ declare module '@theme/DocItem/Content' {
   export default Component;
 }
 
-declare module '@theme-original/DocItem/Content' {
-  import type {Props} from '@theme/DocItem/Content';
-  const Component: import('react').ComponentType<Props>;
+declare module '@theme/Heading' {
+  const Component: import('react').ComponentType<
+    Record<string, unknown> & {as?: string; children?: import('react').ReactNode}
+  >;
   export default Component;
+}
+
+declare module '@theme/MDXContent' {
+  const Component: import('react').ComponentType<{
+    children?: import('react').ReactNode;
+  }>;
+  export default Component;
+}
+
+declare module '@docusaurus/plugin-content-docs/client' {
+  export function useDoc(): {
+    contentTitle?: string;
+    frontMatter: {
+      hide_title?: boolean;
+    };
+    metadata: {
+      title: string;
+    };
+  };
 }

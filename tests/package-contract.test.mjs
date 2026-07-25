@@ -112,7 +112,9 @@ test('publishes one document-level semantic copy boundary for Docusaurus', async
     new URL('../src/components/BoardModel.ts', import.meta.url),
     'utf8',
   );
-  assert.match(docItemContent, /@theme-original\/DocItem\/Content/);
+  assert.doesNotMatch(docItemContent, /@theme-original\/DocItem\/Content/);
+  assert.match(docItemContent, /useDoc/);
+  assert.match(docItemContent, /<MDXContent>\{children\}<\/MDXContent>/);
   assert.match(docItemContent, /<DocumentCopyButton rootRef=\{rootRef\}/);
   assert.match(documentCopy, /serializeDocumentToMarkdown/);
   assert.match(documentCopy, /data-de-board-semantic/);
