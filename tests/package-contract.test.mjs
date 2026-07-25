@@ -119,6 +119,8 @@ test('publishes one document-level semantic copy boundary for Docusaurus', async
   assert.match(documentCopy, /serializeDocumentToMarkdown/);
   assert.match(documentCopy, /data-de-board-semantic/);
   assert.match(documentCopy, /copyLabel = '复制全文'/);
+  assert.match(documentCopy, /\.hash-link, a\.anchor/);
+  assert.doesNotMatch(documentCopy, /\.hash-link, \.anchor/);
   assert.match(board, /data-de-board-semantic/);
   assert.match(board, /serializeBoardDocument/);
   assert.match(boardModel, /export function serializeBoardDocument/);

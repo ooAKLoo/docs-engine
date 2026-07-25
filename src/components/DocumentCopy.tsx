@@ -38,7 +38,7 @@ function shouldSkipElement(element: Element) {
     element.hasAttribute('hidden') ||
     element.getAttribute('aria-hidden') === 'true' ||
     element.matches(
-      'button, script, style, noscript, svg, [data-de-copy-ignore], .hash-link, .anchor',
+      'button, script, style, noscript, svg, [data-de-copy-ignore], .hash-link, a.anchor',
     )
   );
 }

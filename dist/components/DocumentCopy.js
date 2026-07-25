@@ -14,7 +14,7 @@ function markdownFence(value) {
 function shouldSkipElement(element) {
     return (element.hasAttribute('hidden') ||
         element.getAttribute('aria-hidden') === 'true' ||
-        element.matches('button, script, style, noscript, svg, [data-de-copy-ignore], .hash-link, .anchor'));
+        element.matches('button, script, style, noscript, svg, [data-de-copy-ignore], .hash-link, a.anchor'));
 }
 function serializeInlineChildren(element) {
     return Array.from(element.childNodes).map(serializeInlineNode).join('');
