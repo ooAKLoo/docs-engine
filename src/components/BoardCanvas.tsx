@@ -2380,7 +2380,48 @@ function assignEdgeBundles(
     ({source, sourceSide}) => `${source.id}:${sourceSide}`,
     ({target}) => target.id,
   );
+  bundles.forEach(moveCollinearBundleToOuterLane);
   return bundles;
+}
+
+function moveCollinearBundleToOuterLane(bundle: EdgeBundle) {
+  const horizontal = bundle.side === 'left' || bundle.side === 'right';
+  const nodeCross = horizontal ? bundle.node.position.y : bundle.node.position.x;
+  const nodePrimary = horizontal ? bundle.node.position.x : bundle.node.position.y;
+  const vector = sideVector(bundle.side);
+  const members = bundle.members.map((candidate) =>
+    bundle.kind === 'fan-in' ? candidate.source : candidate.target,
+  );
+  const collinear = members.every((node) =>
+    Math.abs((horizontal ? node.position.y : node.position.x) - nodeCross) < 1,
+  );
+  const forwardDistances = members.map((node) =>
+    horizontal
+      ? (node.position.x - nodePrimary) * vector.x
+      : (node.position.y - nodePrimary) * vector.y,
+  );
+  const distinctForwardRanks = new Set(
+    forwardDistances.filter((distance) => distance > 0).map((distance) => format(distance)),
+  );
+  if (!collinear || distinctForwardRanks.size < 2) return;
+
+  // A same-axis fan-out/fan-in would otherwise collapse into one straight
+  // segment that crosses every nearer sibling. Move the whole semantic port to
+  // one outer side so the shared bus stays outside the node row/column.
+  const outerSide: AnchorSide = horizontal ? 'top' : 'left';
+  bundle.side = outerSide;
+  bundle.key = `${bundle.kind}:${bundle.node.id}:${outerSide}`;
+  bundle.members.forEach((candidate) => {
+    if (bundle.kind === 'fan-in') {
+      candidate.targetBundleKey = bundle.key;
+      candidate.targetSide = outerSide;
+      if (!candidate.sourceBundleKey) candidate.sourceSide = outerSide;
+    } else {
+      candidate.sourceBundleKey = bundle.key;
+      candidate.sourceSide = outerSide;
+      if (!candidate.targetBundleKey) candidate.targetSide = outerSide;
+    }
+  });
 }
 
 function edgeBundleIdsForRankSpacing(

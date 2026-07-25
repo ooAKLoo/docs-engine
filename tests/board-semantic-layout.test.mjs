@@ -306,6 +306,41 @@ test('routes same-side fan-out and fan-in through centered shared trunks', async
   }
 });
 
+test('moves a collinear edge bundle to an outer lane instead of crossing sibling nodes', async () => {
+  const document = await importMermaid(`flowchart TB
+    subgraph Before[输入]
+      input[Input]
+    end
+    subgraph Execution[执行]
+      mode{executionMode}
+      llm[LLM]
+      media[Media]
+      action[Action]
+      outcome[Outcome]
+      mode --> llm --> outcome
+      mode --> media --> outcome
+      mode --> action --> outcome
+    end
+    input --> mode`);
+  const markup = renderDocument(document);
+
+  assert.equal((markup.match(/data-de-bundle-key="fan-out:mode:top"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/data-de-bundle-key="fan-in:outcome:top"/gu) ?? []).length, 2);
+  for (const id of [
+    'flow:0:mode:llm',
+    'flow:1:llm:outcome',
+    'flow:2:mode:media',
+    'flow:3:media:outcome',
+    'flow:4:mode:action',
+    'flow:5:action:outcome',
+  ]) {
+    const edge = edgeMarkup(markup, id);
+    assert.match(edge, /data-source-side="top"/u);
+    assert.match(edge, /data-target-side="top"/u);
+    assert.match(edgePath(markup, id), / A | L [-\d.]+ [-\d.]+/u);
+  }
+});
+
 test('lets one edge connect a source fan-out bus to a target fan-in bus', async () => {
   const document = await importMermaid(`flowchart LR
     subgraph Lula[Lula]
@@ -546,7 +581,7 @@ test('bundles every eligible Lula fan-in around a single semantic target port', 
   );
   assert.equal((markup.match(/class="de-board__edge-trunk"/gu) ?? []).length, 2);
   assert.equal((markup.match(/data-de-bundle-key="fan-in:selector:left"/gu) ?? []).length, 2);
-  assert.equal((markup.match(/data-de-bundle-key="fan-in:agent:top"/gu) ?? []).length, 2);
+  assert.equal((markup.match(/data-de-bundle-key="fan-in:agent:left"/gu) ?? []).length, 2);
   for (const id of [
     'flow:0:memory:selector',
     'flow:1:conversation:selector',
@@ -563,12 +598,19 @@ test('bundles every eligible Lula fan-in around a single semantic target port', 
   assert.equal(new Set(branchEndpoints.map(({x}) => x)).size, 1);
   assert.equal(new Set(branchEndpoints.map(({y}) => y)).size, 3);
 
-  const agentBranches = [
+  const agentEdges = [
+    edgeMarkup(markup, 'flow:4:context:agent'),
+    edgeMarkup(markup, 'flow:5:prompt:agent'),
+  ];
+  agentEdges.forEach((edge) => {
+    assert.match(edge, /data-source-side="left"/u);
+    assert.match(edge, /data-target-side="left"/u);
+  });
+  const agentBranchStarts = [
     edgePath(markup, 'flow:4:context:agent'),
     edgePath(markup, 'flow:5:prompt:agent'),
-  ].map(pathEndpoint);
-  assert.equal(new Set(agentBranches.map(({x}) => x)).size, 1);
-  assert.equal(new Set(agentBranches.map(({y}) => y)).size, 1);
+  ].map((path) => linePoints(path)[0]);
+  assert.equal(new Set(agentBranchStarts.map(({y}) => y)).size, 2);
 });
 
 test('rounds fan-in endpoint turns while preserving the central T junction', async () => {
