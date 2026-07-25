@@ -136,6 +136,7 @@ function parseFlowchart(source) {
             const targetNode = ensureNode(parsed.target);
             edges.push(createEdge('flow', edges.length, sourceNode.id, targetNode.id, parsed.label, {
                 arrow: parsed.arrow,
+                sourceArrow: parsed.sourceArrow,
                 stroke: parsed.stroke,
             }));
         });
@@ -171,34 +172,52 @@ function parseFlowGroupDefinition(value, index) {
 function parseFlowEdges(line) {
     const labelled = line.match(/^(.+?)\s+--\s+(.+?)\s+-->\s+(.+)$/u);
     if (labelled)
-        return [{ arrow: true, label: labelled[2].trim(), source: labelled[1], stroke: 'normal', target: labelled[3] }];
-    const dottedLabelled = line.match(/^(.+?)\s+-\.\s*(.+?)\s*\.->\s+(.+)$/u);
-    if (dottedLabelled)
-        return [{ arrow: true, label: dottedLabelled[2].trim(), source: dottedLabelled[1], stroke: 'dotted', target: dottedLabelled[3] }];
-    const pipeLabelled = line.match(/^(.+?)\s*(-->|-\.->|==>)\s*\|([^|]+)\|\s*(.+)$/u);
-    if (pipeLabelled)
         return [{
                 arrow: true,
-                label: pipeLabelled[3].trim(),
-                source: pipeLabelled[1],
-                stroke: connectorStroke(pipeLabelled[2]),
-                target: pipeLabelled[4],
+                label: labelled[2].trim(),
+                source: labelled[1],
+                sourceArrow: false,
+                stroke: 'normal',
+                target: labelled[3],
             }];
-    const parts = line.split(/(-->|-\.->|==>|~~~|---)/u).map((part) => part.trim());
-    if (parts.length < 3 || parts.length % 2 === 0)
+    const dottedLabelled = line.match(/^(.+?)\s+-\.\s*(.+?)\s*\.->\s+(.+)$/u);
+    if (dottedLabelled)
+        return [{
+                arrow: true,
+                label: dottedLabelled[2].trim(),
+                source: dottedLabelled[1],
+                sourceArrow: false,
+                stroke: 'dotted',
+                target: dottedLabelled[3],
+            }];
+    const connectors = [...line.matchAll(/(<-->|<==>|-->|<--|==>|<==|-\.->|~~~|---)(?:\s*\|([^|]+)\|)?/gu)];
+    const first = connectors[0];
+    if (!first || first.index === undefined)
         return [];
+    let source = line.slice(0, first.index).trim();
     const result = [];
-    for (let index = 0; index < parts.length - 2; index += 2) {
-        const connector = parts[index + 1];
-        if (!/^(?:-->|-\.->|==>|~~~|---)$/u.test(connector))
+    for (let index = 0; index < connectors.length; index += 1) {
+        const connectorMatch = connectors[index];
+        const next = connectors[index + 1];
+        if (connectorMatch.index === undefined || !connectorMatch[0])
             return [];
+        const targetStart = connectorMatch.index + connectorMatch[0].length;
+        const targetEnd = next?.index ?? line.length;
+        const target = line.slice(targetStart, targetEnd).trim();
+        if (!source || !target)
+            return [];
+        const connector = connectorMatch[1];
+        const reverse = connector === '<--' || connector === '<==';
+        const bidirectional = connector === '<-->' || connector === '<==>';
         result.push({
             arrow: connector !== '~~~' && connector !== '---',
-            label: '',
-            source: parts[index],
+            label: connectorMatch[2]?.trim() ?? '',
+            source: reverse ? target : source,
+            sourceArrow: bidirectional,
             stroke: connectorStroke(connector),
-            target: parts[index + 2],
+            target: reverse ? source : target,
         });
+        source = target;
     }
     return result;
 }
@@ -546,6 +565,7 @@ function createEdge(prefix, index, sourceId, targetId, label, options = {}) {
         arrow: options.arrow ?? true,
         id: `${prefix}:${index}:${sourceId}:${targetId}`,
         label: normalizeLabel(label),
+        sourceArrow: options.sourceArrow,
         sourceId,
         stroke: options.stroke ?? 'normal',
         targetId,
@@ -554,7 +574,7 @@ function createEdge(prefix, index, sourceId, targetId, label, options = {}) {
 function connectorStroke(value) {
     if (value === '-.->')
         return 'dotted';
-    if (value === '==>')
+    if (value.includes('=='))
         return 'thick';
     if (value === '~~~')
         return 'invisible';

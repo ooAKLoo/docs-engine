@@ -19,6 +19,7 @@ export type ParsedDiagramEdge = {
     label: string;
     labelAlign?: 'start' | 'middle' | 'end';
     role?: BoardEdgeRole;
+    sourceArrow?: boolean;
     sourceSide?: DiagramAnchorSide;
     sourceId: string;
     stroke: 'normal' | 'thick' | 'dotted' | 'invisible';

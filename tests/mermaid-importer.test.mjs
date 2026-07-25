@@ -37,6 +37,57 @@ test('parses labelled feedback edges and chained flowchart edges', async () => {
   );
 });
 
+test('preserves labels across bidirectional, undirected and labelled chained edges', async () => {
+  const graph = await importMermaid(`flowchart LR
+    toy[儿童玩具] <-->|双向 WebSocket / Opus| server[Product Server]
+    guardian[家长客户端] ---|只读投影| server
+    mode{executionMode} -->|文本生成| llm[LLM → Streaming TTS] --> outcome[Turn Outcome]`);
+
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  assert.equal(nodes.get('toy')?.label, '儿童玩具');
+  assert.equal(nodes.get('llm')?.label, 'LLM → Streaming TTS');
+  assert.equal(nodes.get('outcome')?.label, 'Turn Outcome');
+  assert.deepEqual(
+    graph.edges.map(({arrow, label, sourceArrow, sourceId, targetId}) => ({
+      arrow,
+      label,
+      sourceArrow: Boolean(sourceArrow),
+      sourceId,
+      targetId,
+    })),
+    [
+      {
+        arrow: true,
+        label: '双向 WebSocket / Opus',
+        sourceArrow: true,
+        sourceId: 'toy',
+        targetId: 'server',
+      },
+      {
+        arrow: false,
+        label: '只读投影',
+        sourceArrow: false,
+        sourceId: 'guardian',
+        targetId: 'server',
+      },
+      {
+        arrow: true,
+        label: '文本生成',
+        sourceArrow: false,
+        sourceId: 'mode',
+        targetId: 'llm',
+      },
+      {
+        arrow: true,
+        label: '',
+        sourceArrow: false,
+        sourceId: 'llm',
+        targetId: 'outcome',
+      },
+    ],
+  );
+});
+
 test('detects cycle-closing flowchart edges structurally instead of from their labels', async () => {
   const graph = await importMermaid(`flowchart LR
     cases[建立多轮评测集] --> experiment[调整参数]

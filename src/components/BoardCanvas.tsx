@@ -133,6 +133,7 @@ type EdgeRoute = {
   labelMaximumTextWidth?: number;
   path: string;
   points: DiagramNodePosition[];
+  sourceArrowPoints?: string;
   sourceSide: AnchorSide;
   targetSide: AnchorSide;
 };
@@ -824,10 +825,23 @@ export function BoardCanvas({
             ) : null,
           )}
           {routedEdges.map(({edge, route}) =>
+            route.sourceArrowPoints && edge.stroke !== 'invisible' ? (
+              <polygon
+                key={`${edge.id}:source`}
+                className="de-board__arrow"
+                data-arrow-end="source"
+                data-edge-id={edge.id}
+                data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
+                points={route.sourceArrowPoints}
+              />
+            ) : null,
+          )}
+          {routedEdges.map(({edge, route}) =>
             route.arrowPoints && edge.stroke !== 'invisible' ? (
               <polygon
                 key={edge.id}
                 className="de-board__arrow"
+                data-arrow-end="target"
                 data-edge-id={edge.id}
                 data-feedback={isFeedbackEdge(edge) ? 'true' : undefined}
                 points={route.arrowPoints}
@@ -2159,13 +2173,14 @@ function routeGraphEdges(
             candidate.edge.arrow,
             nodes,
           );
+    const route = applyEdgeRoutePatch(
+      automatic,
+      edgePatches.get(candidate.edge.id),
+      bundle ? false : candidate.edge.arrow,
+    );
     return {
       edge: candidate.edge,
-      route: applyEdgeRoutePatch(
-        automatic,
-        edgePatches.get(candidate.edge.id),
-        bundle ? false : candidate.edge.arrow,
-      ),
+      route: candidate.edge.sourceArrow ? withSourceArrow(route) : route,
     };
   });
   const trunks = fanInBundles.map(createFanInTrunk);
@@ -3381,6 +3396,32 @@ function finalizeEdgeRoute(
     points: normalized,
     sourceSide,
     targetSide,
+  };
+}
+
+function withSourceArrow(route: EdgeRoute): EdgeRoute {
+  const tip = route.points[0];
+  const next = route.points[1];
+  if (!tip || !next) return route;
+  const segmentLength = Math.hypot(tip.x - next.x, tip.y - next.y);
+  if (segmentLength < 1) return route;
+  const direction = {
+    x: (tip.x - next.x) / segmentLength,
+    y: (tip.y - next.y) / segmentLength,
+  };
+  const arrowLength = Math.min(11, Math.max(6, segmentLength * 0.58));
+  const halfWidth = arrowLength * 0.52;
+  const base = {
+    x: tip.x - direction.x * arrowLength,
+    y: tip.y - direction.y * arrowLength,
+  };
+  const left = {x: base.x - direction.y * halfWidth, y: base.y + direction.x * halfWidth};
+  const right = {x: base.x + direction.y * halfWidth, y: base.y - direction.x * halfWidth};
+  return {
+    ...route,
+    sourceArrowPoints: [tip, left, right]
+      .map((point) => `${format(point.x)},${format(point.y)}`)
+      .join(' '),
   };
 }
 

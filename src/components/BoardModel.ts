@@ -54,6 +54,8 @@ export type BoardEdge = {
   points?: BoardPoint[];
   /** Routing semantics. Feedback edges close a cycle and use an outer lane. */
   role?: BoardEdgeRole;
+  /** Render an arrowhead at the source endpoint, for Mermaid bidirectional edges. */
+  sourceArrow?: boolean;
   sourceId: string;
   sourceSide?: BoardAnchorSide;
   stroke: 'normal' | 'thick' | 'dotted' | 'invisible';

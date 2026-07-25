@@ -416,7 +416,7 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
                                         setHoveredEdgeId((current) => (current === edge.id ? null : current));
                                     }
                                 }, children: [_jsx("path", { d: route.path, className: "de-board__edge-hit" }), _jsx("path", { d: route.path, className: "de-board__edge-path", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-source-id": edge.sourceId, "data-target-id": edge.targetId, "data-stroke": edge.stroke, "data-source-side": route.sourceSide, "data-target-side": route.targetSide }), showEdgeHandles ? (_jsx("g", { className: "de-board__edge-handles", "aria-hidden": "true", children: getRouteSegmentHandles(route.points).map((handle) => (_jsxs("g", { className: "de-board__edge-handle", "data-orientation": handle.orientation, transform: `translate(${format(handle.x)} ${format(handle.y)})`, onPointerDown: (event) => beginEdgeRouteDrag(event, edge.id, handle, route.points), onPointerMove: moveEdgeRouteDrag, onPointerUp: finishEdgeRouteDrag, onPointerCancel: cancelEdgeRouteDrag, children: [_jsx("circle", { className: "de-board__edge-handle-hit", r: "12" }), _jsx("circle", { className: "de-board__edge-handle-dot", r: "4.5" })] }, `${edge.id}-${handle.segmentIndex}`))) })) : null] }, edge.id));
-                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
+                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.sourceArrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.sourceArrowPoints }, `${edge.id}:source`)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "target", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
                         const selected = selectedNodeIds.includes(node.id);
                         const editing = editingNodeId === node.id;
                         const badge = resolveNodeBadge(node.classes);
@@ -1304,9 +1304,10 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             : candidate.feedback
                 ? routeFeedbackEdge(candidate, feedbackLaneIndexes.get(candidate.edge.id) ?? 0, nodes, direction)
                 : routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, laneIndex, candidate.edge.arrow, nodes);
+        const route = applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), bundle ? false : candidate.edge.arrow);
         return {
             edge: candidate.edge,
-            route: applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), bundle ? false : candidate.edge.arrow),
+            route: candidate.edge.sourceArrow ? withSourceArrow(route) : route,
         };
     });
     const trunks = fanInBundles.map(createFanInTrunk);
@@ -2261,6 +2262,33 @@ function finalizeEdgeRoute(points, arrow, sourceSide, targetSide) {
         points: normalized,
         sourceSide,
         targetSide,
+    };
+}
+function withSourceArrow(route) {
+    const tip = route.points[0];
+    const next = route.points[1];
+    if (!tip || !next)
+        return route;
+    const segmentLength = Math.hypot(tip.x - next.x, tip.y - next.y);
+    if (segmentLength < 1)
+        return route;
+    const direction = {
+        x: (tip.x - next.x) / segmentLength,
+        y: (tip.y - next.y) / segmentLength,
+    };
+    const arrowLength = Math.min(11, Math.max(6, segmentLength * 0.58));
+    const halfWidth = arrowLength * 0.52;
+    const base = {
+        x: tip.x - direction.x * arrowLength,
+        y: tip.y - direction.y * arrowLength,
+    };
+    const left = { x: base.x - direction.y * halfWidth, y: base.y + direction.x * halfWidth };
+    const right = { x: base.x + direction.y * halfWidth, y: base.y - direction.x * halfWidth };
+    return {
+        ...route,
+        sourceArrowPoints: [tip, left, right]
+            .map((point) => `${format(point.x)},${format(point.y)}`)
+            .join(' '),
     };
 }
 function applyEdgeRoutePatch(automatic, patch, arrow) {

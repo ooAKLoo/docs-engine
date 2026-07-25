@@ -99,6 +99,27 @@ test('lays out top-level architecture groups as non-overlapping semantic contain
   });
 });
 
+test('renders Mermaid bidirectional and undirected edge endpoints faithfully', async () => {
+  const document = await importMermaid(`flowchart LR
+    device[设备] <-->|双向通道| server[服务]
+    guardian[家长端] ---|只读关系| server
+    server --> runtime[运行时]`);
+  const markup = renderDocument(document);
+
+  assert.equal(
+    [...markup.matchAll(/<polygon[^>]*data-edge-id="flow:0:device:server"[^>]*>/gu)].length,
+    2,
+  );
+  assert.equal(
+    [...markup.matchAll(/<polygon[^>]*data-edge-id="flow:1:guardian:server"[^>]*>/gu)].length,
+    0,
+  );
+  assert.equal(
+    [...markup.matchAll(/<polygon[^>]*data-edge-id="flow:2:server:runtime"[^>]*>/gu)].length,
+    1,
+  );
+});
+
 test('renders sequence participants on one header row and messages on distinct time rows', async () => {
   const document = await importMermaid(`sequenceDiagram
     autonumber
