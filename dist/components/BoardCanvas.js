@@ -11,10 +11,11 @@ const PAIRED_LANE_STEP = 30;
 const EDGE_SOURCE_PORT_GAP = 10;
 const EDGE_TARGET_PORT_GAP = 16;
 const MICRO_JOG_THRESHOLD = 16;
-const FAN_IN_TRUNK_LENGTH = 42;
-const FAN_IN_ROUTE_LABEL_RESERVE = DIRECT_ROUTE_LABEL_RESERVE + FAN_IN_TRUNK_LENGTH;
+const EDGE_BUNDLE_TRUNK_LENGTH = 42;
+const EDGE_BUNDLE_MINIMUM_TRUNK_LENGTH = 18;
+const EDGE_BUNDLE_ROUTE_LABEL_RESERVE = DIRECT_ROUTE_LABEL_RESERVE + EDGE_BUNDLE_TRUNK_LENGTH;
 const ORTHOGONAL_CORNER_RADIUS = 10;
-const FAN_IN_CORNER_LEG = ORTHOGONAL_CORNER_RADIUS * 2;
+const EDGE_BUNDLE_CORNER_LEG = ORTHOGONAL_CORNER_RADIUS * 2;
 const FEEDBACK_LANE_GAP = 24;
 export function BoardCanvas({ accessibleLabel, document: boardDocument, editable, editingNodeId, fitContent = false, onChange, onConnect, onConnectionDrop, onEdgeRouteChange, onEditRequest, onReady, onSelectNode, onSelectEdge, panActive, selectedEdgeId = null, selectedNodeIds = [], }) {
     const svgRef = useRef(null);
@@ -416,7 +417,7 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
                                         setHoveredEdgeId((current) => (current === edge.id ? null : current));
                                     }
                                 }, children: [_jsx("path", { d: route.path, className: "de-board__edge-hit" }), _jsx("path", { d: route.path, className: "de-board__edge-path", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-source-id": edge.sourceId, "data-target-id": edge.targetId, "data-stroke": edge.stroke, "data-source-side": route.sourceSide, "data-target-side": route.targetSide }), showEdgeHandles ? (_jsx("g", { className: "de-board__edge-handles", "aria-hidden": "true", children: getRouteSegmentHandles(route.points).map((handle) => (_jsxs("g", { className: "de-board__edge-handle", "data-orientation": handle.orientation, transform: `translate(${format(handle.x)} ${format(handle.y)})`, onPointerDown: (event) => beginEdgeRouteDrag(event, edge.id, handle, route.points), onPointerMove: moveEdgeRouteDrag, onPointerUp: finishEdgeRouteDrag, onPointerCancel: cancelEdgeRouteDrag, children: [_jsx("circle", { className: "de-board__edge-handle-hit", r: "12" }), _jsx("circle", { className: "de-board__edge-handle-dot", r: "4.5" })] }, `${edge.id}-${handle.segmentIndex}`))) })) : null] }, edge.id));
-                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.sourceArrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.sourceArrowPoints }, `${edge.id}:source`)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "target", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
+                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.sourceArrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.sourceArrowPoints }, `${trunk.key}:source`)) : null), routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.sourceArrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.sourceArrowPoints }, `${edge.id}:source`)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "target", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
                         const selected = selectedNodeIds.includes(node.id);
                         const editing = editingNodeId === node.id;
                         const badge = resolveNodeBadge(node.classes);
@@ -666,7 +667,7 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
     })));
     const maximumPairLane = Math.max(0, ...[...pairLanes.values()].map((lane) => Math.abs(lane)));
     const pairLaneOffset = maximumPairLane > 0 ? pairedLaneOffset(maximumPairLane) : 0;
-    const fanInEdgeIds = fanInEdgeIdsForRankSpacing(flowEdges, graph.direction);
+    const bundledEdgeIds = edgeBundleIdsForRankSpacing(flowEdges, graph.direction);
     const maximumLabelCrossSize = Math.max(0, ...flowEdges.map((edge) => {
         const metrics = naturalEdgeLabelMetrics(edge, measuredEdgeLabels);
         return horizontal ? metrics.height : metrics.width;
@@ -689,12 +690,12 @@ function layoutDiagramGraph(graph, patches, boardLayout, measuredEdgeLabels = ne
                 metrics: naturalEdgeLabelMetrics(edge, measuredEdgeLabels),
                 // Direct routes consume only anchor clearances. A paired route also owns
                 // two 22 px stubs plus the rounded corners around its carrier segment.
-                // Fan-in routes additionally give part of the rank gap to their shared
+                // Bundled routes additionally give part of the rank gap to their shared
                 // collector, so labels must reserve that trunk before nodes are placed.
                 routePadding: pairLanes.has(edge.id)
                     ? PAIRED_ROUTE_LABEL_RESERVE
-                    : fanInEdgeIds.has(edge.id)
-                        ? FAN_IN_ROUTE_LABEL_RESERVE
+                    : bundledEdgeIds.has(edge.id)
+                        ? EDGE_BUNDLE_ROUTE_LABEL_RESERVE
                         : DIRECT_ROUTE_LABEL_RESERVE,
                 sourceRank,
                 targetRank,
@@ -1171,8 +1172,11 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             },
         ];
     });
+    // Bundle semantic ports before obstacle detours choose local sides. Otherwise
+    // three edges leaving one logical output are split into unrelated top/right
+    // ports merely because an intermediate card blocks two of their direct paths.
+    const edgeBundles = assignEdgeBundles(candidates, edgePatches);
     rerouteBlockedFacingCandidates(candidates, nodes, edgePatches);
-    const fanInBundles = assignFanInBundles(candidates, edgePatches);
     const pairLanes = assignDiagramEdgeLanes(candidates.filter(({ feedback }) => !feedback).map(({ edge }) => ({
         id: edge.id,
         sourceId: edge.sourceId,
@@ -1192,8 +1196,10 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
         portGroups.set(key, group);
     };
     candidates.forEach((candidate) => {
-        addPort(candidate, candidate.source, candidate.target, candidate.sourceSide, 'source');
-        if (!candidate.bundleKey) {
+        if (!candidate.sourceBundleKey) {
+            addPort(candidate, candidate.source, candidate.target, candidate.sourceSide, 'source');
+        }
+        if (!candidate.targetBundleKey) {
             addPort(candidate, candidate.target, candidate.source, candidate.targetSide, 'target');
         }
     });
@@ -1254,7 +1260,9 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
     const portGroupSize = (node, side) => portGroups.get(`${node.id}:${side}`)?.length ?? 0;
     candidates.forEach((candidate) => {
         const patch = edgePatches.get(candidate.edge.id);
-        if ((patch?.points.length ?? 0) >= 2 || candidate.bundleKey)
+        if ((patch?.points.length ?? 0) >= 2 ||
+            candidate.sourceBundleKey ||
+            candidate.targetBundleKey)
             return;
         if (oppositeSide(candidate.sourceSide) !== candidate.targetSide)
             return;
@@ -1288,7 +1296,7 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             candidate.targetOffset = targetOffset;
         }
     });
-    const bundlesByKey = new Map(fanInBundles.map((bundle) => [bundle.key, bundle]));
+    const bundlesByKey = new Map(edgeBundles.map((bundle) => [bundle.key, bundle]));
     const feedbackLaneIndexes = new Map(candidates
         .filter(({ feedback }) => feedback)
         .map((candidate, index) => [candidate.edge.id, index]));
@@ -1296,21 +1304,26 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
         const laneIndex = candidate.source.id === candidate.target.id
             ? candidate.index
             : (pairLanes.get(candidate.edge.id) ?? 0);
-        const bundle = candidate.bundleKey
-            ? bundlesByKey.get(candidate.bundleKey)
+        const sourceBundle = candidate.sourceBundleKey
+            ? bundlesByKey.get(candidate.sourceBundleKey)
             : undefined;
-        const automatic = bundle
-            ? routeFanInBranch(candidate, bundle, laneIndex, nodes)
+        const targetBundle = candidate.targetBundleKey
+            ? bundlesByKey.get(candidate.targetBundleKey)
+            : undefined;
+        const automatic = sourceBundle || targetBundle
+            ? routeBundledBranch(candidate, sourceBundle, targetBundle, laneIndex, nodes)
             : candidate.feedback
                 ? routeFeedbackEdge(candidate, feedbackLaneIndexes.get(candidate.edge.id) ?? 0, nodes, direction)
                 : routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, laneIndex, candidate.edge.arrow, nodes);
-        const route = applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), bundle ? false : candidate.edge.arrow);
+        const route = applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), targetBundle ? false : candidate.edge.arrow);
         return {
             edge: candidate.edge,
-            route: candidate.edge.sourceArrow ? withSourceArrow(route) : route,
+            route: candidate.edge.sourceArrow && !sourceBundle
+                ? withSourceArrow(route)
+                : route,
         };
     });
-    const trunks = fanInBundles.map(createFanInTrunk);
+    const trunks = edgeBundles.map(createEdgeBundleTrunk);
     const labelPlacements = placeDiagramEdgeLabels([
         ...routed.map(({ edge, route }) => ({
             align: edge.labelAlign,
@@ -1323,7 +1336,7 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             points: route.points,
         })),
         ...trunks.map((trunk) => ({
-            arrow: true,
+            arrow: Boolean(trunk.arrowPoints || trunk.sourceArrowPoints),
             id: trunk.key,
             label: '',
             points: trunk.points,
@@ -1346,6 +1359,8 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
 function rerouteBlockedFacingCandidates(candidates, nodes, edgePatches) {
     candidates.forEach((candidate) => {
         if (candidate.feedback ||
+            candidate.sourceBundleKey ||
+            candidate.targetBundleKey ||
             candidate.edge.manual ||
             candidate.edge.sourceSide ||
             candidate.edge.targetSide ||
@@ -1375,109 +1390,150 @@ function feedbackAnchorSides(direction) {
         ? { source: 'bottom', target: 'bottom' }
         : { source: 'right', target: 'right' };
 }
-function assignFanInBundles(candidates, edgePatches) {
-    const groups = new Map();
-    candidates.forEach((candidate) => {
-        if (candidate.feedback)
-            return;
-        // A shared collector works naturally for left/right fan-in because each
-        // branch can join a vertical bus without crossing nodes in the same rank.
-        // Top/bottom fan-in is usually produced by stacked nodes; forcing a
-        // horizontal collector there can make an earlier branch loop around the
-        // later source node. Those ports are separated locally instead.
-        if (candidate.targetSide !== 'left' && candidate.targetSide !== 'right')
-            return;
-        const key = `${candidate.target.id}:${candidate.targetSide}`;
-        const group = groups.get(key) ?? [];
-        group.push(candidate);
-        groups.set(key, group);
-    });
+function assignEdgeBundles(candidates, edgePatches) {
+    const directedPairs = new Set(candidates.map(({ source, target }) => `${source.id}\u0000${target.id}`));
+    const eligible = (candidate) => !candidate.feedback &&
+        candidate.edge.arrow &&
+        !candidate.edge.manual &&
+        candidate.source.id !== candidate.target.id &&
+        !directedPairs.has(`${candidate.target.id}\u0000${candidate.source.id}`) &&
+        (edgePatches.get(candidate.edge.id)?.points.length ?? 0) < 2;
     const bundles = [];
-    groups.forEach((members, groupKey) => {
-        if (members.length < 2)
-            return;
-        const sourceIds = new Set(members.map(({ source }) => source.id));
-        const strokes = new Set(members.map(({ edge }) => edge.stroke));
-        const eligible = sourceIds.size === members.length &&
-            strokes.size === 1 &&
-            members.every(({ edge, source, target }) => edge.arrow &&
-                !edge.manual &&
-                source.id !== target.id &&
-                (edgePatches.get(edge.id)?.points.length ?? 0) < 2);
-        if (!eligible)
-            return;
-        const first = members[0];
-        if (!first)
-            return;
-        const bundle = {
-            key: `fan-in:${groupKey}`,
-            members,
-            stroke: first.edge.stroke,
-            target: first.target,
-            targetSide: first.targetSide,
-        };
-        members.forEach((candidate) => {
-            candidate.bundleKey = bundle.key;
-            candidate.targetOffset = 0;
+    const collect = (kind, groupKey, memberNodeId) => {
+        const groups = new Map();
+        candidates.filter(eligible).forEach((candidate) => {
+            const key = groupKey(candidate);
+            const group = groups.get(key) ?? [];
+            group.push(candidate);
+            groups.set(key, group);
         });
-        bundles.push(bundle);
-    });
+        groups.forEach((members, key) => {
+            if (members.length < 2)
+                return;
+            if (new Set(members.map(memberNodeId)).size !== members.length)
+                return;
+            if (new Set(members.map(({ edge }) => edge.stroke)).size !== 1)
+                return;
+            if (kind === 'fan-out' &&
+                new Set(members.map(({ edge }) => Boolean(edge.sourceArrow))).size !== 1) {
+                return;
+            }
+            const first = members[0];
+            if (!first)
+                return;
+            const fanIn = kind === 'fan-in';
+            const node = fanIn ? first.target : first.source;
+            const side = fanIn ? first.targetSide : first.sourceSide;
+            const bundle = {
+                key: `${kind}:${node.id}:${side}`,
+                kind,
+                members,
+                node,
+                side,
+                stroke: first.edge.stroke,
+            };
+            members.forEach((candidate) => {
+                if (fanIn) {
+                    candidate.targetBundleKey = bundle.key;
+                    candidate.targetOffset = 0;
+                }
+                else {
+                    candidate.sourceBundleKey = bundle.key;
+                    candidate.sourceOffset = 0;
+                }
+            });
+            bundles.push(bundle);
+        });
+    };
+    // One edge may participate in both bundles (for example
+    // Product Server → Models is part of a source fan-out and a target fan-in).
+    // Keeping the two endpoint bundles independent lets the middle branch connect
+    // both shared buses without inventing duplicate ports.
+    collect('fan-in', ({ target, targetSide }) => `${target.id}:${targetSide}`, ({ source }) => source.id);
+    collect('fan-out', ({ source, sourceSide }) => `${source.id}:${sourceSide}`, ({ target }) => target.id);
     return bundles;
 }
-function fanInEdgeIdsForRankSpacing(edges, direction) {
-    if (direction !== 'LR' && direction !== 'RL')
-        return new Set();
-    const automaticTargetSide = direction === 'RL' ? 'right' : 'left';
-    const groups = new Map();
-    edges.forEach((edge) => {
-        if (!edge.arrow ||
-            edge.manual ||
-            edge.sourceId === edge.targetId ||
-            (edge.points?.length ?? 0) >= 2)
-            return;
-        const targetSide = edge.targetSide ?? automaticTargetSide;
-        if (targetSide !== 'left' && targetSide !== 'right')
-            return;
-        const key = `${edge.targetId}:${targetSide}`;
-        const group = groups.get(key) ?? [];
-        group.push(edge);
-        groups.set(key, group);
-    });
+function edgeBundleIdsForRankSpacing(edges, direction) {
     const ids = new Set();
-    groups.forEach((group) => {
-        if (group.length < 2)
-            return;
-        const sourceIds = new Set(group.map((edge) => edge.sourceId));
-        const strokes = new Set(group.map((edge) => edge.stroke));
-        if (sourceIds.size !== group.length || strokes.size !== 1)
-            return;
-        group.forEach((edge) => ids.add(edge.id));
-    });
+    const automaticSides = direction === 'RL'
+        ? { source: 'left', target: 'right' }
+        : direction === 'TB'
+            ? { source: 'bottom', target: 'top' }
+            : direction === 'BT'
+                ? { source: 'top', target: 'bottom' }
+                : { source: 'right', target: 'left' };
+    const directedPairs = new Set(edges.map((edge) => `${edge.sourceId}\u0000${edge.targetId}`));
+    const eligible = edges.filter((edge) => edge.arrow &&
+        !edge.manual &&
+        edge.sourceId !== edge.targetId &&
+        !directedPairs.has(`${edge.targetId}\u0000${edge.sourceId}`) &&
+        (edge.points?.length ?? 0) < 2);
+    const collect = (groupKey, memberNodeId) => {
+        const groups = new Map();
+        eligible.forEach((edge) => {
+            const key = groupKey(edge);
+            const group = groups.get(key) ?? [];
+            group.push(edge);
+            groups.set(key, group);
+        });
+        groups.forEach((group) => {
+            if (group.length < 2 ||
+                new Set(group.map(memberNodeId)).size !== group.length ||
+                new Set(group.map((edge) => edge.stroke)).size !== 1) {
+                return;
+            }
+            group.forEach((edge) => ids.add(edge.id));
+        });
+    };
+    collect((edge) => `${edge.targetId}:${edge.targetSide ?? automaticSides.target}`, (edge) => edge.sourceId);
+    collect((edge) => `${edge.sourceId}:${edge.sourceSide ?? automaticSides.source}`, (edge) => edge.targetId);
     return ids;
 }
-function fanInCollectorCenter(bundle) {
-    const tip = anchorPoint(bundle.target, bundle.targetSide, 0, 14);
-    const vector = sideVector(bundle.targetSide);
+function edgeBundleEndpoint(bundle) {
+    return anchorPoint(bundle.node, bundle.side, 0, bundle.kind === 'fan-in' ? 14 : 10);
+}
+function edgeBundleMemberAnchor(candidate, bundle) {
+    return bundle.kind === 'fan-in'
+        ? anchorPoint(candidate.source, candidate.sourceSide, candidate.sourceOffset, 10)
+        : anchorPoint(candidate.target, candidate.targetSide, candidate.targetOffset, 14);
+}
+function edgeBundleTrunkLength(bundle) {
+    const endpoint = edgeBundleEndpoint(bundle);
+    const vector = sideVector(bundle.side);
+    const forwardDistances = bundle.members.flatMap((candidate) => {
+        const member = edgeBundleMemberAnchor(candidate, bundle);
+        const distance = (member.x - endpoint.x) * vector.x + (member.y - endpoint.y) * vector.y;
+        return distance > 0 ? [distance] : [];
+    });
+    if (forwardDistances.length === 0)
+        return EDGE_BUNDLE_TRUNK_LENGTH;
+    const nearest = Math.min(...forwardDistances);
+    return Math.max(8, Math.min(EDGE_BUNDLE_TRUNK_LENGTH, Math.max(EDGE_BUNDLE_MINIMUM_TRUNK_LENGTH, nearest * 0.38), Math.max(8, nearest - 8)));
+}
+function edgeBundleCollectorCenter(bundle) {
+    const endpoint = edgeBundleEndpoint(bundle);
+    const vector = sideVector(bundle.side);
+    const length = edgeBundleTrunkLength(bundle);
     return {
-        x: tip.x + vector.x * FAN_IN_TRUNK_LENGTH,
-        y: tip.y + vector.y * FAN_IN_TRUNK_LENGTH,
+        x: endpoint.x + vector.x * length,
+        y: endpoint.y + vector.y * length,
     };
 }
-function fanInBranchJoin(candidate, bundle) {
-    const collector = fanInCollectorCenter(bundle);
-    const start = anchorPoint(candidate.source, candidate.sourceSide, candidate.sourceOffset, 10);
-    return bundle.targetSide === 'left' || bundle.targetSide === 'right'
-        ? { x: collector.x, y: start.y }
-        : { x: start.x, y: collector.y };
+function edgeBundleBranchJoin(candidate, bundle) {
+    const collector = edgeBundleCollectorCenter(bundle);
+    const member = edgeBundleMemberAnchor(candidate, bundle);
+    return bundle.side === 'left' || bundle.side === 'right'
+        ? { x: collector.x, y: member.y }
+        : { x: member.x, y: collector.y };
 }
-function fanInCollectorGeometry(bundle) {
-    const collector = fanInCollectorCenter(bundle);
+function edgeBundleCollectorGeometry(bundle) {
+    const collector = edgeBundleCollectorCenter(bundle);
     const joins = bundle.members.map((candidate) => ({
         candidate,
-        point: fanInBranchJoin(candidate, bundle),
+        point: edgeBundleBranchJoin(candidate, bundle),
     }));
-    const horizontalTarget = bundle.targetSide === 'left' || bundle.targetSide === 'right';
-    const axisValue = (point) => horizontalTarget ? point.y : point.x;
+    const horizontalStem = bundle.side === 'left' || bundle.side === 'right';
+    const axisValue = (point) => horizontalStem ? point.y : point.x;
     const collectorAxis = axisValue(collector);
     const joinAxes = joins.map(({ point }) => axisValue(point));
     const minimumJoinAxis = Math.min(...joinAxes);
@@ -1485,19 +1541,19 @@ function fanInCollectorGeometry(bundle) {
     const minimumAxis = Math.min(collectorAxis, minimumJoinAxis);
     const maximumAxis = Math.max(collectorAxis, maximumJoinAxis);
     const minimumCornerLeg = minimumJoinAxis < collectorAxis
-        ? Math.min(FAN_IN_CORNER_LEG, collectorAxis - minimumJoinAxis)
+        ? Math.min(EDGE_BUNDLE_CORNER_LEG, collectorAxis - minimumJoinAxis)
         : 0;
     const maximumCornerLeg = maximumJoinAxis > collectorAxis
-        ? Math.min(FAN_IN_CORNER_LEG, maximumJoinAxis - collectorAxis)
+        ? Math.min(EDGE_BUNDLE_CORNER_LEG, maximumJoinAxis - collectorAxis)
         : 0;
-    const pointAtAxis = (point, axis) => horizontalTarget ? { ...point, y: axis } : { ...point, x: axis };
+    const pointAtAxis = (point, axis) => horizontalStem ? { ...point, y: axis } : { ...point, x: axis };
     return {
         axisValue,
         collector,
         collectorAxis,
         collectorEnd: pointAtAxis(collector, maximumAxis - maximumCornerLeg),
         collectorStart: pointAtAxis(collector, minimumAxis + minimumCornerLeg),
-        horizontalTarget,
+        horizontalStem,
         joins,
         maximumCornerLeg,
         maximumJoinAxis,
@@ -1506,45 +1562,86 @@ function fanInCollectorGeometry(bundle) {
         pointAtAxis,
     };
 }
-function routeFanInBranch(candidate, bundle, laneIndex, obstacles) {
-    const join = fanInBranchJoin(candidate, bundle);
-    const geometry = fanInCollectorGeometry(bundle);
-    const virtualTarget = {
+function edgeBundleJoinContinuation(candidate, bundle) {
+    const join = edgeBundleBranchJoin(candidate, bundle);
+    const geometry = edgeBundleCollectorGeometry(bundle);
+    const joinAxis = geometry.axisValue(join);
+    if (Math.abs(joinAxis - geometry.minimumJoinAxis) < 0.1 &&
+        geometry.minimumCornerLeg > 0) {
+        return geometry.pointAtAxis(join, joinAxis + geometry.minimumCornerLeg);
+    }
+    if (Math.abs(joinAxis - geometry.maximumJoinAxis) < 0.1 &&
+        geometry.maximumCornerLeg > 0) {
+        return geometry.pointAtAxis(join, joinAxis - geometry.maximumCornerLeg);
+    }
+    return undefined;
+}
+function routeBundledBranch(candidate, sourceBundle, targetBundle, laneIndex, obstacles) {
+    const sourceJoin = sourceBundle
+        ? edgeBundleBranchJoin(candidate, sourceBundle)
+        : undefined;
+    const targetJoin = targetBundle
+        ? edgeBundleBranchJoin(candidate, targetBundle)
+        : undefined;
+    const virtualSource = {
         classes: [],
         height: 0,
-        id: `__fan-in:${candidate.edge.id}`,
+        id: `__fan-out:${candidate.edge.id}`,
         label: '',
-        position: join,
+        position: sourceJoin ?? candidate.source.position,
         shape: 'rect',
         textLines: [],
         tone: 'neutral',
         width: 0,
     };
-    const automatic = routeEdge(candidate.source, virtualTarget, candidate.sourceSide, bundle.targetSide, candidate.sourceOffset, 0, laneIndex, false, obstacles);
-    const points = automatic.points.length > 1
-        ? [...automatic.points.slice(0, -1), join]
-        : automatic.points;
-    const joinAxis = geometry.axisValue(join);
-    const collectorContinuation = Math.abs(joinAxis - geometry.minimumJoinAxis) < 0.1 &&
-        geometry.minimumCornerLeg > 0
-        ? geometry.pointAtAxis(join, joinAxis + geometry.minimumCornerLeg)
-        : Math.abs(joinAxis - geometry.maximumJoinAxis) < 0.1 &&
-            geometry.maximumCornerLeg > 0
-            ? geometry.pointAtAxis(join, joinAxis - geometry.maximumCornerLeg)
-            : undefined;
-    return finalizeEdgeRoute(collectorContinuation ? [...points, collectorContinuation] : points, false, candidate.sourceSide, bundle.targetSide);
+    const virtualTarget = {
+        ...virtualSource,
+        id: `__fan-in:${candidate.edge.id}`,
+        position: targetJoin ?? candidate.target.position,
+    };
+    const automatic = routeEdge(sourceBundle ? virtualSource : candidate.source, targetBundle ? virtualTarget : candidate.target, candidate.sourceSide, candidate.targetSide, sourceBundle ? 0 : candidate.sourceOffset, targetBundle ? 0 : candidate.targetOffset, laneIndex, candidate.edge.arrow && !targetBundle, obstacles);
+    let points = automatic.points;
+    if (sourceJoin && points.length > 1) {
+        points = [sourceJoin, ...points.slice(1)];
+    }
+    if (targetJoin && points.length > 1) {
+        points = [...points.slice(0, -1), targetJoin];
+    }
+    const sourceContinuation = sourceBundle
+        ? edgeBundleJoinContinuation(candidate, sourceBundle)
+        : undefined;
+    const targetContinuation = targetBundle
+        ? edgeBundleJoinContinuation(candidate, targetBundle)
+        : undefined;
+    if (sourceContinuation)
+        points = [sourceContinuation, ...points];
+    if (targetContinuation)
+        points = [...points, targetContinuation];
+    return finalizeEdgeRoute(points, candidate.edge.arrow && !targetBundle, candidate.sourceSide, candidate.targetSide);
 }
-function createFanInTrunk(bundle) {
-    const geometry = fanInCollectorGeometry(bundle);
+function createEdgeBundleTrunk(bundle) {
+    const geometry = edgeBundleCollectorGeometry(bundle);
     const { collector, collectorAxis, collectorEnd, collectorStart } = geometry;
-    const tip = anchorPoint(bundle.target, bundle.targetSide, 0, 14);
+    const endpoint = edgeBundleEndpoint(bundle);
     const collectorBeforeJoins = collectorAxis < geometry.minimumJoinAxis;
     const collectorAfterJoins = collectorAxis > geometry.maximumJoinAxis;
-    const trunk = finalizeEdgeRoute(collectorBeforeJoins
-        ? [collectorEnd, collector, tip]
+    const collectorConnection = collectorBeforeJoins
+        ? collectorEnd
         : collectorAfterJoins
-            ? [collectorStart, collector, tip]
-            : [collector, tip], true, oppositeSide(bundle.targetSide), bundle.targetSide);
+            ? collectorStart
+            : undefined;
+    const stemPoints = bundle.kind === 'fan-in'
+        ? collectorConnection
+            ? [collectorConnection, collector, endpoint]
+            : [collector, endpoint]
+        : collectorConnection
+            ? [endpoint, collector, collectorConnection]
+            : [endpoint, collector];
+    let trunk = finalizeEdgeRoute(stemPoints, bundle.kind === 'fan-in', bundle.kind === 'fan-in' ? oppositeSide(bundle.side) : bundle.side, bundle.kind === 'fan-in' ? bundle.side : oppositeSide(bundle.side));
+    if (bundle.kind === 'fan-out' &&
+        bundle.members.every(({ edge }) => edge.sourceArrow)) {
+        trunk = withSourceArrow(trunk);
+    }
     const collectorPath = !collectorBeforeJoins &&
         !collectorAfterJoins &&
         Math.hypot(collectorEnd.x - collectorStart.x, collectorEnd.y - collectorStart.y) >= 0.1
@@ -1556,6 +1653,7 @@ function createFanInTrunk(bundle) {
         key: bundle.key,
         path: [collectorPath, trunk.path].filter(Boolean).join(' '),
         points: trunk.points,
+        sourceArrowPoints: trunk.sourceArrowPoints,
         stroke: bundle.stroke,
     };
 }

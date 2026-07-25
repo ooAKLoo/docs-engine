@@ -258,6 +258,83 @@ test('distributes coincident same-side ports instead of overpainting one shared 
   assert.equal(secondEndpoint.y, 165);
 });
 
+test('routes same-side fan-out and fan-in through centered shared trunks', async () => {
+  const document = await importMermaid(`flowchart TB
+    subgraph Execution[3 · 执行与真实结果]
+      mode{executionMode}
+      llm[LLM → Streaming TTS]
+      media[Media Playback]
+      action[Device Action / no_output]
+      outcome[Turn Outcome]
+      mode -->|文本生成| llm --> outcome
+      mode -->|录音内容| media --> outcome
+      mode -->|动作 / 静默| action --> outcome
+    end`);
+  const markup = renderDocument(document);
+  const fanOutPath = markup.match(
+    /data-de-bundle-key="fan-out:mode:bottom"[^>]*><path d="([^"]+)"/u,
+  )?.[1] ?? '';
+  const fanInPath = markup.match(
+    /data-de-bundle-key="fan-in:outcome:top"[^>]*><path d="([^"]+)"/u,
+  )?.[1] ?? '';
+  const modeX = Number(markup.match(
+    /data-de-node-id="mode"[^>]*transform="translate\(([-\d.]+)/u,
+  )?.[1]);
+  const outcomeX = Number(markup.match(
+    /data-de-node-id="outcome"[^>]*transform="translate\(([-\d.]+)/u,
+  )?.[1]);
+
+  assert.equal((markup.match(/data-de-bundle-key="fan-out:mode:bottom"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/data-de-bundle-key="fan-in:outcome:top"/gu) ?? []).length, 2);
+  assert.match(fanOutPath, new RegExp(`M ${modeX} [-\\d.]+ L ${modeX} [-\\d.]+`, 'u'));
+  assert.match(fanInPath, new RegExp(`M ${outcomeX} [-\\d.]+ L ${outcomeX} [-\\d.]+`, 'u'));
+
+  const outgoingStarts = [
+    edgePath(markup, 'flow:0:mode:llm'),
+    edgePath(markup, 'flow:2:mode:media'),
+    edgePath(markup, 'flow:4:mode:action'),
+  ].map((path) => linePoints(path)[0]);
+  assert.equal(new Set(outgoingStarts.map(({y}) => y)).size, 1);
+  assert.equal(new Set(outgoingStarts.map(({x}) => x)).size, 3);
+
+  for (const id of [
+    'flow:1:llm:outcome',
+    'flow:3:media:outcome',
+    'flow:5:action:outcome',
+  ]) {
+    assert.doesNotMatch(markup, new RegExp(`<polygon[^>]*data-edge-id="${id}"`, 'u'));
+  }
+});
+
+test('lets one edge connect a source fan-out bus to a target fan-in bus', async () => {
+  const document = await importMermaid(`flowchart LR
+    subgraph Lula[Lula]
+      server[Product Server]
+      worker[Conversation Lab Worker]
+    end
+    subgraph External[外部基础能力]
+      models[ASR / LLM / TTS]
+      database[(Postgres)]
+      assets[(OSS / CDN)]
+    end
+    server --> models
+    server --> database
+    server --> assets
+    worker --> models`);
+  const markup = renderDocument(document);
+  const sharedEdgeId = 'flow:0:server:models';
+  const sourceBundle = markup.match(
+    /data-de-bundle-key="fan-out:server:right"[^>]*data-edge-ids="([^"]+)"/u,
+  )?.[1] ?? '';
+  const targetBundle = markup.match(
+    /data-de-bundle-key="fan-in:models:left"[^>]*data-edge-ids="([^"]+)"/u,
+  )?.[1] ?? '';
+
+  assert.match(sourceBundle, new RegExp(sharedEdgeId, 'u'));
+  assert.match(targetBundle, new RegExp(sharedEdgeId, 'u'));
+  assert.ok(edgePath(markup, sharedEdgeId).length > 0);
+});
+
 test('snaps nearly aligned automatic endpoints onto one truly straight axis', () => {
   const document = {
     version: 1,
@@ -435,7 +512,7 @@ test('keeps authored centre pins fixed while separating automatic neighbours', (
   assert.equal(pathEndpoint(edgePath(markup, 'automatic')).y, 150);
 });
 
-test('bundles the Lula fan-in into one shared trunk and keeps blocked vertical flow outside nodes', async () => {
+test('bundles every eligible Lula fan-in around a single semantic target port', async () => {
   const document = await importMermaid(`flowchart LR
     subgraph facts[儿童事实]
         memory[(长期记忆与画像)]
@@ -467,8 +544,9 @@ test('bundles the Lula fan-in into one shared trunk and keeps blocked vertical f
     trunk[1],
     'flow:0:memory:selector flow:1:conversation:selector flow:2:activity:selector',
   );
-  assert.equal((markup.match(/class="de-board__edge-trunk"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/class="de-board__edge-trunk"/gu) ?? []).length, 2);
   assert.equal((markup.match(/data-de-bundle-key="fan-in:selector:left"/gu) ?? []).length, 2);
+  assert.equal((markup.match(/data-de-bundle-key="fan-in:agent:top"/gu) ?? []).length, 2);
   for (const id of [
     'flow:0:memory:selector',
     'flow:1:conversation:selector',
@@ -485,11 +563,12 @@ test('bundles the Lula fan-in into one shared trunk and keeps blocked vertical f
   assert.equal(new Set(branchEndpoints.map(({x}) => x)).size, 1);
   assert.equal(new Set(branchEndpoints.map(({y}) => y)).size, 3);
 
-  const blocked = edgeMarkup(markup, 'flow:4:context:agent');
-  const direct = edgePath(markup, 'flow:5:prompt:agent');
-  assert.match(blocked, /data-source-side="left"/u);
-  assert.match(blocked, /data-target-side="left"/u);
-  assert.match(direct, /^M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+$/u);
+  const agentBranches = [
+    edgePath(markup, 'flow:4:context:agent'),
+    edgePath(markup, 'flow:5:prompt:agent'),
+  ].map(pathEndpoint);
+  assert.equal(new Set(agentBranches.map(({x}) => x)).size, 1);
+  assert.equal(new Set(agentBranches.map(({y}) => y)).size, 1);
 });
 
 test('rounds fan-in endpoint turns while preserving the central T junction', async () => {
@@ -536,9 +615,9 @@ test('rounds fan-in endpoint turns while preserving the central T junction', asy
   assert.ok(dependencyLabel, '短关系标签必须保留为一行');
   assert.doesNotMatch(dependencyLabel[1], /data-floating/u);
   assert.equal((dependencyLabel[2].match(/<tspan/gu) ?? []).length, 1);
-  assert.doesNotMatch(
-    edgePath(markup, 'entity:2:entity:ContentLibraryAdapter:entity:ContentAssetRegistry'),
-    / A /u,
+  assert.match(
+    markup,
+    /data-de-bundle-key="fan-out:entity:ContentLibraryAdapter:right"[^>]*data-edge-ids="[^"]*entity:2:entity:ContentLibraryAdapter:entity:ContentAssetRegistry[^"]*"/u,
   );
 });
 
