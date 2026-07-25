@@ -46,6 +46,11 @@ export type DocBlock = {
         caption?: string;
     }>;
 } | {
+    type: 'video';
+    src: string;
+    title: string;
+    poster?: string;
+} | {
     type: 'callout';
     variant: CalloutVariant;
     title: string;

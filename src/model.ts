@@ -32,6 +32,7 @@ export type DocBlock =
   | {type: 'formula'; lines: string[]; compact?: boolean}
   | {type: 'image'; src: string; alt: string; caption?: string}
   | {type: 'imageGrid'; images: Array<{src: string; alt: string; caption?: string}>}
+  | {type: 'video'; src: string; title: string; poster?: string}
   | {type: 'callout'; variant: CalloutVariant; title: string; body: string[]}
   | {type: 'table'; headers: string[]; rows: string[][]; statusOptions?: string[]}
   | {

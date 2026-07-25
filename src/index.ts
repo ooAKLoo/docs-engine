@@ -73,6 +73,7 @@ export {
   type TransitionPartProps,
   type TransitionProps,
 } from './components/Transition.js';
+export {Video, type VideoProps} from './components/Video.js';
 export type {
   CalloutVariant,
   DocBlock,

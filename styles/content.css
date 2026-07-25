@@ -157,6 +157,26 @@
   outline-offset: 3px;
 }
 
+:where(.de-prose) .de-video {
+  margin: 1.75rem 0 2.125rem;
+}
+
+:where(.de-prose) .de-video > video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #101216;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+}
+
+:where(.de-prose) .de-video > figcaption {
+  margin-top: 0.625rem;
+  color: var(--de-ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 :where(.de-prose) .de-code-block {
   overflow: hidden;
   margin: 1rem 0;

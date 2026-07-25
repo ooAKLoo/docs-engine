@@ -18,4 +18,5 @@ export { Table } from './components/Table.js';
 export { TableScroll } from './components/TableScroll.js';
 export { Timeline, } from './components/Timeline.js';
 export { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, } from './components/Transition.js';
+export { Video } from './components/Video.js';
 //# sourceMappingURL=index.js.map
