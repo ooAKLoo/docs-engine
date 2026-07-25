@@ -1,10 +1,11 @@
 export { Annotation } from './components/Annotation.js';
 export { Callout } from './components/Callout.js';
 export { CodeBlock } from './components/CodeBlock.js';
+export { DocumentCopyButton, serializeDocumentToMarkdown, } from './components/DocumentCopy.js';
 export { Board, } from './components/Board.js';
 export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImporter.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
-export { applyBoardOperation } from './components/BoardModel.js';
+export { applyBoardOperation, serializeBoardDocument, } from './components/BoardModel.js';
 export { DocumentContent } from './components/DocumentContent.js';
 export { Formula } from './components/Formula.js';
 export { Priority } from './components/Priority.js';

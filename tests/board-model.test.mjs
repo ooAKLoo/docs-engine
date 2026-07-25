@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   applyBoardOperation,
   detectBoardFeedbackEdgeIds,
+  serializeBoardDocument,
 } from '../dist/components/BoardModel.js';
 
 const document = {
@@ -114,4 +115,59 @@ test('detects cycle-closing edges while preserving explicit routing roles', () =
   ]);
 
   assert.deepEqual([...detected], ['c-a', 'explicit-feedback']);
+});
+
+test('serializes every semantic Board object without renderer geometry', () => {
+  const markdown = serializeBoardDocument(
+    {
+      direction: 'TB',
+      diagramKind: 'flowchart',
+      edges: [
+        {
+          arrow: true,
+          id: 'visible',
+          label: '触发',
+          points: [{x: 100, y: 200}],
+          sourceId: 'a',
+          stroke: 'dotted',
+          targetId: 'b',
+        },
+        {
+          arrow: false,
+          id: 'layout-only',
+          label: '',
+          sourceId: 'a',
+          stroke: 'invisible',
+          targetId: 'b',
+        },
+      ],
+      groups: [
+        {
+          id: 'runtime',
+          label: '运行时',
+          nodeIds: ['a', 'b'],
+        },
+      ],
+      nodes: [
+        {
+          classes: [],
+          id: 'a',
+          label: '输入<br/>Context',
+          position: {x: 100, y: 200},
+          shape: 'round',
+          tone: 'blue',
+        },
+        {classes: [], id: 'b', label: '输出', shape: 'round', tone: 'green'},
+      ],
+      version: 1,
+    },
+    {title: '实时链路'},
+  );
+
+  assert.match(markdown, /^### 实时链路/m);
+  assert.match(markdown, /类型：流程或组件关系；阅读方向：从上到下。/);
+  assert.match(markdown, /分组：\n- 运行时（`runtime`）：输入 \/ Context、输出/);
+  assert.match(markdown, /节点：\n- 输入 \/ Context（`a`）\n- 输出（`b`）/);
+  assert.match(markdown, /输入 \/ Context（`a`） → 输出（`b`）：触发（虚线）/);
+  assert.doesNotMatch(markdown, /layout-only|100|200|position|tone/);
 });

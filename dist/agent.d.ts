@@ -7,5 +7,6 @@
  */
 export { detectMermaidDiagramKind, importMermaid } from './components/MermaidImporter.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, type BoardLayoutDiagnostic, type BoardLayoutDiagnosticCode, type BoardLayoutDiagnosticSeverity, type BoardLayoutValidationOptions, } from './components/BoardLayout.js';
-export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardEdge, BoardEdgeRole, BoardGroup, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardNode, BoardNodeShape, BoardNodeTone, BoardPoint, } from './components/BoardModel.js';
+export { serializeBoardDocument } from './components/BoardModel.js';
+export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardEdge, BoardEdgeRole, BoardGroup, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardMarkdownOptions, BoardNode, BoardNodeShape, BoardNodeTone, BoardPoint, } from './components/BoardModel.js';
 //# sourceMappingURL=agent.d.ts.map

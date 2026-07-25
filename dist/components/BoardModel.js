@@ -41,6 +41,95 @@ export function detectBoardFeedbackEdgeIds(edges) {
     });
     return feedback;
 }
+const boardDirectionLabels = {
+    BT: '从下到上',
+    LR: '从左到右',
+    RL: '从右到左',
+    TB: '从上到下',
+};
+const boardDiagramKindLabels = {
+    class: '类与接口',
+    er: '实体关系',
+    flowchart: '流程或组件关系',
+    gantt: '甘特计划',
+    git: '版本分支',
+    mindmap: '思维导图',
+    pie: '占比',
+    sequence: '时序',
+    state: '状态机',
+    timeline: '时间线',
+};
+function decodeBoardLabel(value) {
+    return value
+        .replace(/<br\s*\/?>/giu, ' / ')
+        .replace(/<[^>]+>/gu, '')
+        .replace(/&amp;/gu, '&')
+        .replace(/&lt;/gu, '<')
+        .replace(/&gt;/gu, '>')
+        .replace(/&quot;/gu, '"')
+        .replace(/&#(?:39|x27);/giu, "'")
+        .replace(/\s+/gu, ' ')
+        .trim();
+}
+function boardEdgeConnector(edge) {
+    if (edge.sourceArrow && edge.arrow)
+        return '↔';
+    if (edge.sourceArrow)
+        return '←';
+    if (edge.arrow)
+        return '→';
+    return '—';
+}
+/**
+ * Export every semantic Board object as readable Markdown. Geometry, colours
+ * and interaction state are intentionally omitted: copied documents preserve
+ * groups, nodes and relationships rather than renderer implementation details.
+ */
+export function serializeBoardDocument(document, options = {}) {
+    const title = decodeBoardLabel(options.title ?? '图表') || '图表';
+    const headingLevel = options.headingLevel ?? 3;
+    const nodesById = new Map(document.nodes.map((node) => [node.id, node]));
+    const groupsById = new Map((document.groups ?? []).map((group) => [group.id, group]));
+    const lines = [
+        `${'#'.repeat(headingLevel)} ${title}`,
+        '',
+        `类型：${document.diagramKind ? boardDiagramKindLabels[document.diagramKind] : '关系图'}；阅读方向：${boardDirectionLabels[document.direction]}。`,
+    ];
+    if (document.groups?.length) {
+        lines.push('', '分组：');
+        document.groups.forEach((group) => {
+            const parent = group.parentId ? groupsById.get(group.parentId) : undefined;
+            const members = group.nodeIds
+                .map((nodeId) => nodesById.get(nodeId))
+                .filter((node) => Boolean(node))
+                .map((node) => decodeBoardLabel(node.label) || node.id);
+            const parentCopy = parent ? `；上级分组：${decodeBoardLabel(parent.label) || parent.id}` : '';
+            lines.push(`- ${decodeBoardLabel(group.label) || group.id}（\`${group.id}\`）：${members.join('、') || '无节点'}${parentCopy}`);
+        });
+    }
+    lines.push('', '节点：');
+    document.nodes.forEach((node) => {
+        lines.push(`- ${decodeBoardLabel(node.label) || node.id}（\`${node.id}\`）`);
+    });
+    const visibleEdges = document.edges.filter((edge) => edge.stroke !== 'invisible');
+    if (visibleEdges.length) {
+        lines.push('', '关系：');
+        visibleEdges.forEach((edge) => {
+            const source = nodesById.get(edge.sourceId);
+            const target = nodesById.get(edge.targetId);
+            const sourceCopy = decodeBoardLabel(source?.label ?? '') || edge.sourceId;
+            const targetCopy = decodeBoardLabel(target?.label ?? '') || edge.targetId;
+            const relation = decodeBoardLabel(edge.label);
+            const qualifiers = [
+                edge.stroke === 'dotted' ? '虚线' : '',
+                edge.stroke === 'thick' ? '强调线' : '',
+                edge.role === 'feedback' ? '反馈关系' : '',
+            ].filter(Boolean);
+            lines.push(`- ${sourceCopy}（\`${edge.sourceId}\`） ${boardEdgeConnector(edge)} ${targetCopy}（\`${edge.targetId}\`）${relation ? `：${relation}` : ''}${qualifiers.length ? `（${qualifiers.join('、')}）` : ''}`);
+        });
+    }
+    return `${lines.join('\n').trim()}\n`;
+}
 /** Pure reducer used by every Board editing surface and suitable for host-side persistence. */
 export function applyBoardOperation(document, operation) {
     if (operation.type === 'update-node-label') {

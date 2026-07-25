@@ -7,4 +7,5 @@
  */
 export { detectMermaidDiagramKind, importMermaid } from './components/MermaidImporter.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
+export { serializeBoardDocument } from './components/BoardModel.js';
 //# sourceMappingURL=agent.js.map

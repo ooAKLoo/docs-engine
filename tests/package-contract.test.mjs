@@ -71,10 +71,15 @@ test('exports a ChatGPT-style code block with language and copy controls', async
     new URL('../src/components/CodeBlock.tsx', import.meta.url),
     'utf8',
   );
+  const clipboard = await readFile(
+    new URL('../src/components/Clipboard.ts', import.meta.url),
+    'utf8',
+  );
   assert.match(index, /CodeBlock/);
   assert.match(docusaurusAdapter, /pre:\s*CodeBlock/);
   assert.match(codeBlock, /de-code-block__toolbar/);
-  assert.match(codeBlock, /navigator\.clipboard/);
+  assert.match(codeBlock, /writeClipboardText/);
+  assert.match(clipboard, /navigator\.clipboard/);
   assert.match(codeBlock, /copyLabel = '复制代码'/);
   assert.match(codeBlock, /<code>\{codeText\}<\/code>/);
   assert.doesNotMatch(codeBlock, /\{content\}/);
@@ -88,6 +93,37 @@ test('exports a ChatGPT-style code block with language and copy controls', async
   assert.match(styles, /> \.de-code-block__pre > code/);
   assert.match(styles, /background:\s*transparent !important/);
   assert.match(styles, /!important/);
+});
+
+test('publishes one document-level semantic copy boundary for Docusaurus', async () => {
+  const docItemContent = await readFile(
+    new URL('../src/docusaurus-theme/DocItem/Content/index.tsx', import.meta.url),
+    'utf8',
+  );
+  const documentCopy = await readFile(
+    new URL('../src/components/DocumentCopy.tsx', import.meta.url),
+    'utf8',
+  );
+  const board = await readFile(
+    new URL('../src/components/Board.tsx', import.meta.url),
+    'utf8',
+  );
+  const boardModel = await readFile(
+    new URL('../src/components/BoardModel.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(docItemContent, /@theme-original\/DocItem\/Content/);
+  assert.match(docItemContent, /<DocumentCopyButton rootRef=\{rootRef\}/);
+  assert.match(documentCopy, /serializeDocumentToMarkdown/);
+  assert.match(documentCopy, /data-de-board-semantic/);
+  assert.match(documentCopy, /copyLabel = '复制全文'/);
+  assert.match(board, /data-de-board-semantic/);
+  assert.match(board, /serializeBoardDocument/);
+  assert.match(boardModel, /export function serializeBoardDocument/);
+  assert.match(index, /DocumentCopyButton/);
+  assert.match(index, /serializeBoardDocument/);
+  assert.match(agent, /serializeBoardDocument/);
+  assert.match(styles, /\.de-document-copy/);
 });
 
 test('exports an explicit native LaTeX formula block without guessing prose semantics', async () => {

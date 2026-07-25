@@ -15,6 +15,7 @@ export {
   type BoardLayoutDiagnosticSeverity,
   type BoardLayoutValidationOptions,
 } from './components/BoardLayout.js';
+export {serializeBoardDocument} from './components/BoardModel.js';
 export type {
   BoardAnchorSide,
   BoardCanvasSize,
@@ -27,6 +28,7 @@ export type {
   BoardImportEdgeLayout,
   BoardImportLayout,
   BoardImportNodeLayout,
+  BoardMarkdownOptions,
   BoardNode,
   BoardNodeShape,
   BoardNodeTone,

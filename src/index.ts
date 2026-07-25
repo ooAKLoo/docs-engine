@@ -2,6 +2,11 @@ export {Annotation, type AnnotationProps} from './components/Annotation.js';
 export {Callout, type CalloutProps} from './components/Callout.js';
 export {CodeBlock, type CodeBlockProps} from './components/CodeBlock.js';
 export {
+  DocumentCopyButton,
+  serializeDocumentToMarkdown,
+  type DocumentCopyButtonProps,
+} from './components/DocumentCopy.js';
+export {
   Board,
   type BoardMediaChange,
   type BoardMediaTransform,
@@ -18,7 +23,10 @@ export {
   type BoardLayoutDiagnosticSeverity,
   type BoardLayoutValidationOptions,
 } from './components/BoardLayout.js';
-export {applyBoardOperation} from './components/BoardModel.js';
+export {
+  applyBoardOperation,
+  serializeBoardDocument,
+} from './components/BoardModel.js';
 export type {
   BoardAnchorSide,
   BoardCanvasSize,
@@ -34,6 +42,7 @@ export type {
   BoardImportLayout,
   BoardImportNodeLayout,
   BoardImportSource,
+  BoardMarkdownOptions,
   BoardNode,
   BoardNodeShape,
   BoardNodeTone,

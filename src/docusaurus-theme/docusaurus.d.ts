@@ -47,3 +47,17 @@ declare module '@theme/MDXComponents/Ul' {
   const Component: import('react').ComponentType<Record<string, unknown>>;
   export default Component;
 }
+
+declare module '@theme/DocItem/Content' {
+  export type Props = {
+    children?: import('react').ReactNode;
+  };
+  const Component: import('react').ComponentType<Props>;
+  export default Component;
+}
+
+declare module '@theme-original/DocItem/Content' {
+  import type {Props} from '@theme/DocItem/Content';
+  const Component: import('react').ComponentType<Props>;
+  export default Component;
+}

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { joinClassNames } from '../classnames.js';
 import { BoardCanvas, } from './BoardCanvas.js';
-import { applyBoardOperation } from './BoardModel.js';
+import { applyBoardOperation, serializeBoardDocument } from './BoardModel.js';
 import { importMermaid } from './MermaidImporter.js';
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
@@ -772,7 +772,7 @@ export function Board({ className, children, document: controlledDocument, defau
     };
     const editModeActive = canEdit && boardMode === 'edit';
     const canvasPanActive = boardTool === 'hand' || spacePressed;
-    const inlineFigure = (_jsxs("figure", { ref: inlineFigureRef, className: joinClassNames('de-diagram', className), "data-editable": canEdit ? 'true' : undefined, "data-grid": grid ? 'true' : undefined, "data-zoomable": zoomable ? 'true' : undefined, tabIndex: zoomable ? 0 : undefined, onClick: handleFigureClick, onDoubleClick: handleFigureDoubleClick, onKeyDown: handleFigureKeyDown, ...props, children: [zoomable ? (_jsxs("div", { className: "de-diagram-inline-toolbar", "aria-label": "\u753B\u677F\u64CD\u4F5C", children: [_jsxs("button", { ref: triggerRef, type: "button", className: "de-diagram-inline-entry", "aria-label": `${canEdit ? '编辑' : '查看'}画板：${accessibleTitle}`, onClick: (event) => {
+    const inlineFigure = (_jsxs("figure", { ref: inlineFigureRef, className: joinClassNames('de-diagram', className), "data-editable": canEdit ? 'true' : undefined, "data-grid": grid ? 'true' : undefined, "data-zoomable": zoomable ? 'true' : undefined, tabIndex: zoomable ? 0 : undefined, onClick: handleFigureClick, onDoubleClick: handleFigureDoubleClick, onKeyDown: handleFigureKeyDown, ...props, children: [boardDocument ? (_jsx("div", { "data-de-board-semantic": true, hidden: true, children: serializeBoardDocument(boardDocument, { title: accessibleTitle }) })) : null, zoomable ? (_jsxs("div", { className: "de-diagram-inline-toolbar", "aria-label": "\u753B\u677F\u64CD\u4F5C", children: [_jsxs("button", { ref: triggerRef, type: "button", className: "de-diagram-inline-entry", "aria-label": `${canEdit ? '编辑' : '查看'}画板：${accessibleTitle}`, onClick: (event) => {
                             event.stopPropagation();
                             openViewer(canEdit ? 'edit' : 'view');
                         }, children: [canEdit ? (_jsx(PenLine, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 })) : (_jsx(Eye, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 })), _jsx("span", { children: canEdit ? '编辑' : '查看' })] }), _jsx("span", { className: "de-diagram-inline-divider", "aria-hidden": "true" }), _jsx("button", { type: "button", "aria-label": `全屏打开画板：${accessibleTitle}`, title: "\u5168\u5C4F\u6253\u5F00", onClick: (event) => {

@@ -2,6 +2,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Check, Copy } from 'lucide-react';
 import { Children, isValidElement, useEffect, useRef, useState, } from 'react';
+import { writeClipboardText } from './Clipboard.js';
 function readText(node) {
     if (typeof node === 'string' || typeof node === 'number')
         return String(node);
@@ -21,21 +22,6 @@ function inferLanguage(children, className) {
         : undefined;
     return languageFromClassName(childClassName) ?? languageFromClassName(className);
 }
-async function copyText(value) {
-    if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-        return;
-    }
-    const textarea = document.createElement('textarea');
-    textarea.value = value;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    textarea.remove();
-}
 export function CodeBlock({ children, className, code, copiedLabel = '已复制', copyLabel = '复制代码', language, onCopy, tabIndex = 0, ...props }) {
     const [copied, setCopied] = useState(false);
     const resetTimerRef = useRef();
@@ -46,7 +32,7 @@ export function CodeBlock({ children, className, code, copiedLabel = '已复制'
             clearTimeout(resetTimerRef.current);
     }, []);
     const handleCopy = async () => {
-        await copyText(codeText);
+        await writeClipboardText(codeText);
         onCopy?.(codeText);
         setCopied(true);
         if (resetTimerRef.current)

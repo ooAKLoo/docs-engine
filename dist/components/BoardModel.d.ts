@@ -120,6 +120,10 @@ export type BoardOperation = {
     points: BoardPoint[];
     type: 'update-edge-route';
 };
+export type BoardMarkdownOptions = {
+    headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+    title?: string;
+};
 type FeedbackDetectableEdge = Pick<BoardEdge, 'id' | 'manual' | 'role' | 'sourceId' | 'stroke' | 'targetId'>;
 /**
  * Detect cycle-closing edges in source order. Explicit roles win; inferred
@@ -127,6 +131,12 @@ type FeedbackDetectableEdge = Pick<BoardEdge, 'id' | 'manual' | 'role' | 'source
  * not cause every later forward edge to be classified as feedback.
  */
 export declare function detectBoardFeedbackEdgeIds(edges: readonly FeedbackDetectableEdge[]): Set<string>;
+/**
+ * Export every semantic Board object as readable Markdown. Geometry, colours
+ * and interaction state are intentionally omitted: copied documents preserve
+ * groups, nodes and relationships rather than renderer implementation details.
+ */
+export declare function serializeBoardDocument(document: BoardDocument, options?: BoardMarkdownOptions): string;
 /** Pure reducer used by every Board editing surface and suitable for host-side persistence. */
 export declare function applyBoardOperation(document: BoardDocument, operation: BoardOperation): BoardDocument;
 export {};

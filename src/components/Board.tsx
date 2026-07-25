@@ -42,7 +42,7 @@ import type {
   BoardNodeShape,
   BoardOperation,
 } from './BoardModel.js';
-import {applyBoardOperation} from './BoardModel.js';
+import {applyBoardOperation, serializeBoardDocument} from './BoardModel.js';
 import {importMermaid} from './MermaidImporter.js';
 
 export type BoardMode = 'view' | 'edit';
@@ -1051,6 +1051,11 @@ export function Board({
       onKeyDown={handleFigureKeyDown}
       {...props}
     >
+      {boardDocument ? (
+        <div data-de-board-semantic hidden>
+          {serializeBoardDocument(boardDocument, {title: accessibleTitle})}
+        </div>
+      ) : null}
       {zoomable ? (
         <div className="de-diagram-inline-toolbar" aria-label="画板操作">
           <button

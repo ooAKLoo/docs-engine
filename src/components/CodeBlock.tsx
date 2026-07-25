@@ -10,6 +10,7 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from 'react';
+import {writeClipboardText} from './Clipboard.js';
 export type CodeBlockProps = Omit<HTMLAttributes<HTMLPreElement>, 'children'> & {
   children?: ReactNode;
   code?: string;
@@ -42,23 +43,6 @@ function inferLanguage(children: ReactNode, className?: string) {
   return languageFromClassName(childClassName) ?? languageFromClassName(className);
 }
 
-async function copyText(value: string) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.setAttribute('readonly', '');
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  textarea.remove();
-}
-
 export function CodeBlock({
   children,
   className,
@@ -83,7 +67,7 @@ export function CodeBlock({
   );
 
   const handleCopy = async () => {
-    await copyText(codeText);
+    await writeClipboardText(codeText);
     onCopy?.(codeText);
     setCopied(true);
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);

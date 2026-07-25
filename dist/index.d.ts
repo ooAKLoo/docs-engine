@@ -1,11 +1,12 @@
 export { Annotation, type AnnotationProps } from './components/Annotation.js';
 export { Callout, type CalloutProps } from './components/Callout.js';
 export { CodeBlock, type CodeBlockProps } from './components/CodeBlock.js';
+export { DocumentCopyButton, serializeDocumentToMarkdown, type DocumentCopyButtonProps, } from './components/DocumentCopy.js';
 export { Board, type BoardMediaChange, type BoardMediaTransform, type BoardMode, type BoardProps, } from './components/Board.js';
 export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImporter.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, type BoardLayoutDiagnostic, type BoardLayoutDiagnosticCode, type BoardLayoutDiagnosticSeverity, type BoardLayoutValidationOptions, } from './components/BoardLayout.js';
-export { applyBoardOperation } from './components/BoardModel.js';
-export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardDocumentChange, BoardDocumentChangeReason, BoardEdge, BoardEdgeRole, BoardGroup, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardImportSource, BoardNode, BoardNodeShape, BoardNodeTone, BoardOperation, BoardPoint, } from './components/BoardModel.js';
+export { applyBoardOperation, serializeBoardDocument, } from './components/BoardModel.js';
+export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardDocumentChange, BoardDocumentChangeReason, BoardEdge, BoardEdgeRole, BoardGroup, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardImportSource, BoardMarkdownOptions, BoardNode, BoardNodeShape, BoardNodeTone, BoardOperation, BoardPoint, } from './components/BoardModel.js';
 export { DocumentContent, type DocumentContentProps } from './components/DocumentContent.js';
 export { Formula, type FormulaProps } from './components/Formula.js';
 export { Priority, type PriorityLevel, type PriorityProps } from './components/Priority.js';
