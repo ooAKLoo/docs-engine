@@ -324,14 +324,21 @@ test('moves a collinear edge bundle to an outer lane instead of crossing sibling
     input --> mode`);
   const markup = renderDocument(document);
 
-  assert.equal((markup.match(/data-de-bundle-key="fan-out:mode:top"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/data-de-bundle-key="fan-out:mode:bottom"/gu) ?? []).length, 1);
   assert.equal((markup.match(/data-de-bundle-key="fan-in:outcome:top"/gu) ?? []).length, 2);
   for (const id of [
     'flow:0:mode:llm',
-    'flow:1:llm:outcome',
     'flow:2:mode:media',
-    'flow:3:media:outcome',
     'flow:4:mode:action',
+  ]) {
+    const edge = edgeMarkup(markup, id);
+    assert.match(edge, /data-source-side="bottom"/u);
+    assert.match(edge, /data-target-side="bottom"/u);
+    assert.match(edgePath(markup, id), / A | L [-\d.]+ [-\d.]+/u);
+  }
+  for (const id of [
+    'flow:1:llm:outcome',
+    'flow:3:media:outcome',
     'flow:5:action:outcome',
   ]) {
     const edge = edgeMarkup(markup, id);
@@ -474,7 +481,7 @@ test('keeps authored orthogonal routes unchanged by automatic near-axis snapping
   assert.equal(pathEndpoint(path).y, 108);
 });
 
-test('keeps authored centre pins fixed while separating automatic neighbours', () => {
+test('deconflicts authored and automatic routes on the same node side', () => {
   const document = {
     version: 1,
     direction: 'LR',
@@ -543,8 +550,94 @@ test('keeps authored centre pins fixed while separating automatic neighbours', (
   };
   const markup = renderDocument(document);
 
-  assert.equal(pathEndpoint(edgePath(markup, 'authored')).y, 160);
-  assert.equal(pathEndpoint(edgePath(markup, 'automatic')).y, 150);
+  assert.equal(pathEndpoint(edgePath(markup, 'authored')).y, 155);
+  assert.equal(pathEndpoint(edgePath(markup, 'automatic')).y, 165);
+});
+
+test('separates authored incoming and outgoing routes that share one node side', () => {
+  const document = {
+    version: 1,
+    direction: 'TB',
+    diagramKind: 'flowchart',
+    nodes: [
+      {
+        classes: [],
+        height: 80,
+        id: 'bootstrap',
+        label: '组合根',
+        position: {x: 100, y: 360},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 120,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'realtime',
+        label: '实时语音',
+        position: {x: 300, y: 160},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 180,
+      },
+      {
+        classes: [],
+        height: 80,
+        id: 'observability',
+        label: '运行观测',
+        position: {x: 520, y: 420},
+        shape: 'rect',
+        tone: 'neutral',
+        width: 140,
+      },
+    ],
+    edges: [
+      {
+        arrow: true,
+        id: 'bootstrap-realtime',
+        label: '',
+        points: [
+          {x: 160, y: 360},
+          {x: 260, y: 360},
+          {x: 260, y: 240},
+          {x: 300, y: 240},
+          {x: 300, y: 200},
+        ],
+        sourceId: 'bootstrap',
+        sourceSide: 'right',
+        stroke: 'dotted',
+        targetId: 'realtime',
+        targetSide: 'bottom',
+      },
+      {
+        arrow: true,
+        id: 'realtime-observability',
+        label: '',
+        points: [
+          {x: 300, y: 200},
+          {x: 300, y: 500},
+          {x: 520, y: 500},
+          {x: 520, y: 460},
+        ],
+        sourceId: 'realtime',
+        sourceSide: 'bottom',
+        stroke: 'normal',
+        targetId: 'observability',
+        targetSide: 'bottom',
+      },
+    ],
+  };
+  const markup = renderDocument(document);
+  const incoming = edgePath(markup, 'bootstrap-realtime');
+  const outgoing = edgePath(markup, 'realtime-observability');
+  const incomingX = pathEndpoint(incoming).x;
+  const outgoingX = linePoints(outgoing)[0].x;
+
+  assert.notEqual(incomingX, outgoingX);
+  assert.equal(incomingX, 292);
+  assert.equal(outgoingX, 308);
+  assert.match(incoming, / 240(?: |$)/u);
+  assert.match(outgoing, / 500(?: |$)/u);
 });
 
 test('bundles every eligible Lula fan-in around a single semantic target port', async () => {

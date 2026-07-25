@@ -1213,7 +1213,6 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             else
                 port.candidate.targetOffset = offset;
         };
-        const authoredPorts = ports.filter(({ candidate }) => (edgePatches.get(candidate.edge.id)?.points.length ?? 0) >= 2);
         if (ports.length === 1) {
             ports.forEach((port) => setOffset(port, 0));
             return;
@@ -1225,25 +1224,6 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
         const preferredGap = ports.some(({ candidate, role }) => role === 'target' && candidate.edge.arrow)
             ? EDGE_TARGET_PORT_GAP
             : EDGE_SOURCE_PORT_GAP;
-        if (authoredPorts.length > 0) {
-            // Persisted orthogonal routes own the centre pin. Keep them fixed, but
-            // still move automatic neighbours away from that pin instead of resetting
-            // the entire group to zero and recreating an overpainted shaft.
-            authoredPorts.forEach((port) => setOffset(port, 0));
-            const automatic = ports
-                .filter((port) => !authoredPorts.includes(port))
-                .map((port) => ({
-                desired: clamp(port.projection - axisCenter, -limit, limit),
-                port,
-            }))
-                .sort((firstPort, secondPort) => firstPort.desired - secondPort.desired ||
-                firstPort.port.candidate.index - secondPort.port.candidate.index);
-            const offsets = distributePortOffsetsAroundFixedCenter(automatic.map(({ desired }) => desired), limit, preferredGap);
-            automatic.forEach(({ port }, index) => {
-                setOffset(port, offsets[index] ?? 0);
-            });
-            return;
-        }
         const gap = Math.min(preferredGap, (limit * 2) / Math.max(1, ports.length - 1));
         const ordered = ports
             .map((port) => ({
@@ -1252,7 +1232,10 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
         }))
             .sort((firstPort, secondPort) => firstPort.desired - secondPort.desired ||
             firstPort.port.candidate.index - secondPort.port.candidate.index);
-        const offsets = distributePortOffsets(ordered.map(({ desired }) => desired), limit, gap);
+        const mixedRoles = new Set(ports.map(({ role }) => role)).size > 1;
+        const offsets = mixedRoles
+            ? ordered.map((_, index) => clamp((index - (ordered.length - 1) / 2) * gap, -limit, limit))
+            : distributePortOffsets(ordered.map(({ desired }) => desired), limit, gap);
         ordered.forEach(({ port }, index) => {
             setOffset(port, offsets[index] ?? 0);
         });
@@ -1451,10 +1434,10 @@ function assignEdgeBundles(candidates, edgePatches) {
     // both shared buses without inventing duplicate ports.
     collect('fan-in', ({ target, targetSide }) => `${target.id}:${targetSide}`, ({ source }) => source.id);
     collect('fan-out', ({ source, sourceSide }) => `${source.id}:${sourceSide}`, ({ target }) => target.id);
-    bundles.forEach(moveCollinearBundleToOuterLane);
+    bundles.forEach((bundle) => moveCollinearBundleToOuterLane(bundle, candidates));
     return bundles;
 }
-function moveCollinearBundleToOuterLane(bundle) {
+function moveCollinearBundleToOuterLane(bundle, candidates) {
     const horizontal = bundle.side === 'left' || bundle.side === 'right';
     const nodeCross = horizontal ? bundle.node.position.y : bundle.node.position.x;
     const nodePrimary = horizontal ? bundle.node.position.x : bundle.node.position.y;
@@ -1469,8 +1452,18 @@ function moveCollinearBundleToOuterLane(bundle) {
         return;
     // A same-axis fan-out/fan-in would otherwise collapse into one straight
     // segment that crosses every nearer sibling. Move the whole semantic port to
-    // one outer side so the shared bus stays outside the node row/column.
-    const outerSide = horizontal ? 'top' : 'left';
+    // the quieter outer side so an incoming edge and an outgoing bus never
+    // overpaint the same node pin or occupy two almost-identical corridors.
+    const outerSides = horizontal
+        ? ['top', 'bottom']
+        : ['left', 'right'];
+    const memberIds = new Set(bundle.members.map(({ edge }) => edge.id));
+    const sideOccupancy = (side) => candidates.filter((candidate) => !memberIds.has(candidate.edge.id) &&
+        ((candidate.source.id === bundle.node.id && candidate.sourceSide === side) ||
+            (candidate.target.id === bundle.node.id && candidate.targetSide === side))).length;
+    const outerSide = sideOccupancy(outerSides[1]) < sideOccupancy(outerSides[0])
+        ? outerSides[1]
+        : outerSides[0];
     bundle.side = outerSide;
     bundle.key = `${bundle.kind}:${bundle.node.id}:${outerSide}`;
     bundle.members.forEach((candidate) => {
@@ -1738,28 +1731,6 @@ function routeFeedbackEdge(candidate, laneIndex, nodes, direction) {
             tip,
         ];
     return finalizeEdgeRoute(points, candidate.edge.arrow, candidate.sourceSide, candidate.targetSide);
-}
-/**
- * Fit sorted port projections to the node boundary while preserving their
- * minimum gap. Isotonic regression centres coincident projections instead of
- * always pushing the later edge in one direction.
- */
-function distributePortOffsetsAroundFixedCenter(desired, limit, preferredGap) {
-    if (desired.length === 0 || limit <= 0)
-        return desired.map(() => 0);
-    const sideCapacityNeeded = Math.max(1, Math.ceil(desired.length / 2));
-    const gap = Math.min(preferredGap, limit / sideCapacityNeeded);
-    const sideCapacity = Math.max(1, Math.floor(limit / Math.max(gap, 0.1)));
-    const negativeDesired = desired.filter((offset) => offset < -0.1).length;
-    const centredDesired = desired.filter((offset) => Math.abs(offset) <= 0.1).length;
-    const minimumNegative = Math.max(0, desired.length - sideCapacity);
-    const maximumNegative = Math.min(desired.length, sideCapacity);
-    const negativeCount = clamp(negativeDesired + Math.ceil(centredDesired / 2), minimumNegative, maximumNegative);
-    const positiveCount = desired.length - negativeCount;
-    return [
-        ...Array.from({ length: negativeCount }, (_, index) => -(negativeCount - index) * gap),
-        ...Array.from({ length: positiveCount }, (_, index) => (index + 1) * gap),
-    ];
 }
 function distributePortOffsets(desired, limit, gap) {
     if (desired.length <= 1)
@@ -2434,7 +2405,26 @@ function applyEdgeRoutePatch(automatic, patch, arrow) {
     const end = automatic.points.at(-1);
     if (!start || !end)
         return patch.label ? { ...automatic, label: patch.label } : automatic;
-    const points = normalizeOrthogonalPoints([start, ...patch.points.slice(1, -1), end]);
+    const patchedPoints = patch.points.map((point) => ({ ...point }));
+    patchedPoints[0] = start;
+    patchedPoints[patchedPoints.length - 1] = end;
+    const sourceNeighbor = patchedPoints[1];
+    const targetNeighbor = patchedPoints.at(-2);
+    if (sourceNeighbor && targetNeighbor && patchedPoints.length > 2) {
+        if (automatic.sourceSide === 'top' || automatic.sourceSide === 'bottom') {
+            sourceNeighbor.x = start.x;
+        }
+        else {
+            sourceNeighbor.y = start.y;
+        }
+        if (automatic.targetSide === 'top' || automatic.targetSide === 'bottom') {
+            targetNeighbor.x = end.x;
+        }
+        else {
+            targetNeighbor.y = end.y;
+        }
+    }
+    const points = normalizeOrthogonalPoints(patchedPoints);
     if (!isOrthogonalRoute(points))
         return patch.label ? { ...automatic, label: patch.label } : automatic;
     const route = finalizeEdgeRoute(points, arrow, automatic.sourceSide, automatic.targetSide);
