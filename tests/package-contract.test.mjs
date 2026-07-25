@@ -244,6 +244,14 @@ test('uses BoardDocument as the only editable diagram model', async () => {
   assert.match(styles, /\.de-board__connection-preview/);
   assert.match(styles, /\.de-board__guides/);
   assert.match(styles, /\.de-board__edge-path/);
+  assert.doesNotMatch(
+    styles,
+    /\.de-board__edge-path\s*\{[^}]*vector-effect:\s*non-scaling-stroke/su,
+  );
+  assert.match(
+    styles,
+    /\.de-board__edge-hit\s*\{[^}]*vector-effect:\s*non-scaling-stroke/su,
+  );
   assert.match(styles, /\.de-board__edge-handle/);
   assert.match(styles, /\.de-board__node-badge/);
   assert.match(styles, /\.de-board__edge\[data-feedback='true'\]/);
