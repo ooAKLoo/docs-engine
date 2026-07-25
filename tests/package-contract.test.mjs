@@ -58,6 +58,7 @@ test('shares one semantic palette between callouts, statuses and priorities', ()
   assert.match(tokens, /--de-callout-red-background:\s*var\(--de-status-danger-background\)/);
   assert.match(tokens, /--de-callout-orange-background:\s*var\(--de-status-warning-background\)/);
   assert.match(tokens, /--de-callout-neutral-background:\s*var\(--de-status-neutral-background\)/);
+  assert.match(tokens, /--de-status-neutral-background:\s*rgb\(241,\s*241,\s*241\)/);
   assert.match(styles, /\.de-callout:is\(\[data-variant='blue'\], \[data-variant='info'\]\)/);
   assert.match(styles, /\.de-callout:is\(\[data-variant='purple'\], \[data-variant='brand'\]\)/);
   assert.match(styles, /\.de-callout:is\(\[data-variant='neutral'\], \[data-variant='note'\]\)/);
