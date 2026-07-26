@@ -336,6 +336,35 @@ export function Gallery() {
               </tbody>
             </Table>
           </div>
+          <h3>密集契约表格</h3>
+          <p>表格内的代码标识符保持完整；列宽不足时由容器横向滚动，不按任意字符拆词。</p>
+          <div style={{maxWidth: '900px'}}>
+            <Table>
+              <thead>
+                <tr><th>工具</th><th>适用场景</th><th>不适用场景</th><th>参数</th><th>执行模块</th><th>返回事实</th><th>副作用</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>idiom_chain</code></td>
+                  <td>开始、提交或停止成语接龙</td>
+                  <td>普通插话与知识问答</td>
+                  <td><code>command</code>；<code>candidate</code></td>
+                  <td><code>executeIdiomChainCommand</code></td>
+                  <td><code>started/accepted/invalid/wrong_chain</code></td>
+                  <td>提交候选事件</td>
+                </tr>
+                <tr>
+                  <td><code>change_language</code></td>
+                  <td>持久切换会话语言</td>
+                  <td>单词翻译与临时示例</td>
+                  <td><code>language: zh-CN/en-US</code></td>
+                  <td><code>applyEnglishCoachCommand</code></td>
+                  <td>语言上下文与领域事件</td>
+                  <td>更新会话状态</td>
+                </tr>
+              </tbody>
+            </Table>
+          </div>
           <h3>资源链接</h3>
           <p>资源链接统一使用浅灰色 Link2 图标，并保持图标和地址同行；窄屏由表格容器横向滚动。</p>
           <Table>

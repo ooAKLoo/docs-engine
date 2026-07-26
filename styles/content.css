@@ -59,7 +59,7 @@
   display: table;
   width: 100%;
   min-width: var(--de-table-min-width, var(--doc-table-min-width, 640px));
-  max-width: 100%;
+  max-width: none;
   border: 0;
   border-spacing: 0;
   border-collapse: collapse;
@@ -129,7 +129,8 @@
 
 .de-table-shell .de-table code {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 :where(.de-prose) .de-resource-link {

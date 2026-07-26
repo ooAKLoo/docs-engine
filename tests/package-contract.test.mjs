@@ -44,6 +44,24 @@ test('keeps annotation and table visuals borderless', () => {
   assert.doesNotMatch(styles, /:where\(\.de-prose\) table/);
 });
 
+test('keeps table identifiers intact and lets dense tables scroll', () => {
+  assert.match(
+    styles,
+    /\.de-table-shell > \.de-table-scroll > \.de-table\s*\{[^}]*max-width:\s*none;/s,
+  );
+  assert.match(
+    styles,
+    /\.de-table-shell \.de-table code\s*\{[^}]*overflow-wrap:\s*normal;[^}]*word-break:\s*normal;/s,
+  );
+  assert.doesNotMatch(
+    styles,
+    /\.de-table-shell \.de-table code\s*\{[^}]*overflow-wrap:\s*anywhere;/s,
+  );
+  assert.match(showcase, /密集契约表格/);
+  assert.match(showcase, /<code>idiom_chain<\/code>/);
+  assert.match(showcase, /<code>change_language<\/code>/);
+});
+
 test('shares one semantic palette between callouts, statuses and priorities', () => {
   for (const tone of ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'neutral']) {
     assert.match(model, new RegExp(`\\| '${tone}'`));
