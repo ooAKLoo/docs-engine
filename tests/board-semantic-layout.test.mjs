@@ -15,6 +15,21 @@ function renderDocument(document) {
   }));
 }
 
+
+/**
+ * The built-in automatic router only runs when a document carries no authored
+ * geometry. Imports now ship ELK-authored geometry, so router regressions are
+ * exercised against the stripped semantic document.
+ */
+function withoutAuthoredGeometry(document) {
+  return {
+    ...document,
+    canvas: undefined,
+    edges: document.edges.map(({labelPosition, points, sourceSide, targetSide, ...edge}) => edge),
+    nodes: document.nodes.map(({height, position, width, ...node}) => node),
+  };
+}
+
 function edgePath(markup, id) {
   const edge = markup.match(
     new RegExp(`<g class="de-board__edge" data-de-edge-id="${id}"[\\s\\S]*?<\\/g>`),
@@ -152,7 +167,7 @@ test('renders sequence participants on one header row and messages on distinct t
 });
 
 test('keeps cross-group flow off internal anchors and separates a bidirectional branch', async () => {
-  const document = await importMermaid(`flowchart LR
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     subgraph Source[资产事实源]
       validate{Schema 通过？}
       collections[(运行集合)]
@@ -166,7 +181,7 @@ test('keeps cross-group flow off internal anchors and separates a bidirectional 
     validate -- 退回 --> review
     review --> validate
     collections --> catalog
-    catalog --> selection`);
+    catalog --> selection`));
   const markup = renderDocument(document);
   const edgeMarkup = (id) => markup.match(
     new RegExp(`<g class="de-board__edge" data-de-edge-id="${id}"[\\s\\S]*?<\\/g>`),
@@ -259,7 +274,7 @@ test('distributes coincident same-side ports instead of overpainting one shared 
 });
 
 test('routes same-side fan-out and fan-in through centered shared trunks', async () => {
-  const document = await importMermaid(`flowchart TB
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart TB
     subgraph Execution[3 · 执行与真实结果]
       mode{executionMode}
       llm[LLM → Streaming TTS]
@@ -269,7 +284,7 @@ test('routes same-side fan-out and fan-in through centered shared trunks', async
       mode -->|文本生成| llm --> outcome
       mode -->|录音内容| media --> outcome
       mode -->|动作 / 静默| action --> outcome
-    end`);
+    end`));
   const markup = renderDocument(document);
   const fanOutPath = markup.match(
     /data-de-bundle-key="fan-out:mode:bottom"[^>]*><path d="([^"]+)"/u,
@@ -307,7 +322,7 @@ test('routes same-side fan-out and fan-in through centered shared trunks', async
 });
 
 test('moves a collinear edge bundle to an outer lane instead of crossing sibling nodes', async () => {
-  const document = await importMermaid(`flowchart TB
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart TB
     subgraph Before[输入]
       input[Input]
     end
@@ -321,7 +336,7 @@ test('moves a collinear edge bundle to an outer lane instead of crossing sibling
       mode --> media --> outcome
       mode --> action --> outcome
     end
-    input --> mode`);
+    input --> mode`));
   const markup = renderDocument(document);
 
   assert.equal((markup.match(/data-de-bundle-key="fan-out:mode:bottom"/gu) ?? []).length, 1);
@@ -349,7 +364,7 @@ test('moves a collinear edge bundle to an outer lane instead of crossing sibling
 });
 
 test('lets one edge connect a source fan-out bus to a target fan-in bus', async () => {
-  const document = await importMermaid(`flowchart LR
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     subgraph Lula[Lula]
       server[Product Server]
       worker[Conversation Lab Worker]
@@ -362,7 +377,7 @@ test('lets one edge connect a source fan-out bus to a target fan-in bus', async 
     server --> models
     server --> database
     server --> assets
-    worker --> models`);
+    worker --> models`));
   const markup = renderDocument(document);
   const sharedEdgeId = 'flow:0:server:models';
   const sourceBundle = markup.match(
@@ -641,7 +656,7 @@ test('separates authored incoming and outgoing routes that share one node side',
 });
 
 test('bundles every eligible Lula fan-in around a single semantic target port', async () => {
-  const document = await importMermaid(`flowchart LR
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     subgraph facts[儿童事实]
         memory[(长期记忆与画像)]
     end
@@ -661,7 +676,7 @@ test('bundles every eligible Lula fan-in around a single semantic target port', 
     selector --> context
     context --> agent
     prompt --> agent
-    agent --> plan[Generation Plan]`);
+    agent --> plan[Generation Plan]`));
   const markup = renderDocument(document);
   const trunk = markup.match(
     /<g class="de-board__edge-trunk"[^>]*data-de-bundle-key="fan-in:selector:left"[^>]*data-edge-ids="([^"]+)"[^>]*>([\s\S]*?)<\/g>/u,
@@ -707,7 +722,7 @@ test('bundles every eligible Lula fan-in around a single semantic target port', 
 });
 
 test('rounds fan-in endpoint turns while preserving the central T junction', async () => {
-  const document = await importMermaid(`classDiagram
+  const document = withoutAuthoredGeometry(await importMermaid(`classDiagram
     class ChildExperience {
         +选择下一段内容()
     }
@@ -727,7 +742,7 @@ test('rounds fan-in endpoint turns while preserving the central T junction', asy
     }
     ChildExperience --> PlayableContentCatalogPort : 只依赖合同
     ContentLibraryAdapter ..|> PlayableContentCatalogPort : 实现合同
-    ContentLibraryAdapter --> ContentAssetRegistry : 读取事实`);
+    ContentLibraryAdapter --> ContentAssetRegistry : 读取事实`));
   const markup = renderDocument(document);
   const upperBranch = edgePath(
     markup,
@@ -757,7 +772,7 @@ test('rounds fan-in endpoint turns while preserving the central T junction', asy
 });
 
 test('routes structurally detected Lula feedback edges on distinct outer lanes', async () => {
-  const document = await importMermaid(`flowchart LR
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     dialogue[收集并脱敏优秀对话] --> principle[提炼交流原则]
     principle --> cases[建立多轮评测集]
     cases --> experiment[调整 Prompt、Context Policy 或模型参数]
@@ -767,7 +782,7 @@ test('routes structurally detected Lula feedback edges on distinct outer lanes',
     release -->|是| online[按 Prompt 版本上线]
     release -->|否| experiment
     online --> observe[观察连续性、打断与重复回答]
-    observe -.形成新案例.-> cases`);
+    observe -.形成新案例.-> cases`));
   const markup = renderDocument(document);
   const firstFeedback = edgeMarkup(markup, 'flow:7:release:experiment');
   const secondFeedback = edgeMarkup(markup, 'flow:9:observe:cases');

@@ -1,0 +1,1 @@
+{"version":3,"file":"BoardElkLayout.d.ts","sourceRoot":"","sources":["../../src/components/BoardElkLayout.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAEV,aAAa,EAGb,iBAAiB,EAElB,MAAM,iBAAiB,CAAC;AA2EzB,sFAAsF;AACtF,wBAAgB,sBAAsB,CAAC,IAAI,EAAE,aAAa,CAAC,aAAa,CAAC,kDAExE;AAED;;;;;;GAMG;AACH,wBAAsB,qBAAqB,CACzC,QAAQ,EAAE,aAAa,GACtB,OAAO,CAAC,iBAAiB,GAAG,SAAS,CAAC,CAgBxC"}

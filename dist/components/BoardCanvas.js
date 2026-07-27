@@ -1,8 +1,9 @@
 'use client';
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { assignDiagramEdgeLanes, calculateAdaptiveRankGaps, compactDiagramEdgeLabelMetrics, measureDiagramEdgeLabel, measureDiagramTextWidth, placeDiagramEdgeLabels, wrapDiagramText, } from './BoardAutoLayout.js';
+import { assignDiagramEdgeLanes, calculateAdaptiveRankGaps, compactDiagramEdgeLabelMetrics, measureDiagramEdgeLabel, measureDiagramTextWidth, placeDiagramEdgeLabels, } from './BoardAutoLayout.js';
 import { detectBoardFeedbackEdgeIds, } from './BoardModel.js';
+import { hasBoardClass, measureBadgeWidth, measureNode, resolveNodeBadge, } from './BoardNodeMetrics.js';
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 const DIRECT_ROUTE_LABEL_RESERVE = 47;
 const PAIRED_ROUTE_LABEL_RESERVE = 108;
@@ -1283,6 +1284,29 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
     const feedbackLaneIndexes = new Map(candidates
         .filter(({ feedback }) => feedback)
         .map((candidate, index) => [candidate.edge.id, index]));
+    // Authored routes stay verbatim only while their terminals do not collide
+    // on a node. Two routes sharing one authored anchor point still go through
+    // endpoint re-anchoring so the shared port is separated.
+    const authoredTerminals = candidates.flatMap((candidate) => {
+        const points = edgePatches.get(candidate.edge.id)?.points;
+        if (!points || points.length < 2)
+            return [];
+        return [
+            { edgeId: candidate.edge.id, nodeId: candidate.source.id, point: points[0] },
+            { edgeId: candidate.edge.id, nodeId: candidate.target.id, point: points[points.length - 1] },
+        ];
+    });
+    const conflictedAuthoredEdges = new Set();
+    authoredTerminals.forEach((first, index) => {
+        authoredTerminals.slice(index + 1).forEach((second) => {
+            if (first.edgeId !== second.edgeId &&
+                first.nodeId === second.nodeId &&
+                Math.hypot(first.point.x - second.point.x, first.point.y - second.point.y) < 6) {
+                conflictedAuthoredEdges.add(first.edgeId);
+                conflictedAuthoredEdges.add(second.edgeId);
+            }
+        });
+    });
     const routed = candidates.map((candidate) => {
         const laneIndex = candidate.source.id === candidate.target.id
             ? candidate.index
@@ -1298,7 +1322,8 @@ function routeGraphEdges(nodes, edges, edgePatches, measuredEdgeLabels = new Map
             : candidate.feedback
                 ? routeFeedbackEdge(candidate, feedbackLaneIndexes.get(candidate.edge.id) ?? 0, nodes, direction)
                 : routeEdge(candidate.source, candidate.target, candidate.sourceSide, candidate.targetSide, candidate.sourceOffset, candidate.targetOffset, laneIndex, candidate.edge.arrow, nodes);
-        const route = applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), targetBundle ? false : candidate.edge.arrow);
+        const exactRouteAllowed = !conflictedAuthoredEdges.has(candidate.edge.id);
+        const route = applyEdgeRoutePatch(automatic, edgePatches.get(candidate.edge.id), targetBundle ? false : candidate.edge.arrow, exactRouteAllowed ? candidate.source : undefined, exactRouteAllowed ? candidate.target : undefined);
         return {
             edge: candidate.edge,
             route: candidate.edge.sourceArrow && !sourceBundle
@@ -2395,11 +2420,26 @@ function withSourceArrow(route) {
             .join(' '),
     };
 }
-function applyEdgeRoutePatch(automatic, patch, arrow) {
+function applyEdgeRoutePatch(automatic, patch, arrow, source, target) {
     if (!patch)
         return automatic;
     if (patch.points.length < 2 || automatic.points.length < 2) {
         return patch.label ? { ...automatic, label: patch.label } : automatic;
+    }
+    // An authored route whose endpoints still sit on both node borders is exact
+    // geometry (for example an ELK or agent layout for unmoved nodes). Keep it
+    // verbatim instead of re-anchoring, which would bend the port order the
+    // author chose into micro jogs and avoidable crossings.
+    const patchStart = patch.points[0];
+    const patchEnd = patch.points.at(-1);
+    if (source && target && patchStart && patchEnd &&
+        pointOnNodeBorder(patchStart, source) &&
+        pointOnNodeBorder(patchEnd, target)) {
+        const points = normalizeOrthogonalPoints(patch.points.map((point) => ({ ...point })));
+        if (isOrthogonalRoute(points)) {
+            const route = finalizeEdgeRoute(points, arrow, automatic.sourceSide, automatic.targetSide);
+            return patch.label ? { ...route, label: patch.label } : route;
+        }
     }
     const start = automatic.points[0];
     const end = automatic.points.at(-1);
@@ -2437,6 +2477,13 @@ function translateEdgeRoutePatch(patch, delta) {
             : null),
         points: patch.points.map((point) => ({ x: point.x + delta.x, y: point.y + delta.y })),
     };
+}
+function pointOnNodeBorder(point, node, tolerance = 3) {
+    const deltaX = Math.abs(point.x - node.position.x) - node.width / 2;
+    const deltaY = Math.abs(point.y - node.position.y) - node.height / 2;
+    if (deltaX > tolerance || deltaY > tolerance)
+        return false;
+    return Math.abs(deltaX) <= tolerance || Math.abs(deltaY) <= tolerance;
 }
 function isOrthogonalRoute(points) {
     return points.slice(1).every((point, index) => {
@@ -2742,25 +2789,6 @@ function unionDiagramBounds(first, second) {
     const bottom = Math.max(first.top + first.height, second.top + second.height);
     return { height: bottom - top, left, top, width: right - left };
 }
-function measureNode(label, shape, classes = [], authoredWidth) {
-    const detailLabel = hasBoardClass(classes, 'deBoardDetail');
-    const gate = resolveNodeBadge(classes);
-    const wideCard = hasBoardClass(classes, 'deBoardWide');
-    const horizontalPadding = detailLabel ? 46 : 38;
-    const maximumTextWidth = Math.max(36, Math.min(202, (authoredWidth ?? 240) - horizontalPadding));
-    const lines = wrapDiagramText(label, maximumTextWidth);
-    const contentWidth = Math.max(...lines.map((line, index) => measureTextWidth(line) * (detailLabel && index > 0 ? 0.86 : 1)), 36);
-    const minimumWidth = gate ? 204 : wideCard ? 200 : detailLabel ? 150 : shape === 'stadium' ? 92 : 118;
-    const baseWidth = Math.max(minimumWidth, Math.min(240, contentWidth + (detailLabel ? 46 : 38)));
-    const baseHeight = gate ? 140 : Math.max(detailLabel ? 82 : 54, lines.length * 20 + (detailLabel ? 34 : 24));
-    if (shape === 'circle' || shape === 'diamond') {
-        if (shape === 'diamond' && gate)
-            return { height: baseHeight, textLines: lines, width: baseWidth };
-        const diameter = Math.max(baseWidth, baseHeight + 22);
-        return { height: diameter, textLines: lines, width: diameter };
-    }
-    return { height: baseHeight, textLines: lines, width: baseWidth };
-}
 function roundedDiamondPath(halfWidth, halfHeight) {
     return [
         `M 0 ${-halfHeight}`,
@@ -2778,25 +2806,6 @@ function roundedDiamondPath(halfWidth, halfHeight) {
         `Q ${-halfWidth * 0.088} ${-halfHeight} 0 ${-halfHeight}`,
         'Z',
     ].join(' ');
-}
-function hasBoardClass(classes, className) {
-    return classes.some((value) => value.toLowerCase() === className.toLowerCase());
-}
-function resolveNodeBadge(classes) {
-    if (hasBoardClass(classes, 'deBoardGateOne'))
-        return '门槛 01';
-    if (hasBoardClass(classes, 'deBoardGateTwo'))
-        return '门槛 02';
-    return null;
-}
-function measureBadgeWidth(value) {
-    const textWidth = [...value].reduce((width, character) => {
-        const codePoint = character.codePointAt(0) ?? 0;
-        if (character === ' ')
-            return width + 3.8;
-        return width + (codePoint > 0xff ? 11 : /[A-Z0-9]/.test(character) ? 6.5 : 5.8);
-    }, 0);
-    return Math.max(68, Math.ceil(textWidth + 24));
 }
 function isFeedbackEdge(edge) {
     return edge.role === 'feedback';

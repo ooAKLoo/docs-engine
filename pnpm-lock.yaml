@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      elkjs:
+        specifier: ^0.12.0
+        version: 0.12.0
       katex:
         specifier: ^0.16.47
         version: 0.16.47
@@ -344,6 +347,9 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  elkjs@0.12.0:
+    resolution: {integrity: sha512-YZcKynxVxYoKIOEpywEPwCFdg+BTbxQRNf3pbwdDCvc8O3kQD8bmIwSxKU1eOTVc4Xo+VG9Te+575mlfvOrhEQ==}
 
   esbuild@0.25.12:
     resolution: {integrity: sha512-bbPBYYrtZbkt6Os6FiTLCTFxvq4tt3JKall1vRwshA3fdVztsLAatFaZobhkBC8/BrPetoa0oksYoKXoG4ryJg==}
@@ -747,6 +753,8 @@ snapshots:
 
   detect-libc@2.1.2:
     optional: true
+
+  elkjs@0.12.0: {}
 
   esbuild@0.25.12:
     optionalDependencies:

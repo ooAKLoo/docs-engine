@@ -1,5 +1,6 @@
 import { detectBoardFeedbackEdgeIds } from './BoardModel.js';
 import { applyBoardLayout } from './BoardLayout.js';
+import { computeElkBoardLayout, supportsElkBoardLayout } from './BoardElkLayout.js';
 const diagramTones = ['blue', 'teal', 'purple', 'orange', 'green', 'neutral'];
 export async function importMermaid(source, options = {}) {
     const kind = detectMermaidDiagramKind(source);
@@ -27,7 +28,7 @@ export async function importMermaid(source, options = {}) {
     const feedbackEdgeIds = graph.kind === 'flowchart'
         ? detectBoardFeedbackEdgeIds(graph.edges)
         : new Set();
-    return applyBoardLayout({
+    const document = {
         diagramKind: graph.kind,
         direction: graph.direction,
         edges: graph.edges.map((edge) => ({
@@ -37,7 +38,15 @@ export async function importMermaid(source, options = {}) {
         groups: graph.groups,
         nodes: graph.nodes,
         version: 1,
-    }, options.layout);
+    };
+    // Without authored geometry, general graphs receive an ELK layered layout:
+    // container-aware layers, crossing minimisation and separated orthogonal
+    // lanes. On any failure the renderer falls back to its built-in layout.
+    const layout = options.layout
+        ?? (supportsElkBoardLayout(graph.kind)
+            ? await computeElkBoardLayout(document).catch(() => undefined)
+            : undefined);
+    return applyBoardLayout(document, layout);
 }
 export function detectMermaidDiagramKind(source) {
     const first = sourceLines(source)[0]?.trim().toLowerCase() ?? '';
