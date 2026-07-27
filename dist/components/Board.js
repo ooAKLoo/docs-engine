@@ -2,15 +2,19 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { ChevronDown, Eye, Hand, HelpCircle, Maximize2, Minus, MousePointer2, PenLine, Plus, Workflow, X, } from 'lucide-react';
 import { AnimatePresence, domMax, LazyMotion, m, useReducedMotion } from 'motion/react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { joinClassNames } from '../classnames.js';
-import { BoardCanvas, } from './BoardCanvas.js';
+import { BoardCanvas as RawBoardCanvas, } from './BoardCanvas.js';
 import { applyBoardOperation, serializeBoardDocument } from './BoardModel.js';
 import { importMermaid } from './MermaidImporter.js';
+import { advanceBoardViewport, normalizeBoardWheelDelta, } from './BoardViewport.js';
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
+const WHEEL_ZOOM_SENSITIVITY = 0.0018;
+const MAX_WHEEL_ZOOM_DELTA = 120;
+const BoardCanvas = memo(RawBoardCanvas);
 const QUICK_SHAPES = [
     { label: '圆角矩形', shape: 'round' },
     { label: '矩形', shape: 'rect' },
@@ -34,6 +38,8 @@ export function Board({ className, children, document: controlledDocument, defau
     const mediaItemRef = useRef(null);
     const viewportRef = useRef({ x: 0, y: 0, scale: 1 });
     const inlineViewportRef = useRef({ x: 0, y: 0, scale: 1 });
+    const viewportFrameRef = useRef(null);
+    const inlineViewportFrameRef = useRef(null);
     const panSessionRef = useRef(null);
     const marqueeSessionRef = useRef(null);
     const spacePressedRef = useRef(false);
@@ -107,18 +113,43 @@ export function Board({ className, children, document: controlledDocument, defau
         onDocumentChange?.({ ...meta, document: next, operation });
     }, [controlledDocument, onDocumentChange]);
     const updateViewport = useCallback((update) => {
-        setViewport((current) => {
-            const next = typeof update === 'function' ? update(current) : update;
-            viewportRef.current = next;
-            return next;
-        });
+        if (viewportFrameRef.current !== null) {
+            cancelAnimationFrame(viewportFrameRef.current);
+            viewportFrameRef.current = null;
+        }
+        setViewport(advanceBoardViewport(viewportRef, update));
     }, []);
     const updateInlineViewport = useCallback((update) => {
-        setInlineViewport((current) => {
-            const next = typeof update === 'function' ? update(current) : update;
-            inlineViewportRef.current = next;
-            return next;
+        if (inlineViewportFrameRef.current !== null) {
+            cancelAnimationFrame(inlineViewportFrameRef.current);
+            inlineViewportFrameRef.current = null;
+        }
+        setInlineViewport(advanceBoardViewport(inlineViewportRef, update));
+    }, []);
+    const queueViewportUpdate = useCallback((update) => {
+        advanceBoardViewport(viewportRef, update);
+        if (viewportFrameRef.current !== null)
+            return;
+        viewportFrameRef.current = requestAnimationFrame(() => {
+            viewportFrameRef.current = null;
+            setViewport(viewportRef.current);
         });
+    }, []);
+    const queueInlineViewportUpdate = useCallback((update) => {
+        advanceBoardViewport(inlineViewportRef, update);
+        if (inlineViewportFrameRef.current !== null)
+            return;
+        inlineViewportFrameRef.current = requestAnimationFrame(() => {
+            inlineViewportFrameRef.current = null;
+            setInlineViewport(inlineViewportRef.current);
+        });
+    }, []);
+    useEffect(() => () => {
+        if (viewportFrameRef.current !== null)
+            cancelAnimationFrame(viewportFrameRef.current);
+        if (inlineViewportFrameRef.current !== null) {
+            cancelAnimationFrame(inlineViewportFrameRef.current);
+        }
     }, []);
     const updateMediaTransform = useCallback((update) => {
         setMediaTransform((current) => {
@@ -203,6 +234,10 @@ export function Board({ className, children, document: controlledDocument, defau
         });
         hasFittedRef.current = true;
     }, [measureContentBounds, updateViewport]);
+    const handleBoardReady = useCallback(() => {
+        if (!hasFittedRef.current)
+            requestAnimationFrame(fitView);
+    }, [fitView]);
     const zoomAt = useCallback((nextScale, clientX, clientY) => {
         const canvas = canvasRef.current;
         if (!canvas)
@@ -543,16 +578,34 @@ export function Board({ className, children, document: controlledDocument, defau
     const handleWheel = useCallback((event) => {
         event.preventDefault();
         setZoomMenuOpen(false);
+        const canvas = canvasRef.current;
+        if (!canvas)
+            return;
+        const deltaX = normalizeBoardWheelDelta(event.deltaX, event.deltaMode, canvas.clientWidth);
+        const deltaY = normalizeBoardWheelDelta(event.deltaY, event.deltaMode, canvas.clientHeight);
         if (event.ctrlKey || event.metaKey) {
-            zoomAt(viewportRef.current.scale * Math.exp(-event.deltaY * 0.0025), event.clientX, event.clientY);
+            const current = viewportRef.current;
+            const scale = clamp(current.scale *
+                Math.exp(-clamp(deltaY, -MAX_WHEEL_ZOOM_DELTA, MAX_WHEEL_ZOOM_DELTA) *
+                    WHEEL_ZOOM_SENSITIVITY), MIN_ZOOM, MAX_ZOOM);
+            const rect = canvas.getBoundingClientRect();
+            const pointX = event.clientX - rect.left;
+            const pointY = event.clientY - rect.top;
+            const contentX = (pointX - current.x) / current.scale;
+            const contentY = (pointY - current.y) / current.scale;
+            queueViewportUpdate({
+                x: pointX - contentX * scale,
+                y: pointY - contentY * scale,
+                scale,
+            });
             return;
         }
-        updateViewport((current) => ({
+        queueViewportUpdate((current) => ({
             ...current,
-            x: current.x - (event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX),
-            y: current.y - (event.shiftKey ? 0 : event.deltaY),
+            x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
+            y: current.y - (event.shiftKey ? 0 : deltaY),
         }));
-    }, [updateViewport, zoomAt]);
+    }, [queueViewportUpdate]);
     useEffect(() => {
         if (!open)
             return;
@@ -569,27 +622,31 @@ export function Board({ className, children, document: controlledDocument, defau
         const canvas = inlineCanvasRef.current;
         if (!canvas)
             return;
+        const deltaX = normalizeBoardWheelDelta(event.deltaX, event.deltaMode, canvas.clientWidth);
+        const deltaY = normalizeBoardWheelDelta(event.deltaY, event.deltaMode, canvas.clientHeight);
         if (event.ctrlKey || event.metaKey) {
             const current = inlineViewportRef.current;
             const rect = canvas.getBoundingClientRect();
             const pointX = event.clientX - rect.left;
             const pointY = event.clientY - rect.top;
-            const scale = clamp(current.scale * Math.exp(-event.deltaY * 0.0025), MIN_ZOOM, MAX_ZOOM);
+            const scale = clamp(current.scale *
+                Math.exp(-clamp(deltaY, -MAX_WHEEL_ZOOM_DELTA, MAX_WHEEL_ZOOM_DELTA) *
+                    WHEEL_ZOOM_SENSITIVITY), MIN_ZOOM, MAX_ZOOM);
             const contentX = (pointX - current.x) / current.scale;
             const contentY = (pointY - current.y) / current.scale;
-            updateInlineViewport({
+            queueInlineViewportUpdate({
                 x: pointX - contentX * scale,
                 y: pointY - contentY * scale,
                 scale,
             });
             return;
         }
-        updateInlineViewport((current) => ({
+        queueInlineViewportUpdate((current) => ({
             ...current,
-            x: current.x - (event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX),
-            y: current.y - (event.shiftKey ? 0 : event.deltaY),
+            x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
+            y: current.y - (event.shiftKey ? 0 : deltaY),
         }));
-    }, [updateInlineViewport, zoomable]);
+    }, [queueInlineViewportUpdate, zoomable]);
     useEffect(() => {
         if (open || !zoomable)
             return;
@@ -675,7 +732,11 @@ export function Board({ className, children, document: controlledDocument, defau
         const deltaY = event.clientY - session.lastY;
         session.lastX = event.clientX;
         session.lastY = event.clientY;
-        updateViewport((current) => ({ ...current, x: current.x + deltaX, y: current.y + deltaY }));
+        queueViewportUpdate((current) => ({
+            ...current,
+            x: current.x + deltaX,
+            y: current.y + deltaY,
+        }));
     };
     const finishCanvasInteraction = (event, cancelled = false) => {
         const marqueeSession = marqueeSessionRef.current;
@@ -797,10 +858,7 @@ export function Board({ className, children, document: controlledDocument, defau
                                                                 setModeMenuOpen(false);
                                                             }, children: [_jsx(Eye, { "aria-hidden": "true", size: 17 }), _jsxs("span", { children: [_jsx("strong", { children: "\u6D4F\u89C8" }), _jsx("small", { children: "\u4EC5\u7F29\u653E\u548C\u5E73\u79FB\u753B\u5E03" })] })] })] })) : null })] }), _jsxs("nav", { className: "de-diagram-board-tools de-diagram-board-float", "aria-label": "\u753B\u677F\u5DE5\u5177", children: [editModeActive ? (_jsx("button", { type: "button", "aria-label": "\u9009\u62E9\u5DE5\u5177", "aria-pressed": boardTool === 'select', title: "\u9009\u62E9", onClick: () => setBoardTool('select'), children: _jsx(MousePointer2, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })) : null, _jsx("button", { type: "button", "aria-label": "\u624B\u578B\u79FB\u52A8\u5DE5\u5177", "aria-keyshortcuts": "H", "aria-pressed": boardTool === 'hand', title: "\u79FB\u52A8\u753B\u5E03\uFF08H\uFF09", onClick: () => setBoardTool(boardTool === 'hand' ? 'select' : 'hand'), children: _jsx(Hand, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })] }), _jsxs(m.div, { ref: canvasRef, className: "de-diagram-viewer-canvas", "data-grid": grid ? 'true' : undefined, "data-pan-active": canvasPanActive ? 'true' : undefined, "data-panning": isPanning ? 'true' : undefined, "data-selecting": marqueeRect ? 'true' : undefined, style: canvasStyle, onContextMenu: (event) => event.preventDefault(), onPointerDown: handleCanvasPointerDown, onPointerMove: handleCanvasPointerMove, onPointerUp: finishCanvasInteraction, onPointerCancel: (event) => finishCanvasInteraction(event, true), children: [_jsxs("div", { ref: stageRef, className: "de-diagram-viewer-stage", style: {
                                                     transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`,
-                                                }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: boardDocument ? (_jsx(BoardCanvas, { accessibleLabel: accessibleTitle, document: boardDocument, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: () => {
-                                                                if (!hasFittedRef.current)
-                                                                    requestAnimationFrame(fitView);
-                                                            }, onSelectNode: handleSelectNode, onSelectEdge: handleSelectEdge, panActive: canvasPanActive, selectedEdgeId: selectedEdgeId, selectedNodeIds: selectedNodeIds })) : importSource ? (_jsx(BoardLoadState, { error: importError })) : (_jsxs("div", { ref: mediaItemRef, className: "de-diagram-media-item", "data-de-media-item": "true", "data-selected": mediaSelected ? 'true' : undefined, style: {
+                                                }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: boardDocument ? (_jsx(BoardCanvas, { accessibleLabel: accessibleTitle, document: boardDocument, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: handleBoardReady, onSelectNode: handleSelectNode, onSelectEdge: handleSelectEdge, panActive: canvasPanActive, selectedEdgeId: selectedEdgeId, selectedNodeIds: selectedNodeIds })) : importSource ? (_jsx(BoardLoadState, { error: importError })) : (_jsxs("div", { ref: mediaItemRef, className: "de-diagram-media-item", "data-de-media-item": "true", "data-selected": mediaSelected ? 'true' : undefined, style: {
                                                                 transform: `translate3d(${mediaTransform.x}px, ${mediaTransform.y}px, 0) scale(${mediaTransform.scale})`,
                                                             }, onPointerDown: (event) => beginMediaInteraction(event, 'move'), onPointerMove: moveMediaInteraction, onPointerUp: finishMediaInteraction, onPointerCancel: cancelMediaInteraction, children: [children, editModeActive && mediaSelected && !canvasPanActive ? (_jsx("span", { className: "de-diagram-media-scale-handle", "aria-label": "\u8C03\u6574\u56FE\u7247\u6216\u56FE\u5F62\u5927\u5C0F", role: "button", tabIndex: 0, onPointerDown: (event) => beginMediaInteraction(event, 'scale') })) : null] })) }), _jsx(AnimatePresence, { children: editor ? (_jsx("div", { className: "de-diagram-node-editor", style: {
                                                                 left: editor.left,

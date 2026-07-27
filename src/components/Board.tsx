@@ -21,11 +21,11 @@ import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
-import {useCallback, useEffect, useId, useRef, useState} from 'react';
+import {memo, useCallback, useEffect, useId, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {joinClassNames} from '../classnames.js';
 import {
-  BoardCanvas,
+  BoardCanvas as RawBoardCanvas,
   type BoardEditRequest,
   type DiagramConnectRequest,
   type DiagramConnectionDropRequest,
@@ -44,12 +44,21 @@ import type {
 } from './BoardModel.js';
 import {applyBoardOperation, serializeBoardDocument} from './BoardModel.js';
 import {importMermaid} from './MermaidImporter.js';
+import {
+  advanceBoardViewport,
+  type BoardViewport,
+  type BoardViewportUpdate,
+  normalizeBoardWheelDelta,
+} from './BoardViewport.js';
 
 export type BoardMode = 'view' | 'edit';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
+const WHEEL_ZOOM_SENSITIVITY = 0.0018;
+const MAX_WHEEL_ZOOM_DELTA = 120;
+const BoardCanvas = memo(RawBoardCanvas);
 const QUICK_SHAPES: Array<{label: string; shape: BoardNodeShape}> = [
   {label: '圆角矩形', shape: 'round'},
   {label: '矩形', shape: 'rect'},
@@ -58,12 +67,6 @@ const QUICK_SHAPES: Array<{label: string; shape: BoardNodeShape}> = [
   {label: '菱形', shape: 'diamond'},
 ];
 let boardElementSequence = 0;
-
-type BoardViewport = {
-  x: number;
-  y: number;
-  scale: number;
-};
 
 type ContentBounds = {
   height: number;
@@ -194,6 +197,8 @@ export function Board({
   const mediaItemRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<BoardViewport>({x: 0, y: 0, scale: 1});
   const inlineViewportRef = useRef<BoardViewport>({x: 0, y: 0, scale: 1});
+  const viewportFrameRef = useRef<number | null>(null);
+  const inlineViewportFrameRef = useRef<number | null>(null);
   const panSessionRef = useRef<PanSession | null>(null);
   const marqueeSessionRef = useRef<MarqueeSession | null>(null);
   const spacePressedRef = useRef(false);
@@ -276,26 +281,51 @@ export function Board({
   );
 
   const updateViewport = useCallback(
-    (update: BoardViewport | ((current: BoardViewport) => BoardViewport)) => {
-      setViewport((current) => {
-        const next = typeof update === 'function' ? update(current) : update;
-        viewportRef.current = next;
-        return next;
-      });
+    (update: BoardViewportUpdate) => {
+      if (viewportFrameRef.current !== null) {
+        cancelAnimationFrame(viewportFrameRef.current);
+        viewportFrameRef.current = null;
+      }
+      setViewport(advanceBoardViewport(viewportRef, update));
     },
     [],
   );
 
   const updateInlineViewport = useCallback(
-    (update: BoardViewport | ((current: BoardViewport) => BoardViewport)) => {
-      setInlineViewport((current) => {
-        const next = typeof update === 'function' ? update(current) : update;
-        inlineViewportRef.current = next;
-        return next;
-      });
+    (update: BoardViewportUpdate) => {
+      if (inlineViewportFrameRef.current !== null) {
+        cancelAnimationFrame(inlineViewportFrameRef.current);
+        inlineViewportFrameRef.current = null;
+      }
+      setInlineViewport(advanceBoardViewport(inlineViewportRef, update));
     },
     [],
   );
+
+  const queueViewportUpdate = useCallback((update: BoardViewportUpdate) => {
+    advanceBoardViewport(viewportRef, update);
+    if (viewportFrameRef.current !== null) return;
+    viewportFrameRef.current = requestAnimationFrame(() => {
+      viewportFrameRef.current = null;
+      setViewport(viewportRef.current);
+    });
+  }, []);
+
+  const queueInlineViewportUpdate = useCallback((update: BoardViewportUpdate) => {
+    advanceBoardViewport(inlineViewportRef, update);
+    if (inlineViewportFrameRef.current !== null) return;
+    inlineViewportFrameRef.current = requestAnimationFrame(() => {
+      inlineViewportFrameRef.current = null;
+      setInlineViewport(inlineViewportRef.current);
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (viewportFrameRef.current !== null) cancelAnimationFrame(viewportFrameRef.current);
+    if (inlineViewportFrameRef.current !== null) {
+      cancelAnimationFrame(inlineViewportFrameRef.current);
+    }
+  }, []);
 
   const updateMediaTransform = useCallback(
     (update: MediaTransform | ((current: MediaTransform) => MediaTransform)) => {
@@ -401,6 +431,10 @@ export function Board({
     });
     hasFittedRef.current = true;
   }, [measureContentBounds, updateViewport]);
+
+  const handleBoardReady = useCallback(() => {
+    if (!hasFittedRef.current) requestAnimationFrame(fitView);
+  }, [fitView]);
 
   const zoomAt = useCallback(
     (nextScale: number, clientX?: number, clientY?: number) => {
@@ -781,20 +815,39 @@ export function Board({
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
     setZoomMenuOpen(false);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const deltaX = normalizeBoardWheelDelta(event.deltaX, event.deltaMode, canvas.clientWidth);
+    const deltaY = normalizeBoardWheelDelta(event.deltaY, event.deltaMode, canvas.clientHeight);
     if (event.ctrlKey || event.metaKey) {
-      zoomAt(
-        viewportRef.current.scale * Math.exp(-event.deltaY * 0.0025),
-        event.clientX,
-        event.clientY,
+      const current = viewportRef.current;
+      const scale = clamp(
+        current.scale *
+          Math.exp(
+            -clamp(deltaY, -MAX_WHEEL_ZOOM_DELTA, MAX_WHEEL_ZOOM_DELTA) *
+              WHEEL_ZOOM_SENSITIVITY,
+          ),
+        MIN_ZOOM,
+        MAX_ZOOM,
       );
+      const rect = canvas.getBoundingClientRect();
+      const pointX = event.clientX - rect.left;
+      const pointY = event.clientY - rect.top;
+      const contentX = (pointX - current.x) / current.scale;
+      const contentY = (pointY - current.y) / current.scale;
+      queueViewportUpdate({
+        x: pointX - contentX * scale,
+        y: pointY - contentY * scale,
+        scale,
+      });
       return;
     }
-    updateViewport((current) => ({
+    queueViewportUpdate((current) => ({
       ...current,
-      x: current.x - (event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX),
-      y: current.y - (event.shiftKey ? 0 : event.deltaY),
+      x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
+      y: current.y - (event.shiftKey ? 0 : deltaY),
     }));
-  }, [updateViewport, zoomAt]);
+  }, [queueViewportUpdate]);
 
   useEffect(() => {
     if (!open) return;
@@ -810,28 +863,38 @@ export function Board({
       event.preventDefault();
       const canvas = inlineCanvasRef.current;
       if (!canvas) return;
+      const deltaX = normalizeBoardWheelDelta(event.deltaX, event.deltaMode, canvas.clientWidth);
+      const deltaY = normalizeBoardWheelDelta(event.deltaY, event.deltaMode, canvas.clientHeight);
       if (event.ctrlKey || event.metaKey) {
         const current = inlineViewportRef.current;
         const rect = canvas.getBoundingClientRect();
         const pointX = event.clientX - rect.left;
         const pointY = event.clientY - rect.top;
-        const scale = clamp(current.scale * Math.exp(-event.deltaY * 0.0025), MIN_ZOOM, MAX_ZOOM);
+        const scale = clamp(
+          current.scale *
+            Math.exp(
+              -clamp(deltaY, -MAX_WHEEL_ZOOM_DELTA, MAX_WHEEL_ZOOM_DELTA) *
+                WHEEL_ZOOM_SENSITIVITY,
+            ),
+          MIN_ZOOM,
+          MAX_ZOOM,
+        );
         const contentX = (pointX - current.x) / current.scale;
         const contentY = (pointY - current.y) / current.scale;
-        updateInlineViewport({
+        queueInlineViewportUpdate({
           x: pointX - contentX * scale,
           y: pointY - contentY * scale,
           scale,
         });
         return;
       }
-      updateInlineViewport((current) => ({
+      queueInlineViewportUpdate((current) => ({
         ...current,
-        x: current.x - (event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX),
-        y: current.y - (event.shiftKey ? 0 : event.deltaY),
+        x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
+        y: current.y - (event.shiftKey ? 0 : deltaY),
       }));
     },
-    [updateInlineViewport, zoomable],
+    [queueInlineViewportUpdate, zoomable],
   );
 
   useEffect(() => {
@@ -923,7 +986,11 @@ export function Board({
     const deltaY = event.clientY - session.lastY;
     session.lastX = event.clientX;
     session.lastY = event.clientY;
-    updateViewport((current) => ({...current, x: current.x + deltaX, y: current.y + deltaY}));
+    queueViewportUpdate((current) => ({
+      ...current,
+      x: current.x + deltaX,
+      y: current.y + deltaY,
+    }));
   };
 
   const finishCanvasInteraction = (
@@ -1321,9 +1388,7 @@ export function Board({
                                 onConnectionDrop={handleConnectionDrop}
                                 onEdgeRouteChange={handleEdgeRouteChange}
                                 onEditRequest={handleEditRequest}
-                                onReady={() => {
-                                  if (!hasFittedRef.current) requestAnimationFrame(fitView);
-                                }}
+                                onReady={handleBoardReady}
                                 onSelectNode={handleSelectNode}
                                 onSelectEdge={handleSelectEdge}
                                 panActive={canvasPanActive}
