@@ -8,7 +8,7 @@ import { joinClassNames } from '../classnames.js';
 import { BoardCanvas as RawBoardCanvas, } from './BoardCanvas.js';
 import { applyBoardOperation, serializeBoardDocument } from './BoardModel.js';
 import { importMermaid } from './MermaidImporter.js';
-import { advanceBoardViewport, normalizeBoardWheelDelta, } from './BoardViewport.js';
+import { advanceBoardViewport, boardViewportHasSettled, dampBoardViewport, normalizeBoardWheelDelta, } from './BoardViewport.js';
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
@@ -38,8 +38,14 @@ export function Board({ className, children, document: controlledDocument, defau
     const mediaItemRef = useRef(null);
     const viewportRef = useRef({ x: 0, y: 0, scale: 1 });
     const inlineViewportRef = useRef({ x: 0, y: 0, scale: 1 });
+    const displayedViewportRef = useRef(viewportRef.current);
+    const displayedInlineViewportRef = useRef(inlineViewportRef.current);
     const viewportFrameRef = useRef(null);
     const inlineViewportFrameRef = useRef(null);
+    const viewportPanFrameRef = useRef(null);
+    const inlineViewportPanFrameRef = useRef(null);
+    const viewportFrameTimeRef = useRef(null);
+    const inlineViewportFrameTimeRef = useRef(null);
     const panSessionRef = useRef(null);
     const marqueeSessionRef = useRef(null);
     const spacePressedRef = useRef(false);
@@ -117,38 +123,127 @@ export function Board({ className, children, document: controlledDocument, defau
             cancelAnimationFrame(viewportFrameRef.current);
             viewportFrameRef.current = null;
         }
-        setViewport(advanceBoardViewport(viewportRef, update));
+        if (viewportPanFrameRef.current !== null) {
+            cancelAnimationFrame(viewportPanFrameRef.current);
+            viewportPanFrameRef.current = null;
+        }
+        viewportFrameTimeRef.current = null;
+        const next = advanceBoardViewport(viewportRef, update);
+        displayedViewportRef.current = next;
+        setViewport(next);
     }, []);
     const updateInlineViewport = useCallback((update) => {
         if (inlineViewportFrameRef.current !== null) {
             cancelAnimationFrame(inlineViewportFrameRef.current);
             inlineViewportFrameRef.current = null;
         }
-        setInlineViewport(advanceBoardViewport(inlineViewportRef, update));
+        if (inlineViewportPanFrameRef.current !== null) {
+            cancelAnimationFrame(inlineViewportPanFrameRef.current);
+            inlineViewportPanFrameRef.current = null;
+        }
+        inlineViewportFrameTimeRef.current = null;
+        const next = advanceBoardViewport(inlineViewportRef, update);
+        displayedInlineViewportRef.current = next;
+        setInlineViewport(next);
     }, []);
     const queueViewportUpdate = useCallback((update) => {
-        advanceBoardViewport(viewportRef, update);
-        if (viewportFrameRef.current !== null)
-            return;
-        viewportFrameRef.current = requestAnimationFrame(() => {
+        if (viewportFrameRef.current !== null) {
+            cancelAnimationFrame(viewportFrameRef.current);
             viewportFrameRef.current = null;
-            setViewport(viewportRef.current);
+        }
+        viewportFrameTimeRef.current = null;
+        advanceBoardViewport(viewportRef, update);
+        if (viewportPanFrameRef.current !== null)
+            return;
+        viewportPanFrameRef.current = requestAnimationFrame(() => {
+            viewportPanFrameRef.current = null;
+            displayedViewportRef.current = viewportRef.current;
+            setViewport(displayedViewportRef.current);
         });
     }, []);
     const queueInlineViewportUpdate = useCallback((update) => {
-        advanceBoardViewport(inlineViewportRef, update);
-        if (inlineViewportFrameRef.current !== null)
-            return;
-        inlineViewportFrameRef.current = requestAnimationFrame(() => {
+        if (inlineViewportFrameRef.current !== null) {
+            cancelAnimationFrame(inlineViewportFrameRef.current);
             inlineViewportFrameRef.current = null;
-            setInlineViewport(inlineViewportRef.current);
+        }
+        inlineViewportFrameTimeRef.current = null;
+        advanceBoardViewport(inlineViewportRef, update);
+        if (inlineViewportPanFrameRef.current !== null)
+            return;
+        inlineViewportPanFrameRef.current = requestAnimationFrame(() => {
+            inlineViewportPanFrameRef.current = null;
+            displayedInlineViewportRef.current = inlineViewportRef.current;
+            setInlineViewport(displayedInlineViewportRef.current);
         });
     }, []);
+    const dampViewportUpdate = useCallback((update) => {
+        advanceBoardViewport(viewportRef, update);
+        if (prefersReducedMotion) {
+            updateViewport(viewportRef.current);
+            return;
+        }
+        if (viewportPanFrameRef.current !== null) {
+            cancelAnimationFrame(viewportPanFrameRef.current);
+            viewportPanFrameRef.current = null;
+        }
+        if (viewportFrameRef.current !== null)
+            return;
+        const animate = (timestamp) => {
+            const previousTime = viewportFrameTimeRef.current;
+            viewportFrameTimeRef.current = timestamp;
+            const next = dampBoardViewport(displayedViewportRef.current, viewportRef.current, previousTime === null ? 16 : Math.min(32, timestamp - previousTime));
+            if (boardViewportHasSettled(next, viewportRef.current)) {
+                displayedViewportRef.current = viewportRef.current;
+                viewportFrameRef.current = null;
+                viewportFrameTimeRef.current = null;
+                setViewport(viewportRef.current);
+                return;
+            }
+            displayedViewportRef.current = next;
+            setViewport(next);
+            viewportFrameRef.current = requestAnimationFrame(animate);
+        };
+        viewportFrameRef.current = requestAnimationFrame(animate);
+    }, [prefersReducedMotion, updateViewport]);
+    const dampInlineViewportUpdate = useCallback((update) => {
+        advanceBoardViewport(inlineViewportRef, update);
+        if (prefersReducedMotion) {
+            updateInlineViewport(inlineViewportRef.current);
+            return;
+        }
+        if (inlineViewportPanFrameRef.current !== null) {
+            cancelAnimationFrame(inlineViewportPanFrameRef.current);
+            inlineViewportPanFrameRef.current = null;
+        }
+        if (inlineViewportFrameRef.current !== null)
+            return;
+        const animate = (timestamp) => {
+            const previousTime = inlineViewportFrameTimeRef.current;
+            inlineViewportFrameTimeRef.current = timestamp;
+            const next = dampBoardViewport(displayedInlineViewportRef.current, inlineViewportRef.current, previousTime === null ? 16 : Math.min(32, timestamp - previousTime));
+            if (boardViewportHasSettled(next, inlineViewportRef.current)) {
+                displayedInlineViewportRef.current = inlineViewportRef.current;
+                inlineViewportFrameRef.current = null;
+                inlineViewportFrameTimeRef.current = null;
+                setInlineViewport(inlineViewportRef.current);
+                return;
+            }
+            displayedInlineViewportRef.current = next;
+            setInlineViewport(next);
+            inlineViewportFrameRef.current = requestAnimationFrame(animate);
+        };
+        inlineViewportFrameRef.current = requestAnimationFrame(animate);
+    }, [prefersReducedMotion, updateInlineViewport]);
     useEffect(() => () => {
         if (viewportFrameRef.current !== null)
             cancelAnimationFrame(viewportFrameRef.current);
         if (inlineViewportFrameRef.current !== null) {
             cancelAnimationFrame(inlineViewportFrameRef.current);
+        }
+        if (viewportPanFrameRef.current !== null)
+            cancelAnimationFrame(viewportPanFrameRef.current);
+        if (inlineViewportPanFrameRef.current !== null) {
+            cancelAnimationFrame(inlineViewportPanFrameRef.current);
         }
     }, []);
     const updateMediaTransform = useCallback((update) => {
@@ -196,7 +291,7 @@ export function Board({ className, children, document: controlledDocument, defau
             return { height: stage.offsetHeight, left: 0, top: 0, width: stage.offsetWidth };
         }
         const canvasRect = canvas.getBoundingClientRect();
-        const current = viewportRef.current;
+        const current = displayedViewportRef.current;
         const left = Math.min(...rects.map((rect) => rect.left));
         const right = Math.max(...rects.map((rect) => rect.right));
         const top = Math.min(...rects.map((rect) => rect.top));
@@ -249,12 +344,12 @@ export function Board({ className, children, document: controlledDocument, defau
         const pointY = clientY === undefined ? rect.height / 2 : clientY - rect.top;
         const contentX = (pointX - current.x) / current.scale;
         const contentY = (pointY - current.y) / current.scale;
-        updateViewport({
+        dampViewportUpdate({
             x: pointX - contentX * scale,
             y: pointY - contentY * scale,
             scale,
         });
-    }, [updateViewport]);
+    }, [dampViewportUpdate]);
     const zoomBy = useCallback((factor) => {
         zoomAt(viewportRef.current.scale * factor);
     }, [zoomAt]);
@@ -294,7 +389,7 @@ export function Board({ className, children, document: controlledDocument, defau
         if (!stage)
             return;
         const stageRect = stage.getBoundingClientRect();
-        const scale = viewportRef.current.scale;
+        const scale = displayedViewportRef.current.scale;
         setEditor({
             fontSize: request.fontSize / scale,
             nodeId: request.nodeId,
@@ -593,7 +688,7 @@ export function Board({ className, children, document: controlledDocument, defau
             const pointY = event.clientY - rect.top;
             const contentX = (pointX - current.x) / current.scale;
             const contentY = (pointY - current.y) / current.scale;
-            queueViewportUpdate({
+            dampViewportUpdate({
                 x: pointX - contentX * scale,
                 y: pointY - contentY * scale,
                 scale,
@@ -605,7 +700,7 @@ export function Board({ className, children, document: controlledDocument, defau
             x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
             y: current.y - (event.shiftKey ? 0 : deltaY),
         }));
-    }, [queueViewportUpdate]);
+    }, [dampViewportUpdate, queueViewportUpdate]);
     useEffect(() => {
         if (!open)
             return;
@@ -634,7 +729,7 @@ export function Board({ className, children, document: controlledDocument, defau
                     WHEEL_ZOOM_SENSITIVITY), MIN_ZOOM, MAX_ZOOM);
             const contentX = (pointX - current.x) / current.scale;
             const contentY = (pointY - current.y) / current.scale;
-            queueInlineViewportUpdate({
+            dampInlineViewportUpdate({
                 x: pointX - contentX * scale,
                 y: pointY - contentY * scale,
                 scale,
@@ -646,7 +741,7 @@ export function Board({ className, children, document: controlledDocument, defau
             x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
             y: current.y - (event.shiftKey ? 0 : deltaY),
         }));
-    }, [queueInlineViewportUpdate, zoomable]);
+    }, [dampInlineViewportUpdate, queueInlineViewportUpdate, zoomable]);
     useEffect(() => {
         if (open || !zoomable)
             return;
@@ -801,7 +896,7 @@ export function Board({ className, children, document: controlledDocument, defau
         const session = mediaDragRef.current;
         if (!session || session.pointerId !== event.pointerId)
             return;
-        const scale = viewportRef.current.scale;
+        const scale = displayedViewportRef.current.scale;
         const deltaX = (event.clientX - session.pointerStart.x) / scale;
         const deltaY = (event.clientY - session.pointerStart.y) / scale;
         if (session.mode === 'move') {

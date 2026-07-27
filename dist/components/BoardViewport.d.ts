@@ -21,5 +21,16 @@ export declare function advanceBoardViewport(viewportRef: MutableViewportRef, up
  * applying the exponential zoom curve.
  */
 export declare function normalizeBoardWheelDelta(delta: number, deltaMode: number, pageSize: number): number;
+/**
+ * Move the displayed viewport toward its latest interaction target with a
+ * frame-rate-independent, critically damped response. The exponential curve
+ * never overshoots and does not restart when more wheel events arrive.
+ */
+export declare function dampBoardViewport(current: BoardViewport, target: BoardViewport, elapsedMs: number, responseMs?: number): {
+    x: number;
+    y: number;
+    scale: number;
+};
+export declare function boardViewportHasSettled(current: BoardViewport, target: BoardViewport): boolean;
 export {};
 //# sourceMappingURL=BoardViewport.d.ts.map

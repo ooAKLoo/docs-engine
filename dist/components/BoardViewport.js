@@ -1,3 +1,4 @@
+const DEFAULT_VIEWPORT_RESPONSE_MS = 55;
 /**
  * Resolve and publish a viewport update synchronously.
  *
@@ -23,5 +24,23 @@ export function normalizeBoardWheelDelta(delta, deltaMode, pageSize) {
     if (deltaMode === 2)
         return delta * Math.max(1, pageSize);
     return delta;
+}
+/**
+ * Move the displayed viewport toward its latest interaction target with a
+ * frame-rate-independent, critically damped response. The exponential curve
+ * never overshoots and does not restart when more wheel events arrive.
+ */
+export function dampBoardViewport(current, target, elapsedMs, responseMs = DEFAULT_VIEWPORT_RESPONSE_MS) {
+    const alpha = 1 - Math.exp(-Math.max(0, elapsedMs) / Math.max(1, responseMs));
+    return {
+        x: current.x + (target.x - current.x) * alpha,
+        y: current.y + (target.y - current.y) * alpha,
+        scale: current.scale + (target.scale - current.scale) * alpha,
+    };
+}
+export function boardViewportHasSettled(current, target) {
+    return (Math.abs(current.x - target.x) < 0.1 &&
+        Math.abs(current.y - target.y) < 0.1 &&
+        Math.abs(current.scale - target.scale) < 0.0005);
 }
 //# sourceMappingURL=BoardViewport.js.map
