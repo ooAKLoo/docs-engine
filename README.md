@@ -21,6 +21,7 @@ pnpm showcase
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board 与导入器）。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
+- `markdownInlineToPlainText()`：把标题中的强调、行内代码和链接等 Markdown 语法归一为目录与锚点使用的可见纯文本；正文仍按 Markdown 语义渲染。
 - React 作为 peer dependency，同时兼容 React 18 与 React 19。
 
 ### 飞书高亮块色系
@@ -54,7 +55,7 @@ Docusaurus 主题在每篇文档标题旁提供“复制全文”。复制结果
 
 ### 文档创作 Skill
 
-`skills/author-technical-docs` 指导 Agent 在写作阶段选择正文、公式、表格、代码、Callout、时间轴与原生图表。Skill 明确禁止依靠运行时文本特征猜测语义，并提供适用于 Lula、oVita 及其他依赖项目的结构决策、MDX 写法和发布前检查清单。软件架构内容还必须先选择读者视图：静态边界使用 C4 / Component / Deployment，跨参与者调用使用 Sequence，生命周期使用 State，数据结构使用 ER / Class；超过复杂度阈值时按视图拆图，不得把所有关系退化成一张 `flowchart`。
+`skills/author-technical-docs` 指导 Agent 在写作阶段选择正文、公式、表格、列表、代码、Callout、时间轴与原生图表。Skill 明确禁止依靠运行时文本特征猜测语义，并提供适用于 Lula、oVita 及其他依赖项目的结构决策、信息密度规则、MDX 写法和发布前检查清单。五项以上短字段、连续短列表和重复“分类 → 包含内容”结构必须先评估行内并列、紧凑定义行或两列表格，不能只靠缩小间距。软件架构内容还必须先选择读者视图：静态边界使用 C4 / Component / Deployment，跨参与者调用使用 Sequence，生命周期使用 State，数据结构使用 ER / Class；超过复杂度阈值时按视图拆图，不得把所有关系退化成一张 `flowchart`。
 
 ## 宿主边界
 

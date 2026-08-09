@@ -45,6 +45,11 @@
       "import": "./dist/model.js",
       "default": "./dist/model.js"
     },
+    "./markdown": {
+      "types": "./dist/markdown.d.ts",
+      "import": "./dist/markdown.js",
+      "default": "./dist/markdown.js"
+    },
     "./styles.css": "./styles/index.css",
     "./tokens.css": "./styles/tokens.css",
     "./package.json": "./package.json"

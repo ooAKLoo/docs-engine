@@ -17,6 +17,14 @@ const docusaurusMdxComponents = await readFile(
 const showcase = await readFile(new URL('../showcase/src/Gallery.tsx', import.meta.url), 'utf8');
 const model = await readFile(new URL('../src/model.ts', import.meta.url), 'utf8');
 const agent = await readFile(new URL('../src/agent.ts', import.meta.url), 'utf8');
+const authorTechnicalDocsSkill = await readFile(
+  new URL('../skills/author-technical-docs/SKILL.md', import.meta.url),
+  'utf8',
+);
+const informationDensityGuidance = await readFile(
+  new URL('../skills/author-technical-docs/references/information-density.md', import.meta.url),
+  'utf8',
+);
 
 test('publishes stable package entry points', () => {
   assert.ok(packageJson.exports['.']);
@@ -24,6 +32,7 @@ test('publishes stable package entry points', () => {
   assert.ok(packageJson.exports['./adapters/docusaurus']);
   assert.ok(packageJson.exports['./adapters/docusaurus-theme']);
   assert.ok(packageJson.exports['./agent']);
+  assert.ok(packageJson.exports['./markdown']);
   assert.ok(packageJson.files.includes('skills'));
   assert.equal(packageJson.peerDependencies.react, '>=18 <20');
   assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
@@ -31,6 +40,18 @@ test('publishes stable package entry points', () => {
   assert.equal(packageJson.dependencies['lucide-react'], '^1.24.0');
   assert.equal(packageJson.dependencies.mermaid, undefined);
   assert.equal(packageJson.dependencies.katex, '^0.16.47');
+});
+
+test('publishes plain-text extraction for headings and table-of-contents labels', () => {
+  assert.match(index, /markdownInlineToPlainText/);
+});
+
+test('publishes explicit information-density authoring guidance', () => {
+  assert.match(authorTechnicalDocsSkill, /信息密度与紧凑表达/);
+  assert.match(authorTechnicalDocsSkill, /五项以上且无需分别解释的短名词或短字段/);
+  assert.match(informationDensityGuidance, /紧凑定义行/);
+  assert.match(informationDensityGuidance, /两列表格/);
+  assert.match(informationDensityGuidance, /不要交给渲染器猜/);
 });
 
 test('keeps annotation and table visuals borderless', () => {

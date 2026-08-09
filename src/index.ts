@@ -83,6 +83,7 @@ export {
   type TransitionProps,
 } from './components/Transition.js';
 export {Video, type VideoProps} from './components/Video.js';
+export {markdownInlineToPlainText} from './markdown.js';
 export type {
   CalloutVariant,
   DocBlock,

@@ -21,5 +21,6 @@ export { TableScroll, type TableScrollProps } from './components/TableScroll.js'
 export { Timeline, type TimelineChangeMeta, type TimelineChangeReason, type TimelineProps, } from './components/Timeline.js';
 export { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, type TransitionCardProps, type TransitionPartProps, type TransitionProps, } from './components/Transition.js';
 export { Video, type VideoProps } from './components/Video.js';
+export { markdownInlineToPlainText } from './markdown.js';
 export type { CalloutVariant, DocBlock, DocumentModel, HeadingLink, TimelineItem, TimelineScale, } from './model.js';
 //# sourceMappingURL=index.d.ts.map

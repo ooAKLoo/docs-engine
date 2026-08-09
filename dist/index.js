@@ -20,4 +20,5 @@ export { TableScroll } from './components/TableScroll.js';
 export { Timeline, } from './components/Timeline.js';
 export { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, } from './components/Transition.js';
 export { Video } from './components/Video.js';
+export { markdownInlineToPlainText } from './markdown.js';
 //# sourceMappingURL=index.js.map
