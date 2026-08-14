@@ -74,7 +74,7 @@ test('owns strict CJK line breaking across host prose styles', () => {
 });
 
 test('uses one neutral GPT-style surface for document summaries', () => {
-  assert.match(tokens, /--de-summary-background:\s*#f4f4f4/);
+  assert.match(tokens, /--de-summary-background:\s*#f3f3f3/);
   assert.match(
     styles,
     /\.de-summary-panel\s*\{[^}]*background:\s*var\(--de-summary-background\);/s,
