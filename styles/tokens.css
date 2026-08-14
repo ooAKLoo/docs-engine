@@ -2,6 +2,7 @@
   --de-page: #fbfcfe;
   --de-surface: #ffffff;
   --de-surface-soft: #f7f9fc;
+  --de-summary-background: #f4f4f4;
   --de-ink: #101828;
   --de-ink-soft: #475467;
   --de-muted: #667085;
@@ -49,6 +50,7 @@
   --de-page: #0b1220;
   --de-surface: #111827;
   --de-surface-soft: #172033;
+  --de-summary-background: rgba(255, 255, 255, 0.08);
   --de-ink: #f8fafc;
   --de-ink-soft: #cbd5e1;
   --de-muted: #94a3b8;

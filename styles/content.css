@@ -406,9 +406,7 @@
   padding: 2rem 2.25rem;
   border: 0;
   border-radius: 22px;
-  background:
-    radial-gradient(circle at 95% 12%, rgba(225, 206, 221, 0.52) 0 6.5rem, transparent 6.55rem),
-    linear-gradient(112deg, #f3f6fc 0%, #ffffff 58%, #fff5ec 100%);
+  background: var(--de-summary-background);
   box-shadow: none;
 }
 

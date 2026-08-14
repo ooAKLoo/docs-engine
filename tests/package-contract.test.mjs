@@ -73,6 +73,15 @@ test('owns strict CJK line breaking across host prose styles', () => {
   assert.doesNotMatch(styles, /line-break:\s*loose/);
 });
 
+test('uses one neutral GPT-style surface for document summaries', () => {
+  assert.match(tokens, /--de-summary-background:\s*#f4f4f4/);
+  assert.match(
+    styles,
+    /\.de-summary-panel\s*\{[^}]*background:\s*var\(--de-summary-background\);/s,
+  );
+  assert.doesNotMatch(styles, /\.de-summary-panel\s*\{[^}]*(?:linear|radial)-gradient/s);
+});
+
 test('keeps table identifiers intact and lets dense tables scroll', () => {
   assert.match(
     styles,
