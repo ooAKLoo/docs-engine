@@ -29,6 +29,7 @@ export function Board({ className, children, document: controlledDocument, defau
     const dialogId = useId();
     const inlineFigureRef = useRef(null);
     const inlineCanvasRef = useRef(null);
+    const inlineStageRef = useRef(null);
     const viewerFigureRef = useRef(null);
     const canvasRef = useRef(null);
     const stageRef = useRef(null);
@@ -50,7 +51,10 @@ export function Board({ className, children, document: controlledDocument, defau
     const marqueeSessionRef = useRef(null);
     const spacePressedRef = useRef(false);
     const boardToolRef = useRef(canEdit ? 'select' : 'hand');
-    const hasFittedRef = useRef(false);
+    // While true the full-screen viewport is under automatic control: the board
+    // keeps re-fitting itself as the dialog, fonts and measured labels settle.
+    // The first manual pan or zoom hands the viewport over to the user.
+    const autoFitViewportRef = useRef(false);
     const mediaDragRef = useRef(null);
     const mediaTransformRef = useRef(resolveMediaTransform(mediaTransformValue));
     const prefersReducedMotion = useReducedMotion();
@@ -118,6 +122,30 @@ export function Board({ className, children, document: controlledDocument, defau
             setInternalDocument(next);
         onDocumentChange?.({ ...meta, document: next, operation });
     }, [controlledDocument, onDocumentChange]);
+    // Promote the stage to a compositor layer only while a pan or zoom is in
+    // flight: the gesture animates on the GPU, and releasing the hint right
+    // after lets the browser re-rasterize the SVG crisply at the settled scale.
+    const stageWillChangeTimerRef = useRef(null);
+    const inlineStageWillChangeTimerRef = useRef(null);
+    const holdStageWillChange = useCallback((stage, timerRef) => {
+        if (stage)
+            stage.style.willChange = 'transform';
+        if (timerRef.current !== null)
+            window.clearTimeout(timerRef.current);
+        timerRef.current = window.setTimeout(() => {
+            timerRef.current = null;
+            if (stage)
+                stage.style.willChange = '';
+        }, 240);
+    }, []);
+    const releaseStageWillChange = useCallback((stage, timerRef) => {
+        if (timerRef.current !== null) {
+            window.clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        if (stage)
+            stage.style.willChange = '';
+    }, []);
     const updateViewport = useCallback((update) => {
         if (viewportFrameRef.current !== null) {
             cancelAnimationFrame(viewportFrameRef.current);
@@ -128,10 +156,11 @@ export function Board({ className, children, document: controlledDocument, defau
             viewportPanFrameRef.current = null;
         }
         viewportFrameTimeRef.current = null;
+        releaseStageWillChange(stageRef.current, stageWillChangeTimerRef);
         const next = advanceBoardViewport(viewportRef, update);
         displayedViewportRef.current = next;
         setViewport(next);
-    }, []);
+    }, [releaseStageWillChange]);
     const updateInlineViewport = useCallback((update) => {
         if (inlineViewportFrameRef.current !== null) {
             cancelAnimationFrame(inlineViewportFrameRef.current);
@@ -142,11 +171,16 @@ export function Board({ className, children, document: controlledDocument, defau
             inlineViewportPanFrameRef.current = null;
         }
         inlineViewportFrameTimeRef.current = null;
+        releaseStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
         const next = advanceBoardViewport(inlineViewportRef, update);
         displayedInlineViewportRef.current = next;
         setInlineViewport(next);
-    }, []);
+    }, [releaseStageWillChange]);
     const queueViewportUpdate = useCallback((update) => {
+        // Only user gestures route through here, so the viewport leaves automatic
+        // fit-on-open control from now on.
+        autoFitViewportRef.current = false;
+        holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
         if (viewportFrameRef.current !== null) {
             cancelAnimationFrame(viewportFrameRef.current);
             viewportFrameRef.current = null;
@@ -160,8 +194,9 @@ export function Board({ className, children, document: controlledDocument, defau
             displayedViewportRef.current = viewportRef.current;
             setViewport(displayedViewportRef.current);
         });
-    }, []);
+    }, [holdStageWillChange]);
     const queueInlineViewportUpdate = useCallback((update) => {
+        holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
         if (inlineViewportFrameRef.current !== null) {
             cancelAnimationFrame(inlineViewportFrameRef.current);
             inlineViewportFrameRef.current = null;
@@ -175,13 +210,15 @@ export function Board({ className, children, document: controlledDocument, defau
             displayedInlineViewportRef.current = inlineViewportRef.current;
             setInlineViewport(displayedInlineViewportRef.current);
         });
-    }, []);
+    }, [holdStageWillChange]);
     const dampViewportUpdate = useCallback((update) => {
+        autoFitViewportRef.current = false;
         advanceBoardViewport(viewportRef, update);
         if (prefersReducedMotion) {
             updateViewport(viewportRef.current);
             return;
         }
+        holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
         if (viewportPanFrameRef.current !== null) {
             cancelAnimationFrame(viewportPanFrameRef.current);
             viewportPanFrameRef.current = null;
@@ -196,21 +233,24 @@ export function Board({ className, children, document: controlledDocument, defau
                 displayedViewportRef.current = viewportRef.current;
                 viewportFrameRef.current = null;
                 viewportFrameTimeRef.current = null;
+                releaseStageWillChange(stageRef.current, stageWillChangeTimerRef);
                 setViewport(viewportRef.current);
                 return;
             }
+            holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
             displayedViewportRef.current = next;
             setViewport(next);
             viewportFrameRef.current = requestAnimationFrame(animate);
         };
         viewportFrameRef.current = requestAnimationFrame(animate);
-    }, [prefersReducedMotion, updateViewport]);
+    }, [holdStageWillChange, prefersReducedMotion, releaseStageWillChange, updateViewport]);
     const dampInlineViewportUpdate = useCallback((update) => {
         advanceBoardViewport(inlineViewportRef, update);
         if (prefersReducedMotion) {
             updateInlineViewport(inlineViewportRef.current);
             return;
         }
+        holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
         if (inlineViewportPanFrameRef.current !== null) {
             cancelAnimationFrame(inlineViewportPanFrameRef.current);
             inlineViewportPanFrameRef.current = null;
@@ -225,15 +265,17 @@ export function Board({ className, children, document: controlledDocument, defau
                 displayedInlineViewportRef.current = inlineViewportRef.current;
                 inlineViewportFrameRef.current = null;
                 inlineViewportFrameTimeRef.current = null;
+                releaseStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
                 setInlineViewport(inlineViewportRef.current);
                 return;
             }
+            holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
             displayedInlineViewportRef.current = next;
             setInlineViewport(next);
             inlineViewportFrameRef.current = requestAnimationFrame(animate);
         };
         inlineViewportFrameRef.current = requestAnimationFrame(animate);
-    }, [prefersReducedMotion, updateInlineViewport]);
+    }, [holdStageWillChange, prefersReducedMotion, releaseStageWillChange, updateInlineViewport]);
     useEffect(() => () => {
         if (viewportFrameRef.current !== null)
             cancelAnimationFrame(viewportFrameRef.current);
@@ -308,6 +350,7 @@ export function Board({ className, children, document: controlledDocument, defau
         const bounds = measureContentBounds();
         if (!canvas || !bounds)
             return;
+        autoFitViewportRef.current = false;
         updateViewport({
             x: (canvas.clientWidth - bounds.width * scale) / 2 - bounds.left * scale,
             y: (canvas.clientHeight - bounds.height * scale) / 2 - bounds.top * scale,
@@ -327,10 +370,9 @@ export function Board({ className, children, document: controlledDocument, defau
             y: (canvas.clientHeight - bounds.height * scale) / 2 - bounds.top * scale,
             scale,
         });
-        hasFittedRef.current = true;
     }, [measureContentBounds, updateViewport]);
     const handleBoardReady = useCallback(() => {
-        if (!hasFittedRef.current)
+        if (autoFitViewportRef.current)
             requestAnimationFrame(fitView);
     }, [fitView]);
     const zoomAt = useCallback((nextScale, clientX, clientY) => {
@@ -380,7 +422,7 @@ export function Board({ className, children, document: controlledDocument, defau
         setSelectedEdgeId(null);
         setMediaSelected(false);
         setShapePicker(null);
-        hasFittedRef.current = false;
+        autoFitViewportRef.current = true;
         updateViewport({ x: 0, y: 0, scale: 1 });
         setOpen(true);
     }, [canEdit, initialMode, setBoardTool, updateViewport, zoomable]);
@@ -625,20 +667,29 @@ export function Board({ className, children, document: controlledDocument, defau
     useEffect(() => {
         if (!open)
             return;
+        const autoFit = () => {
+            if (autoFitViewportRef.current)
+                fitView();
+        };
         let firstFrame = requestAnimationFrame(() => {
-            firstFrame = requestAnimationFrame(fitView);
+            firstFrame = requestAnimationFrame(autoFit);
         });
-        const stage = stageRef.current;
-        const observer = typeof ResizeObserver === 'undefined'
-            ? null
-            : new ResizeObserver(() => {
-                if (!hasFittedRef.current)
-                    fitView();
-            });
-        if (stage)
-            observer?.observe(stage);
+        // The dialog geometry, web fonts and measured labels can all settle after
+        // the first fit ran, which previously left the content off-screen. Keep
+        // re-fitting until the user takes over the viewport; re-running is
+        // idempotent once the layout is stable.
+        const retries = [120, 360, 800].map((delay) => window.setTimeout(autoFit, delay));
+        if (typeof document !== 'undefined' && 'fonts' in document) {
+            void document.fonts.ready.then(autoFit);
+        }
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(autoFit);
+        if (stageRef.current)
+            observer?.observe(stageRef.current);
+        if (canvasRef.current)
+            observer?.observe(canvasRef.current);
         return () => {
             cancelAnimationFrame(firstFrame);
+            retries.forEach((timer) => window.clearTimeout(timer));
             observer?.disconnect();
         };
     }, [fitView, open]);
@@ -934,8 +985,10 @@ export function Board({ className, children, document: controlledDocument, defau
                         }, children: [canEdit ? (_jsx(PenLine, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 })) : (_jsx(Eye, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 })), _jsx("span", { children: canEdit ? '编辑' : '查看' })] }), _jsx("span", { className: "de-diagram-inline-divider", "aria-hidden": "true" }), _jsx("button", { type: "button", "aria-label": `全屏打开画板：${accessibleTitle}`, title: "\u5168\u5C4F\u6253\u5F00", onClick: (event) => {
                             event.stopPropagation();
                             openViewer(canEdit ? 'edit' : 'view');
-                        }, children: _jsx(Maximize2, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 }) })] })) : null, _jsx("div", { ref: inlineCanvasRef, className: "de-diagram-inline-canvas", children: _jsx("div", { className: "de-diagram-inline-stage", style: {
-                        transform: `translate3d(${inlineViewport.x}px, ${inlineViewport.y}px, 0) scale(${inlineViewport.scale})`,
+                        }, children: _jsx(Maximize2, { "aria-hidden": "true", size: 18, strokeWidth: 1.9 }) })] })) : null, _jsx("div", { ref: inlineCanvasRef, className: "de-diagram-inline-canvas", children: _jsx("div", { ref: inlineStageRef, className: "de-diagram-inline-stage", style: {
+                        // A 2d translate keeps the stage out of a permanent compositor
+                        // layer, so the SVG re-rasterizes crisply at the settled zoom.
+                        transform: `translate(${inlineViewport.x}px, ${inlineViewport.y}px) scale(${inlineViewport.scale})`,
                     }, children: boardDocument ? (_jsx(BoardCanvas, { accessibleLabel: accessibleTitle, document: boardDocument, editable: false, fitContent: true, panActive: false })) : importSource ? (_jsx(BoardLoadState, { error: importError })) : (children) }) })] }));
     const canvasStyle = {
         '--de-diagram-grid-size': `${22 * viewport.scale}px`,
@@ -952,9 +1005,9 @@ export function Board({ className, children, document: controlledDocument, defau
                                                                 setBoardTool('hand');
                                                                 setModeMenuOpen(false);
                                                             }, children: [_jsx(Eye, { "aria-hidden": "true", size: 17 }), _jsxs("span", { children: [_jsx("strong", { children: "\u6D4F\u89C8" }), _jsx("small", { children: "\u4EC5\u7F29\u653E\u548C\u5E73\u79FB\u753B\u5E03" })] })] })] })) : null })] }), _jsxs("nav", { className: "de-diagram-board-tools de-diagram-board-float", "aria-label": "\u753B\u677F\u5DE5\u5177", children: [editModeActive ? (_jsx("button", { type: "button", "aria-label": "\u9009\u62E9\u5DE5\u5177", "aria-pressed": boardTool === 'select', title: "\u9009\u62E9", onClick: () => setBoardTool('select'), children: _jsx(MousePointer2, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })) : null, _jsx("button", { type: "button", "aria-label": "\u624B\u578B\u79FB\u52A8\u5DE5\u5177", "aria-keyshortcuts": "H", "aria-pressed": boardTool === 'hand', title: "\u79FB\u52A8\u753B\u5E03\uFF08H\uFF09", onClick: () => setBoardTool(boardTool === 'hand' ? 'select' : 'hand'), children: _jsx(Hand, { "aria-hidden": "true", size: 20, strokeWidth: 1.8 }) })] }), _jsxs(m.div, { ref: canvasRef, className: "de-diagram-viewer-canvas", "data-grid": grid ? 'true' : undefined, "data-pan-active": canvasPanActive ? 'true' : undefined, "data-panning": isPanning ? 'true' : undefined, "data-selecting": marqueeRect ? 'true' : undefined, style: canvasStyle, onContextMenu: (event) => event.preventDefault(), onPointerDown: handleCanvasPointerDown, onPointerMove: handleCanvasPointerMove, onPointerUp: finishCanvasInteraction, onPointerCancel: (event) => finishCanvasInteraction(event, true), children: [_jsxs("div", { ref: stageRef, className: "de-diagram-viewer-stage", style: {
-                                                    transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`,
+                                                    transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
                                                 }, children: [_jsx("figure", { ref: viewerFigureRef, className: joinClassNames('de-diagram', 'de-diagram-viewer-figure', className), "data-editable": editModeActive ? 'true' : undefined, "data-viewer": "true", ...props, children: boardDocument ? (_jsx(BoardCanvas, { accessibleLabel: accessibleTitle, document: boardDocument, editable: editModeActive, editingNodeId: editor?.nodeId, onChange: handleDiagramNodeChange, onConnect: handleConnect, onConnectionDrop: handleConnectionDrop, onEdgeRouteChange: handleEdgeRouteChange, onEditRequest: handleEditRequest, onReady: handleBoardReady, onSelectNode: handleSelectNode, onSelectEdge: handleSelectEdge, panActive: canvasPanActive, selectedEdgeId: selectedEdgeId, selectedNodeIds: selectedNodeIds })) : importSource ? (_jsx(BoardLoadState, { error: importError })) : (_jsxs("div", { ref: mediaItemRef, className: "de-diagram-media-item", "data-de-media-item": "true", "data-selected": mediaSelected ? 'true' : undefined, style: {
-                                                                transform: `translate3d(${mediaTransform.x}px, ${mediaTransform.y}px, 0) scale(${mediaTransform.scale})`,
+                                                                transform: `translate(${mediaTransform.x}px, ${mediaTransform.y}px) scale(${mediaTransform.scale})`,
                                                             }, onPointerDown: (event) => beginMediaInteraction(event, 'move'), onPointerMove: moveMediaInteraction, onPointerUp: finishMediaInteraction, onPointerCancel: cancelMediaInteraction, children: [children, editModeActive && mediaSelected && !canvasPanActive ? (_jsx("span", { className: "de-diagram-media-scale-handle", "aria-label": "\u8C03\u6574\u56FE\u7247\u6216\u56FE\u5F62\u5927\u5C0F", role: "button", tabIndex: 0, onPointerDown: (event) => beginMediaInteraction(event, 'scale') })) : null] })) }), _jsx(AnimatePresence, { children: editor ? (_jsx("div", { className: "de-diagram-node-editor", style: {
                                                                 left: editor.left,
                                                                 top: editor.top,

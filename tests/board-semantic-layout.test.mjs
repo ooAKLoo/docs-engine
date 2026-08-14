@@ -771,6 +771,88 @@ test('rounds fan-in endpoint turns while preserving the central T junction', asy
   );
 });
 
+test('lays out an unordered two-level tree without route crossings or overlaps', async () => {
+  // Leaves are declared out of parent order on purpose: the automatic layout
+  // must reorder every rank itself before the router can stay planar.
+  const document = withoutAuthoredGeometry(await importMermaid(`flowchart TD
+    root[商业模式] --> who[WHO]
+    root --> what[WHAT]
+    root --> how[HOW]
+    root --> money[MONEY]
+    root --> time[TIME]
+    root --> feedback[FEEDBACK]
+    who --> n1[1 参与者]
+    who --> n2[2 Job / Problem]
+    what --> n3[3 价值]
+    what --> n4[4 价值载体]
+    money --> n5[5 盈利]
+    money --> n6[6 计价单位]
+    time --> n7[7 付款时点]
+    how --> n8[8 成本承担]
+    how --> n9[9 获客方式]
+    time --> n10[10 关系持续时间]
+    money --> n11[11 交叉补贴]
+    feedback --> n12[12 反馈环]`));
+  const markup = renderDocument(document);
+  const paths = [
+    ...[...markup.matchAll(
+      /<g class="de-board__edge" data-de-edge-id="([^"]+)"[\s\S]*?<path d="([^"]+)" class="de-board__edge-path"/gu,
+    )],
+    ...[...markup.matchAll(
+      /<g class="de-board__edge-trunk"[^>]*data-de-bundle-key="([^"]+)"[^>]*><path d="([^"]+)"/gu,
+    )],
+  ].map((match) => ({d: match[2], id: match[1]}));
+  const segments = paths.flatMap(({d, id}) => {
+    const result = [];
+    let current;
+    for (const token of d.match(/[MLA][^MLA]*/gu) ?? []) {
+      const numbers = (token.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
+      const point = {x: numbers.at(-2), y: numbers.at(-1)};
+      if (token[0] !== 'M' && current) result.push({a: current, b: point, id});
+      current = point;
+    }
+    return result;
+  });
+  const axisOf = (segment) =>
+    Math.abs(segment.a.y - segment.b.y) < 0.01
+      ? 'h'
+      : Math.abs(segment.a.x - segment.b.x) < 0.01
+        ? 'v'
+        : 'd';
+  const conflicts = [];
+  segments.forEach((first, index) => {
+    segments.slice(index + 1).forEach((second) => {
+      if (first.id === second.id) return;
+      const firstAxis = axisOf(first);
+      const secondAxis = axisOf(second);
+      if (firstAxis === 'd' || secondAxis === 'd') return;
+      if (firstAxis === secondAxis) {
+        const along = firstAxis === 'h' ? 'x' : 'y';
+        const across = firstAxis === 'h' ? 'y' : 'x';
+        const overlap =
+          Math.min(Math.max(first.a[along], first.b[along]), Math.max(second.a[along], second.b[along])) -
+          Math.max(Math.min(first.a[along], first.b[along]), Math.min(second.a[along], second.b[along]));
+        if (Math.abs(first.a[across] - second.a[across]) < 0.75 && overlap > 2) {
+          conflicts.push(`overlap ${first.id} / ${second.id}`);
+        }
+        return;
+      }
+      const h = firstAxis === 'h' ? first : second;
+      const v = firstAxis === 'h' ? second : first;
+      if (
+        v.a.x > Math.min(h.a.x, h.b.x) + 0.75 &&
+        v.a.x < Math.max(h.a.x, h.b.x) - 0.75 &&
+        h.a.y > Math.min(v.a.y, v.b.y) + 0.75 &&
+        h.a.y < Math.max(v.a.y, v.b.y) - 0.75
+      ) {
+        conflicts.push(`crossing ${h.id} × ${v.id}`);
+      }
+    });
+  });
+
+  assert.deepEqual(conflicts, []);
+});
+
 test('routes structurally detected Lula feedback edges on distinct outer lanes', async () => {
   const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     dialogue[收集并脱敏优秀对话] --> principle[提炼交流原则]

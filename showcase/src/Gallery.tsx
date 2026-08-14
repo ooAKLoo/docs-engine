@@ -1,7 +1,9 @@
-import {useState, type CSSProperties} from 'react';
+import {useEffect, useState, type CSSProperties} from 'react';
 import {
   Annotation,
   Board,
+  type BoardDocument,
+  importMermaid,
   Callout,
   CodeBlock,
   DocumentContent,
@@ -54,6 +56,28 @@ const urbanUberMermaidSource = `flowchart LR
     class phone,gps,payment deBlue
     class city deOrange
     class uber deGreen`;
+
+// Leaves are declared out of parent order on purpose: the automatic layout must
+// reorder each rank itself, otherwise sibling fans cross like the old router.
+const businessModelMermaidSource = `flowchart TD
+    root[商业模式] --> who[WHO]
+    root --> what[WHAT]
+    root --> how[HOW]
+    root --> money[MONEY]
+    root --> time[TIME]
+    root --> feedback[FEEDBACK]
+    who --> n1[1 参与者]
+    who --> n2[2 Job / Problem]
+    what --> n3[3 价值]
+    what --> n4[4 价值载体]
+    money --> n5[5 盈利]
+    money --> n6[6 计价单位]
+    time --> n7[7 付款时点]
+    how --> n8[8 成本承担]
+    how --> n9[9 获客方式]
+    time --> n10[10 关系持续时间]
+    money --> n11[11 交叉补贴]
+    feedback --> n12[12 反馈环]`;
 
 const unifiedBoardMermaidSource = `flowchart LR
     product([首批产品<br/>完成交付准备]) --> koc[7 名 KOC 测试<br/>真实家庭使用]
@@ -446,6 +470,11 @@ export function Gallery() {
             importSource={{format: 'mermaid', source: urbanUberMermaidSource}}
             aria-label="智能手机、GPS、移动支付与 Uber 出现的因果链路"
           />
+          <h3>内置自动排线回归：商业模式树</h3>
+          <p>
+            这棵树刻意打乱叶子节点的声明顺序，并剥离导入几何，完全交给内置自动布局与排线引擎。层内节点会按重心法重排并与父节点对齐，跨层边沿布局方向锚定，因此扇出干线之间不再出现交叉或重叠。
+          </p>
+          <AutoRoutedTreeExample />
           <h3>设计布局，同一 Board</h3>
           <p>
             这张图在 Mermaid 导入时应用精确构图，导入后仍只是一份 <code>BoardDocument</code>。正文内可滚轮平移、⌘ / Ctrl + 滚轮缩放；打开画板后可选中、拖动、双击原地编辑，并从锚点创建或调整连线。
@@ -461,6 +490,41 @@ export function Gallery() {
         </section>
       </main>
     </DocumentContent>
+  );
+}
+
+// Strip the ELK-authored import geometry so the Board exercises the built-in
+// automatic layout and edge routing, exactly like documents without authored
+// positions (for example mindmaps) do.
+function AutoRoutedTreeExample() {
+  const [document, setDocument] = useState<BoardDocument>();
+
+  useEffect(() => {
+    let cancelled = false;
+    void importMermaid(businessModelMermaidSource).then((imported) => {
+      if (cancelled) return;
+      setDocument({
+        ...imported,
+        canvas: undefined,
+        edges: imported.edges.map(
+          ({labelPosition, points, sourceSide, targetSide, ...edge}) => edge,
+        ),
+        nodes: imported.nodes.map(
+          ({height, position, width, ...node}) => node,
+        ),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!document) return null;
+  return (
+    <Board
+      defaultDocument={document}
+      aria-label="商业模式 12 要素的自动布局树"
+    />
   );
 }
 

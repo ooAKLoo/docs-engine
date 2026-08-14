@@ -19,6 +19,7 @@ import type {
   HTMLAttributes,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
+  MutableRefObject,
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import {memo, useCallback, useEffect, useId, useRef, useState} from 'react';
@@ -190,6 +191,7 @@ export function Board({
   const dialogId = useId();
   const inlineFigureRef = useRef<HTMLElement>(null);
   const inlineCanvasRef = useRef<HTMLDivElement>(null);
+  const inlineStageRef = useRef<HTMLDivElement>(null);
   const viewerFigureRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -211,7 +213,10 @@ export function Board({
   const marqueeSessionRef = useRef<MarqueeSession | null>(null);
   const spacePressedRef = useRef(false);
   const boardToolRef = useRef<BoardTool>(canEdit ? 'select' : 'hand');
-  const hasFittedRef = useRef(false);
+  // While true the full-screen viewport is under automatic control: the board
+  // keeps re-fitting itself as the dialog, fonts and measured labels settle.
+  // The first manual pan or zoom hands the viewport over to the user.
+  const autoFitViewportRef = useRef(false);
   const mediaDragRef = useRef<MediaDragSession | null>(null);
   const mediaTransformRef = useRef<MediaTransform>(resolveMediaTransform(mediaTransformValue));
   const prefersReducedMotion = useReducedMotion();
@@ -288,6 +293,33 @@ export function Board({
     [controlledDocument, onDocumentChange],
   );
 
+  // Promote the stage to a compositor layer only while a pan or zoom is in
+  // flight: the gesture animates on the GPU, and releasing the hint right
+  // after lets the browser re-rasterize the SVG crisply at the settled scale.
+  const stageWillChangeTimerRef = useRef<number | null>(null);
+  const inlineStageWillChangeTimerRef = useRef<number | null>(null);
+  const holdStageWillChange = useCallback((
+    stage: HTMLElement | null,
+    timerRef: MutableRefObject<number | null>,
+  ) => {
+    if (stage) stage.style.willChange = 'transform';
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      if (stage) stage.style.willChange = '';
+    }, 240);
+  }, []);
+  const releaseStageWillChange = useCallback((
+    stage: HTMLElement | null,
+    timerRef: MutableRefObject<number | null>,
+  ) => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (stage) stage.style.willChange = '';
+  }, []);
+
   const updateViewport = useCallback(
     (update: BoardViewportUpdate) => {
       if (viewportFrameRef.current !== null) {
@@ -299,11 +331,12 @@ export function Board({
         viewportPanFrameRef.current = null;
       }
       viewportFrameTimeRef.current = null;
+      releaseStageWillChange(stageRef.current, stageWillChangeTimerRef);
       const next = advanceBoardViewport(viewportRef, update);
       displayedViewportRef.current = next;
       setViewport(next);
     },
-    [],
+    [releaseStageWillChange],
   );
 
   const updateInlineViewport = useCallback(
@@ -317,14 +350,19 @@ export function Board({
         inlineViewportPanFrameRef.current = null;
       }
       inlineViewportFrameTimeRef.current = null;
+      releaseStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
       const next = advanceBoardViewport(inlineViewportRef, update);
       displayedInlineViewportRef.current = next;
       setInlineViewport(next);
     },
-    [],
+    [releaseStageWillChange],
   );
 
   const queueViewportUpdate = useCallback((update: BoardViewportUpdate) => {
+    // Only user gestures route through here, so the viewport leaves automatic
+    // fit-on-open control from now on.
+    autoFitViewportRef.current = false;
+    holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
     if (viewportFrameRef.current !== null) {
       cancelAnimationFrame(viewportFrameRef.current);
       viewportFrameRef.current = null;
@@ -337,9 +375,10 @@ export function Board({
       displayedViewportRef.current = viewportRef.current;
       setViewport(displayedViewportRef.current);
     });
-  }, []);
+  }, [holdStageWillChange]);
 
   const queueInlineViewportUpdate = useCallback((update: BoardViewportUpdate) => {
+    holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
     if (inlineViewportFrameRef.current !== null) {
       cancelAnimationFrame(inlineViewportFrameRef.current);
       inlineViewportFrameRef.current = null;
@@ -352,14 +391,16 @@ export function Board({
       displayedInlineViewportRef.current = inlineViewportRef.current;
       setInlineViewport(displayedInlineViewportRef.current);
     });
-  }, []);
+  }, [holdStageWillChange]);
 
   const dampViewportUpdate = useCallback((update: BoardViewportUpdate) => {
+    autoFitViewportRef.current = false;
     advanceBoardViewport(viewportRef, update);
     if (prefersReducedMotion) {
       updateViewport(viewportRef.current);
       return;
     }
+    holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
     if (viewportPanFrameRef.current !== null) {
       cancelAnimationFrame(viewportPanFrameRef.current);
       viewportPanFrameRef.current = null;
@@ -377,15 +418,17 @@ export function Board({
         displayedViewportRef.current = viewportRef.current;
         viewportFrameRef.current = null;
         viewportFrameTimeRef.current = null;
+        releaseStageWillChange(stageRef.current, stageWillChangeTimerRef);
         setViewport(viewportRef.current);
         return;
       }
+      holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
       displayedViewportRef.current = next;
       setViewport(next);
       viewportFrameRef.current = requestAnimationFrame(animate);
     };
     viewportFrameRef.current = requestAnimationFrame(animate);
-  }, [prefersReducedMotion, updateViewport]);
+  }, [holdStageWillChange, prefersReducedMotion, releaseStageWillChange, updateViewport]);
 
   const dampInlineViewportUpdate = useCallback((update: BoardViewportUpdate) => {
     advanceBoardViewport(inlineViewportRef, update);
@@ -393,6 +436,7 @@ export function Board({
       updateInlineViewport(inlineViewportRef.current);
       return;
     }
+    holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
     if (inlineViewportPanFrameRef.current !== null) {
       cancelAnimationFrame(inlineViewportPanFrameRef.current);
       inlineViewportPanFrameRef.current = null;
@@ -410,15 +454,17 @@ export function Board({
         displayedInlineViewportRef.current = inlineViewportRef.current;
         inlineViewportFrameRef.current = null;
         inlineViewportFrameTimeRef.current = null;
+        releaseStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
         setInlineViewport(inlineViewportRef.current);
         return;
       }
+      holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
       displayedInlineViewportRef.current = next;
       setInlineViewport(next);
       inlineViewportFrameRef.current = requestAnimationFrame(animate);
     };
     inlineViewportFrameRef.current = requestAnimationFrame(animate);
-  }, [prefersReducedMotion, updateInlineViewport]);
+  }, [holdStageWillChange, prefersReducedMotion, releaseStageWillChange, updateInlineViewport]);
 
   useEffect(() => () => {
     if (viewportFrameRef.current !== null) cancelAnimationFrame(viewportFrameRef.current);
@@ -504,6 +550,7 @@ export function Board({
       const canvas = canvasRef.current;
       const bounds = measureContentBounds();
       if (!canvas || !bounds) return;
+      autoFitViewportRef.current = false;
       updateViewport({
         x: (canvas.clientWidth - bounds.width * scale) / 2 - bounds.left * scale,
         y: (canvas.clientHeight - bounds.height * scale) / 2 - bounds.top * scale,
@@ -533,11 +580,10 @@ export function Board({
       y: (canvas.clientHeight - bounds.height * scale) / 2 - bounds.top * scale,
       scale,
     });
-    hasFittedRef.current = true;
   }, [measureContentBounds, updateViewport]);
 
   const handleBoardReady = useCallback(() => {
-    if (!hasFittedRef.current) requestAnimationFrame(fitView);
+    if (autoFitViewportRef.current) requestAnimationFrame(fitView);
   }, [fitView]);
 
   const zoomAt = useCallback(
@@ -595,7 +641,7 @@ export function Board({
       setSelectedEdgeId(null);
       setMediaSelected(false);
       setShapePicker(null);
-      hasFittedRef.current = false;
+      autoFitViewportRef.current = true;
       updateViewport({x: 0, y: 0, scale: 1});
       setOpen(true);
     },
@@ -873,19 +919,27 @@ export function Board({
 
   useEffect(() => {
     if (!open) return;
+    const autoFit = () => {
+      if (autoFitViewportRef.current) fitView();
+    };
     let firstFrame = requestAnimationFrame(() => {
-      firstFrame = requestAnimationFrame(fitView);
+      firstFrame = requestAnimationFrame(autoFit);
     });
-    const stage = stageRef.current;
+    // The dialog geometry, web fonts and measured labels can all settle after
+    // the first fit ran, which previously left the content off-screen. Keep
+    // re-fitting until the user takes over the viewport; re-running is
+    // idempotent once the layout is stable.
+    const retries = [120, 360, 800].map((delay) => window.setTimeout(autoFit, delay));
+    if (typeof document !== 'undefined' && 'fonts' in document) {
+      void document.fonts.ready.then(autoFit);
+    }
     const observer =
-      typeof ResizeObserver === 'undefined'
-        ? null
-        : new ResizeObserver(() => {
-            if (!hasFittedRef.current) fitView();
-          });
-    if (stage) observer?.observe(stage);
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(autoFit);
+    if (stageRef.current) observer?.observe(stageRef.current);
+    if (canvasRef.current) observer?.observe(canvasRef.current);
     return () => {
       cancelAnimationFrame(firstFrame);
+      retries.forEach((timer) => window.clearTimeout(timer));
       observer?.disconnect();
     };
   }, [fitView, open]);
@@ -1262,9 +1316,12 @@ export function Board({
       ) : null}
       <div ref={inlineCanvasRef} className="de-diagram-inline-canvas">
         <div
+          ref={inlineStageRef}
           className="de-diagram-inline-stage"
           style={{
-            transform: `translate3d(${inlineViewport.x}px, ${inlineViewport.y}px, 0) scale(${inlineViewport.scale})`,
+            // A 2d translate keeps the stage out of a permanent compositor
+            // layer, so the SVG re-rasterizes crisply at the settled zoom.
+            transform: `translate(${inlineViewport.x}px, ${inlineViewport.y}px) scale(${inlineViewport.scale})`,
           }}
         >
           {boardDocument ? (
@@ -1467,7 +1524,7 @@ export function Board({
                           ref={stageRef}
                           className="de-diagram-viewer-stage"
                           style={{
-                            transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`,
+                            transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
                           }}
                         >
                           <figure
@@ -1508,7 +1565,7 @@ export function Board({
                                 data-de-media-item="true"
                                 data-selected={mediaSelected ? 'true' : undefined}
                                 style={{
-                                  transform: `translate3d(${mediaTransform.x}px, ${mediaTransform.y}px, 0) scale(${mediaTransform.scale})`,
+                                  transform: `translate(${mediaTransform.x}px, ${mediaTransform.y}px) scale(${mediaTransform.scale})`,
                                 }}
                                 onPointerDown={(event) => beginMediaInteraction(event, 'move')}
                                 onPointerMove={moveMediaInteraction}

@@ -1511,7 +1511,9 @@
   width: clamp(720px, 76vw, 1120px);
   min-height: 1px;
   transform-origin: 0 0;
-  will-change: transform;
+  /* No will-change: a permanent compositor layer caches the SVG as a texture
+     and scaling that texture blurs text. Without it the browser re-rasterizes
+     the vectors at the settled zoom level, keeping the board crisp. */
 }
 
 :where(.de-prose) .de-diagram-viewer-figure {
@@ -1652,7 +1654,7 @@
   width: 100%;
   min-height: inherit;
   transform-origin: 0 0;
-  will-change: transform;
+  /* Deliberately no will-change; see .de-diagram-viewer-stage. */
 }
 
 .de-diagram[data-zoomable='true']:focus-visible > .de-diagram-inline-canvas {
@@ -2322,7 +2324,7 @@
   width: clamp(720px, 76vw, 1120px);
   min-height: 1px;
   transform-origin: 0 0;
-  will-change: transform;
+  /* Deliberately no will-change; see the first .de-diagram-viewer-stage rule. */
 }
 
 :where(.de-prose) .de-diagram-viewer-figure {
@@ -2366,7 +2368,7 @@
   transform-origin: center;
   touch-action: none;
   cursor: grab;
-  will-change: transform;
+  /* Deliberately no will-change; see .de-diagram-viewer-stage. */
 }
 
 .de-diagram-media-item:active {

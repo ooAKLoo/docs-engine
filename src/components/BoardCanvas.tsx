@@ -1365,13 +1365,15 @@ function layoutDiagramGraph(
   const rankPrimarySizes = sortedRanks.map((rank) =>
     Math.max(...(groups.get(rank) ?? []).map((node) => (horizontal ? node.width : node.height))),
   );
-  const rankCrossSizes = sortedRanks.map((rank) => {
-    const group = groups.get(rank) ?? [];
-    return (
-      group.reduce((sum, node) => sum + (horizontal ? node.height : node.width), 0) +
-      Math.max(0, group.length - 1) * nodeGap
-    );
-  });
+  // Crossing-minimised order and neighbour-aligned cross centers relative to 0.
+  const crossCenters = orderAndAlignRankCross(
+    groups,
+    sortedRanks,
+    flowEdges.filter((edge) => !edge.manual),
+    horizontal,
+    nodeGap,
+    groupOrderByNode,
+  );
   const rankIndexes = new Map(sortedRanks.map((rank, index) => [rank, index]));
   const rankGaps = calculateAdaptiveRankGaps(
     sortedRanks.length,
@@ -1397,7 +1399,16 @@ function layoutDiagramGraph(
       }];
     }),
   );
-  const crossSize = Math.max(1, ...rankCrossSizes);
+  const crossBounds = measuredNodes.map((node) => {
+    const center = crossCenters.get(node.id) ?? 0;
+    const half = (horizontal ? node.height : node.width) / 2;
+    return {high: center + half, low: center - half};
+  });
+  const minimumCross =
+    crossBounds.length > 0 ? Math.min(...crossBounds.map(({low}) => low)) : 0;
+  const maximumCross =
+    crossBounds.length > 0 ? Math.max(...crossBounds.map(({high}) => high)) : 1;
+  const crossSize = Math.max(1, maximumCross - minimumCross);
   const primarySize =
     rankPrimarySizes.reduce((sum, size) => sum + size, 0) +
     rankGaps.reduce((sum, gap) => sum + gap, 0);
@@ -1414,17 +1425,15 @@ function layoutDiagramGraph(
     const group = groups.get(rank) ?? [];
     const rankSize = rankPrimarySizes[rankIndex];
     const primaryCenter = primaryCursor + rankSize / 2;
-    let crossCursor = crossMargin + (crossSize - rankCrossSizes[rankIndex]) / 2;
     group.forEach((node) => {
-      const nodeCrossSize = horizontal ? node.height : node.width;
-      const crossCenter = crossCursor + nodeCrossSize / 2;
+      const crossCenter =
+        crossMargin + ((crossCenters.get(node.id) ?? 0) - minimumCross);
       positions.set(
         node.id,
         horizontal
           ? {x: primaryCenter, y: crossCenter}
           : {x: crossCenter, y: primaryCenter},
       );
-      crossCursor += nodeCrossSize + nodeGap;
     });
     primaryCursor += rankSize + (rankGaps[rankIndex] ?? 0);
   });
@@ -1829,6 +1838,157 @@ function assignRanks(nodes: ParsedDiagramNode[], edges: ParsedDiagramEdge[]) {
   return ranks;
 }
 
+/**
+ * Order the nodes of every rank with barycenter sweeps so connected nodes of
+ * neighbouring ranks stay close, then align each node's cross-axis center on
+ * the mean of its neighbours (an order-preserving least-squares placement).
+ * Both steps remove the edge crossings a pure insertion-order layout produces
+ * on trees and layered graphs. Returns cross-axis centers around origin 0.
+ */
+function orderAndAlignRankCross(
+  groups: Map<number, Array<{height: number; id: string; width: number}>>,
+  sortedRanks: number[],
+  edges: Array<{sourceId: string; targetId: string}>,
+  horizontal: boolean,
+  nodeGap: number,
+  groupOrderByNode: Map<string, number>,
+) {
+  const crossSizeOf = (node: {height: number; width: number}) =>
+    horizontal ? node.height : node.width;
+  const rankIndexById = new Map<string, number>();
+  sortedRanks.forEach((rank, index) => {
+    (groups.get(rank) ?? []).forEach((node) => rankIndexById.set(node.id, index));
+  });
+  const neighborsAbove = new Map<string, string[]>();
+  const neighborsBelow = new Map<string, string[]>();
+  edges.forEach((edge) => {
+    const sourceIndex = rankIndexById.get(edge.sourceId);
+    const targetIndex = rankIndexById.get(edge.targetId);
+    if (sourceIndex === undefined || targetIndex === undefined || sourceIndex === targetIndex) {
+      return;
+    }
+    const [upper, lower] =
+      sourceIndex < targetIndex
+        ? [edge.sourceId, edge.targetId]
+        : [edge.targetId, edge.sourceId];
+    neighborsAbove.set(lower, [...(neighborsAbove.get(lower) ?? []), upper]);
+    neighborsBelow.set(upper, [...(neighborsBelow.get(upper) ?? []), lower]);
+  });
+
+  const centers = new Map<string, number>();
+  const packCentered = (rank: number) => {
+    const group = groups.get(rank) ?? [];
+    const total =
+      group.reduce((sum, node) => sum + crossSizeOf(node), 0) +
+      Math.max(0, group.length - 1) * nodeGap;
+    let cursor = -total / 2;
+    group.forEach((node) => {
+      centers.set(node.id, cursor + crossSizeOf(node) / 2);
+      cursor += crossSizeOf(node) + nodeGap;
+    });
+  };
+  sortedRanks.forEach(packCentered);
+
+  const neighborMean = (nodeId: string, neighbors: Map<string, string[]>) => {
+    const linked = neighbors.get(nodeId) ?? [];
+    if (linked.length === 0) return undefined;
+    return (
+      linked.reduce((sum, id) => sum + (centers.get(id) ?? 0), 0) / linked.length
+    );
+  };
+  const sortRank = (rank: number, neighbors: Map<string, string[]>) => {
+    const group = groups.get(rank) ?? [];
+    if (group.length < 2) return;
+    const keys = new Map(
+      group.map((node) => [
+        node.id,
+        neighborMean(node.id, neighbors) ?? centers.get(node.id) ?? 0,
+      ]),
+    );
+    group.sort((first, second) =>
+      (groupOrderByNode.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+        (groupOrderByNode.get(second.id) ?? Number.MAX_SAFE_INTEGER) ||
+      (keys.get(first.id) ?? 0) - (keys.get(second.id) ?? 0),
+    );
+    packCentered(rank);
+  };
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let index = 1; index < sortedRanks.length; index += 1) {
+      sortRank(sortedRanks[index], neighborsAbove);
+    }
+    for (let index = sortedRanks.length - 2; index >= 0; index -= 1) {
+      sortRank(sortedRanks[index], neighborsBelow);
+    }
+  }
+
+  const alignRank = (rank: number, neighbors: Map<string, string[]>) => {
+    const group = groups.get(rank) ?? [];
+    if (group.length === 0) return;
+    const desired = group.map(
+      (node) => neighborMean(node.id, neighbors) ?? centers.get(node.id) ?? 0,
+    );
+    const placed = packOrderedCrossCenters(
+      group.map(crossSizeOf),
+      desired,
+      nodeGap,
+    );
+    group.forEach((node, index) => centers.set(node.id, placed[index] ?? 0));
+  };
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let index = 1; index < sortedRanks.length; index += 1) {
+      alignRank(sortedRanks[index], neighborsAbove);
+    }
+    for (let index = sortedRanks.length - 2; index >= 0; index -= 1) {
+      alignRank(sortedRanks[index], neighborsBelow);
+    }
+  }
+  return centers;
+}
+
+/**
+ * Place items on one axis as close as possible to their desired centers while
+ * preserving order and a minimum gap: overlapping neighbours merge into
+ * clusters positioned at the mean of their members' desired starts.
+ */
+function packOrderedCrossCenters(
+  sizes: number[],
+  desired: number[],
+  gap: number,
+) {
+  type Cluster = {count: number; items: number[]; length: number; sum: number};
+  const clusters: Cluster[] = [];
+  sizes.forEach((size, index) => {
+    let cluster: Cluster = {
+      count: 1,
+      items: [index],
+      length: size,
+      sum: (desired[index] ?? 0) - size / 2,
+    };
+    while (clusters.length > 0) {
+      const previous = clusters[clusters.length - 1];
+      const shift = previous.length + gap;
+      if (previous.sum / previous.count + shift <= cluster.sum / cluster.count) break;
+      clusters.pop();
+      cluster = {
+        count: previous.count + cluster.count,
+        items: [...previous.items, ...cluster.items],
+        length: previous.length + gap + cluster.length,
+        sum: previous.sum + cluster.sum - cluster.count * shift,
+      };
+    }
+    clusters.push(cluster);
+  });
+  const centers = new Array<number>(sizes.length).fill(0);
+  clusters.forEach((cluster) => {
+    let cursor = cluster.sum / cluster.count;
+    cluster.items.forEach((index) => {
+      centers[index] = cursor + (sizes[index] ?? 0) / 2;
+      cursor += (sizes[index] ?? 0) + gap;
+    });
+  });
+  return centers;
+}
+
 function routeDraftConnection(
   source: LayoutNode,
   target: LayoutNode | undefined,
@@ -1962,7 +2122,7 @@ function routeGraphEdges(
     const feedback = isFeedbackEdge(edge);
     const sides = feedback
       ? feedbackAnchorSides(direction)
-      : resolveAnchorSides(source, target);
+      : resolveAnchorSides(source, target, direction);
     return [
       {
         edge,
@@ -2937,12 +3097,31 @@ function sameTextLines(first: string[], second: string[]) {
   return first.length === second.length && first.every((line, index) => line === second[index]);
 }
 
-function resolveAnchorSides(source: LayoutNode, target: LayoutNode) {
+function resolveAnchorSides(
+  source: LayoutNode,
+  target: LayoutNode,
+  direction: BoardDocument['direction'] = 'LR',
+) {
   if (source.id === target.id) {
     return {source: 'right' as const, target: 'top' as const};
   }
   const deltaX = target.position.x - source.position.x;
   const deltaY = target.position.y - source.position.y;
+  // Edges that clearly span layers anchor on the flow axis regardless of how
+  // far apart the layers place the two cards sideways. Otherwise wide fans
+  // split across side ports and the resulting bundles cross each other.
+  const verticalGap = Math.abs(deltaY) - (source.height + target.height) / 2;
+  const horizontalGap = Math.abs(deltaX) - (source.width + target.width) / 2;
+  if ((direction === 'TB' || direction === 'BT') && verticalGap >= 10) {
+    return deltaY >= 0
+      ? {source: 'bottom' as const, target: 'top' as const}
+      : {source: 'top' as const, target: 'bottom' as const};
+  }
+  if ((direction === 'LR' || direction === 'RL') && horizontalGap >= 10) {
+    return deltaX >= 0
+      ? {source: 'right' as const, target: 'left' as const}
+      : {source: 'left' as const, target: 'right' as const};
+  }
   const horizontalScore = Math.abs(deltaX) / Math.max(1, (source.width + target.width) / 2);
   const verticalScore = Math.abs(deltaY) / Math.max(1, (source.height + target.height) / 2);
   if (horizontalScore >= verticalScore) {

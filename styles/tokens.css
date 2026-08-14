@@ -1,13 +1,13 @@
 :where(.de-root) {
-  --de-page: #fbfcfe;
+  --de-page: #fcfcfc;
   --de-surface: #ffffff;
-  --de-surface-soft: #f7f9fc;
+  --de-surface-soft: #f8f8f8;
   --de-summary-background: #f3f3f3;
   --de-ink: #101828;
   --de-ink-soft: #475467;
   --de-muted: #667085;
-  --de-line: #edf0f4;
-  --de-line-strong: #e4e7ec;
+  --de-line: #efefef;
+  --de-line-strong: #e6e6e6;
   --de-brand: #2563eb;
   --de-brand-soft: #f3f6fb;
   --de-accent: #0f766e;
