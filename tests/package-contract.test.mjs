@@ -65,6 +65,14 @@ test('keeps annotation and table visuals borderless', () => {
   assert.doesNotMatch(styles, /:where\(\.de-prose\) table/);
 });
 
+test('owns strict CJK line breaking across host prose styles', () => {
+  assert.match(
+    styles,
+    /\.de-root\.de-prose :is\(p, li, h1, h2, h3, h4, td, th, figcaption\)\s*\{[^}]*line-break:\s*strict;[^}]*word-break:\s*normal;/s,
+  );
+  assert.doesNotMatch(styles, /line-break:\s*loose/);
+});
+
 test('keeps table identifiers intact and lets dense tables scroll', () => {
   assert.match(
     styles,

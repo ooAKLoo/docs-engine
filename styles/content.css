@@ -1,3 +1,15 @@
+:where(.de-root.de-prose) {
+  line-break: strict;
+  word-break: normal;
+}
+
+/* Keep CJK forbidden punctuation attached to the preceding line even when a host
+ * applies a looser element-level prose rule after Docs Engine's stylesheet. */
+.de-root.de-prose :is(p, li, h1, h2, h3, h4, td, th, figcaption) {
+  line-break: strict;
+  word-break: normal;
+}
+
 :where(.de-prose) .de-annotation {
   position: relative;
   max-width: 92%;
