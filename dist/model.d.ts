@@ -31,7 +31,7 @@ export type DocBlock = {
     language?: string;
 } | {
     type: 'formula';
-    lines: string[];
+    latex: string;
     compact?: boolean;
 } | {
     type: 'image';
@@ -50,6 +50,11 @@ export type DocBlock = {
     src: string;
     title: string;
     poster?: string;
+} | {
+    type: 'diagram';
+    syntax: 'mermaid';
+    source: string;
+    title: string;
 } | {
     type: 'annotation';
     text: string;

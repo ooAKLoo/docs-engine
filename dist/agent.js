@@ -6,6 +6,9 @@
  * BoardDocument before a host renders it.
  */
 export { detectMermaidDiagramKind, importMermaid } from './components/MermaidImporter.js';
+export { parseDocumentMarkdown } from './parseDocumentMarkdown.js';
+export { serializeDocBlock } from './serializeDocumentMarkdown.js';
+export { collectHeadings, slugifyHeading } from './collectHeadings.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
 export { serializeBoardDocument } from './components/BoardModel.js';
 //# sourceMappingURL=agent.js.map

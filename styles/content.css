@@ -84,6 +84,197 @@
   transform: translateY(-50%);
 }
 
+:where(.de-prose) h2,
+:where(.de-prose) h3,
+:where(.de-prose) h4 {
+  letter-spacing: 0;
+  scroll-margin-top: 34px;
+}
+
+:where(.de-prose) h2 {
+  margin: 2.875rem 0 0.25rem;
+  color: var(--de-ink);
+  font-size: 1.875rem;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+:where(.de-prose) h3 {
+  margin: 1.625rem 0 0;
+  color: var(--de-ink);
+  font-size: 1.3125rem;
+  font-weight: 700;
+  line-height: 1.32;
+}
+
+:where(.de-prose) h4 {
+  margin: 1.125rem 0 0;
+  color: var(--de-ink-soft);
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+:where(.de-prose) p {
+  margin: 0;
+  color: var(--de-ink-soft);
+  font-size: 1rem;
+  line-height: 1.78;
+}
+
+:where(.de-prose) p[data-tone='muted'],
+:where(.de-prose) li[data-muted='true'] {
+  color: var(--de-muted);
+  font-style: italic;
+}
+
+:where(.de-prose) ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.125rem 0 0.25rem;
+  padding-left: 1.5rem;
+  color: var(--de-ink-soft);
+}
+
+:where(.de-prose) ul li::marker {
+  color: var(--de-ink);
+}
+
+:where(.de-prose) .de-image {
+  margin: 0.5rem 0 0.875rem;
+  overflow-x: auto;
+}
+
+:where(.de-prose) .de-image img {
+  display: block;
+  width: 100%;
+  min-width: 860px;
+  height: auto;
+  border: 1px solid var(--de-line);
+  border-radius: 8px;
+  background: var(--de-surface);
+}
+
+:where(.de-prose) .de-image figcaption {
+  margin-top: 0.5rem;
+  color: var(--de-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+:where(.de-prose) .de-image-grid {
+  display: grid;
+  grid-auto-flow: dense;
+  grid-auto-rows: clamp(98px, 7.6vw, 132px);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0.625rem 0 1.375rem;
+}
+
+:where(.de-prose) .de-image-grid__item {
+  position: relative;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--de-line);
+  border-radius: 8px;
+  background: var(--de-surface-soft);
+}
+
+:where(.de-prose) .de-image-grid__item:nth-child(1) {
+  grid-column: span 5;
+  grid-row: span 4;
+}
+
+:where(.de-prose) .de-image-grid[data-image-count='2'] .de-image-grid__item:nth-child(1),
+:where(.de-prose) .de-image-grid[data-image-count='2'] .de-image-grid__item:nth-child(2) {
+  grid-column: span 6;
+  grid-row: span 4;
+}
+
+:where(.de-prose) .de-image-grid__item:nth-child(2),
+:where(.de-prose) .de-image-grid__item:nth-child(3) {
+  grid-column: span 7;
+  grid-row: span 2;
+}
+
+:where(.de-prose) .de-image-grid__item:nth-child(4),
+:where(.de-prose) .de-image-grid__item:nth-child(5),
+:where(.de-prose) .de-image-grid__item:nth-child(6) {
+  grid-column: span 4;
+  grid-row: span 2;
+}
+
+:where(.de-prose) .de-image-grid[data-image-count='5'] .de-image-grid__item:nth-child(4),
+:where(.de-prose) .de-image-grid[data-image-count='5'] .de-image-grid__item:nth-child(5) {
+  grid-column: span 6;
+}
+
+:where(.de-prose) .de-image-grid[data-image-count='7'] .de-image-grid__item:nth-child(n + 4) {
+  grid-column: span 3;
+}
+
+:where(.de-prose) .de-image-grid__item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center top;
+}
+
+:where(.de-prose) .de-image-grid__item figcaption {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  display: inline-flex;
+  width: fit-content;
+  max-width: calc(100% - 20px);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 999px;
+  background: rgba(19, 19, 21, 0.72);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+  padding: 6px 10px;
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 760px) {
+  :where(.de-prose) .de-image img {
+    min-width: 760px;
+  }
+
+  :where(.de-prose) .de-image-grid {
+    grid-auto-flow: row;
+    grid-auto-rows: auto;
+    grid-template-columns: 1fr;
+  }
+
+  :where(.de-prose) .de-image-grid__item,
+  :where(.de-prose) .de-image-grid__item:nth-child(1),
+  :where(.de-prose) .de-image-grid__item:nth-child(2),
+  :where(.de-prose) .de-image-grid__item:nth-child(3),
+  :where(.de-prose) .de-image-grid__item:nth-child(4),
+  :where(.de-prose) .de-image-grid__item:nth-child(5),
+  :where(.de-prose) .de-image-grid__item:nth-child(6),
+  :where(.de-prose) .de-image-grid[data-image-count='2'] .de-image-grid__item:nth-child(1),
+  :where(.de-prose) .de-image-grid[data-image-count='2'] .de-image-grid__item:nth-child(2),
+  :where(.de-prose) .de-image-grid[data-image-count='5'] .de-image-grid__item:nth-child(4),
+  :where(.de-prose) .de-image-grid[data-image-count='5'] .de-image-grid__item:nth-child(5),
+  :where(.de-prose) .de-image-grid[data-image-count='7'] .de-image-grid__item:nth-child(n + 4) {
+    grid-column: auto;
+    grid-row: auto;
+    min-height: 0;
+  }
+
+  :where(.de-prose) .de-image-grid__item img {
+    height: auto;
+  }
+}
+
 .de-table-shell {
   position: relative;
   min-width: 0;

@@ -54,8 +54,19 @@ test('publishes stable package entry points', () => {
   assert.equal(packageJson.dependencies.katex, '^0.16.47');
 });
 
-test('publishes plain-text extraction for headings and table-of-contents labels', () => {
+test('publishes document markdown parsing so hosts do not copy a renderer', () => {
   assert.match(index, /markdownInlineToPlainText/);
+  assert.match(index, /parseDocumentMarkdown/);
+  assert.match(index, /DocumentBlock/);
+  assert.match(index, /serializeDocBlock/);
+  assert.match(index, /collectHeadings/);
+  assert.match(authorTechnicalDocsSkill, /parseDocumentMarkdown/);
+  assert.match(authorTechnicalDocsSkill, /DocumentBlock/);
+  assert.match(model, /type: 'formula'; latex: string/);
+  assert.match(model, /type: 'diagram'; syntax: 'mermaid'/);
+  assert.match(styles, /\.de-image/);
+  assert.match(styles, /\.de-image-grid/);
+  assert.doesNotMatch(styles, /\.formula-block/);
 });
 
 test('publishes explicit information-density authoring guidance', () => {

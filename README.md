@@ -19,7 +19,8 @@ pnpm showcase
 - `styles/tokens.css`：颜色、排版与组件 token。
 - `styles/content.css`：Annotation、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Annotation 可带 `label` 把维度名和判断写在同一条里；Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
-- `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board 与导入器）。
+- `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board、DocumentBlock 与导入器）。
+- `parseDocumentMarkdown()` / `DocumentBlock`：Markdown 子集的解析与渲染；依赖方不要复制解析器或正文样式。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
 - `markdownInlineToPlainText()`：把标题中的强调、行内代码和链接等 Markdown 语法归一为目录与锚点使用的可见纯文本；正文仍按 Markdown 语义渲染。
 - React 作为 peer dependency，同时兼容 React 18 与 React 19。
@@ -60,7 +61,7 @@ Docusaurus 主题在每篇文档标题旁提供“复制全文”。复制结果
 ## 宿主边界
 
 - Lula 保留 Docusaurus、目录与内容构建脚本；Docs Engine 拥有 Board、Mermaid 导入和 MDX 组件映射。
-- oVita 保留 Next.js、Markdown 文件读取、业务 DocBlock、状态编辑和写回 API。
+- oVita 保留 Next.js、文件发现、frontmatter、侧栏/搜索，以及可编辑状态表、证据卡片等宿主业务；正文解析与渲染走 `parseDocumentMarkdown()` 和 `DocumentBlock`。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
 标准 Markdown 代码围栏在两类宿主中都归一为 Docs Engine 的 `CodeBlock`；目录树这类纯文本结构使用 `text` 语言即可，不需要依赖方增加目录图组件、Prism 包装器或代码块 CSS。

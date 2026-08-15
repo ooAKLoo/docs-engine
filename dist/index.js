@@ -6,8 +6,10 @@ export { Board, } from './components/Board.js';
 export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImporter.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
 export { applyBoardOperation, serializeBoardDocument, } from './components/BoardModel.js';
+export { DocumentBlock } from './components/DocumentBlock.js';
 export { DocumentContent } from './components/DocumentContent.js';
 export { Formula } from './components/Formula.js';
+export { MarkdownInline } from './components/MarkdownInline.js';
 export { Priority } from './components/Priority.js';
 export { ResourceLink } from './components/ResourceLink.js';
 export { RiskGrid, RiskItem } from './components/RiskGrid.js';
@@ -20,4 +22,7 @@ export { Timeline, } from './components/Timeline.js';
 export { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, } from './components/Transition.js';
 export { Video } from './components/Video.js';
 export { markdownInlineToPlainText } from './markdown.js';
+export { parseDocumentMarkdown } from './parseDocumentMarkdown.js';
+export { serializeDocBlock } from './serializeDocumentMarkdown.js';
+export { collectHeadings, slugifyHeading } from './collectHeadings.js';
 //# sourceMappingURL=index.js.map

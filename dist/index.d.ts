@@ -7,8 +7,10 @@ export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImp
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, type BoardLayoutDiagnostic, type BoardLayoutDiagnosticCode, type BoardLayoutDiagnosticSeverity, type BoardLayoutValidationOptions, } from './components/BoardLayout.js';
 export { applyBoardOperation, serializeBoardDocument, } from './components/BoardModel.js';
 export type { BoardAnchorSide, BoardCanvasSize, BoardDiagramKind, BoardDirection, BoardDocument, BoardDocumentChange, BoardDocumentChangeReason, BoardEdge, BoardEdgeRole, BoardGroup, BoardImportEdgeLayout, BoardImportLayout, BoardImportNodeLayout, BoardImportSource, BoardMarkdownOptions, BoardNode, BoardNodeShape, BoardNodeTone, BoardOperation, BoardPoint, } from './components/BoardModel.js';
+export { DocumentBlock, type DocumentBlockProps } from './components/DocumentBlock.js';
 export { DocumentContent, type DocumentContentProps } from './components/DocumentContent.js';
 export { Formula, type FormulaProps } from './components/Formula.js';
+export { MarkdownInline } from './components/MarkdownInline.js';
 export { Priority, type PriorityLevel, type PriorityProps } from './components/Priority.js';
 export { ResourceLink, type ResourceLinkProps } from './components/ResourceLink.js';
 export { RiskGrid, RiskItem, type RiskGridProps, type RiskItemProps } from './components/RiskGrid.js';
@@ -21,5 +23,8 @@ export { Timeline, type TimelineChangeMeta, type TimelineChangeReason, type Time
 export { Transition, TransitionArrow, TransitionCard, TransitionCopy, TransitionLabel, TransitionTitle, type TransitionCardProps, type TransitionPartProps, type TransitionProps, } from './components/Transition.js';
 export { Video, type VideoProps } from './components/Video.js';
 export { markdownInlineToPlainText } from './markdown.js';
+export { parseDocumentMarkdown, type ParseDocumentMarkdownResult } from './parseDocumentMarkdown.js';
+export { serializeDocBlock } from './serializeDocumentMarkdown.js';
+export { collectHeadings, slugifyHeading } from './collectHeadings.js';
 export type { CalloutVariant, DocBlock, DocumentModel, HeadingLink, TimelineItem, TimelineScale, } from './model.js';
 //# sourceMappingURL=index.d.ts.map
