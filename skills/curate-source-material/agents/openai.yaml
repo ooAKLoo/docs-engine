@@ -1,0 +1,4 @@
+interface:
+  display_name: "原始素材忠实整理"
+  short_description: "把文章、视频转写或访谈原文忠实整理成开头有总览、密度合理的 Docs Engine 文档"
+  default_prompt: "使用 $curate-source-material 将这份素材忠实整理成结构清晰的文档：开头给出总览，不扩写内容，连续短行合并为紧凑结构。"
