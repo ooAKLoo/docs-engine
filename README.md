@@ -21,7 +21,7 @@ pnpm showcase
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board、DocumentBlock 与导入器）。
 - `parseDocumentMarkdown()` / `DocumentBlock`：Markdown 子集的解析与渲染；依赖方不要复制解析器或正文样式。
-- `DocumentFrame` / `DocumentCatalog` / `DocumentOutline`：可选的左文档目录与右章节目录。Next.js 宿主从 `@ooakloo/docs-engine/nav` 引入，避免和主入口的服务端导出混在一起；Docusaurus 宿主可继续用框架自带侧栏。
+- `DocumentFrame` / `DocumentCatalog` / `DocumentOutline`：可选的左文档目录与右章节目录。页内切篇时让 Frame 保持挂载并传入 `contentKey`，正文和右栏会短淡入；整页重挂接不上这段过渡。Next.js 宿主从 `@ooakloo/docs-engine/nav` 引入，避免和主入口的服务端导出混在一起；Docusaurus 宿主可继续用框架自带侧栏。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
 - `markdownInlineToPlainText()`：把标题中的强调、行内代码和链接等 Markdown 语法归一为目录与锚点使用的可见纯文本；正文仍按 Markdown 语义渲染。
 - React 作为 peer dependency，同时兼容 React 18 与 React 19。

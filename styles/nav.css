@@ -39,6 +39,10 @@
   min-width: 0;
 }
 
+.de-document-frame__switch {
+  min-width: 0;
+}
+
 .de-document-frame__collapse,
 .de-document-frame__expand {
   display: grid;

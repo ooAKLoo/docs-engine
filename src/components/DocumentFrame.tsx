@@ -1,6 +1,7 @@
 'use client';
 
 import {PanelLeftClose, PanelLeftOpen} from 'lucide-react';
+import {AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion} from 'motion/react';
 import {useEffect, useState, type HTMLAttributes, type ReactNode} from 'react';
 import {joinClassNames} from '../classnames.js';
 
@@ -9,6 +10,12 @@ export type DocumentFrameProps = HTMLAttributes<HTMLElement> & {
   outline?: ReactNode;
   children: ReactNode;
   persistKey?: string;
+  /**
+   * When the frame stays mounted and this key changes, fade the main column
+   * and chapter outline. Full-page remounts cannot interpolate; keep the
+   * catalog and frame in a layout, then pass the current document id.
+   */
+  contentKey?: string;
 };
 
 /**
@@ -20,6 +27,7 @@ export function DocumentFrame({
   catalog,
   children,
   className,
+  contentKey,
   outline,
   persistKey = 'de-document-catalog-collapsed',
   ...props
@@ -36,6 +44,17 @@ export function DocumentFrame({
     setCollapsed(nextCollapsed);
     window.localStorage.setItem(persistKey, String(nextCollapsed));
   }
+
+  const main = (
+    <div className="de-document-frame__main">
+      <DocumentFrameSwitch contentKey={contentKey}>{children}</DocumentFrameSwitch>
+    </div>
+  );
+  const outlinePane = outline ? (
+    <div className="de-document-frame__outline">
+      <DocumentFrameSwitch contentKey={contentKey}>{outline}</DocumentFrameSwitch>
+    </div>
+  ) : null;
 
   return (
     <div
@@ -71,8 +90,52 @@ export function DocumentFrame({
         </button>
       ) : null}
 
-      <div className="de-document-frame__main">{children}</div>
-      {outline ? <div className="de-document-frame__outline">{outline}</div> : null}
+      {contentKey != null ? (
+        <LazyMotion features={domAnimation} strict>
+          {main}
+          {outlinePane}
+        </LazyMotion>
+      ) : (
+        <>
+          {main}
+          {outlinePane}
+        </>
+      )}
     </div>
+  );
+}
+
+function DocumentFrameSwitch({
+  children,
+  contentKey,
+}: {
+  children: ReactNode;
+  contentKey?: string;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+
+  if (contentKey == null) {
+    return children;
+  }
+
+  const instant = prefersReducedMotion === true;
+  const transition = instant ? {duration: 0} : {duration: 0.2, ease: [0.22, 1, 0.36, 1] as const};
+  const initial = instant ? {opacity: 0} : {opacity: 0, y: 6};
+  const animate = {opacity: 1, y: 0};
+  const exit = instant ? {opacity: 0} : {opacity: 0, y: -4};
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <m.div
+        key={contentKey}
+        className="de-document-frame__switch"
+        initial={initial}
+        animate={animate}
+        exit={exit}
+        transition={transition}
+      >
+        {children}
+      </m.div>
+    </AnimatePresence>
   );
 }

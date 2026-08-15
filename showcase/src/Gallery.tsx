@@ -1,4 +1,4 @@
-import {useState, type CSSProperties} from 'react';
+import {useState, type CSSProperties, type MouseEvent} from 'react';
 import {
   Annotation,
   Board,
@@ -510,53 +510,142 @@ export function Gallery() {
         <section className="showcase-section" id="document-nav">
           <h2>十一、文档目录与章节目录</h2>
           <p>
-            非 Docusaurus 宿主可以可选接入三栏文档壳：左边是文档目录，右边是本章章节并跟踪阅读位置。框架已经提供侧栏的宿主不必改用这组组件。
+            非 Docusaurus 宿主可以可选接入三栏文档壳。点左边换一篇，中间正文和右边本章会短淡入。宿主让 <code>DocumentFrame</code> 保持挂载并传入 <code>contentKey</code> 即可；整页重挂接不上这段过渡。
           </p>
           <div className="showcase-document-nav">
-            <DocumentFrame
-              catalog={
-                <DocumentCatalog
-                  currentId="positioning"
-                  groups={[
-                    {
-                      key: 'product',
-                      label: '产品与市场',
-                      items: [
-                        {id: 'positioning', title: '定位与边界', href: '#document-nav'},
-                        {id: 'model', title: '商业模式', href: '#document-nav'},
-                      ],
-                    },
-                    {
-                      key: 'engineering',
-                      label: '工程',
-                      items: [{id: 'runtime', title: '运行时边界', href: '#document-nav'}],
-                    },
-                  ]}
-                />
-              }
-              outline={
-                <DocumentOutline
-                  headings={[
-                    {id: 'nav-demo-layout', level: 1, text: '三栏怎么分工'},
-                    {id: 'nav-demo-optional', level: 2, text: '为什么可选'},
-                    {id: 'nav-demo-host', level: 1, text: '宿主还要提供什么'},
-                  ]}
-                />
-              }
-            >
-              <article>
-                <h3 id="nav-demo-layout">三栏怎么分工</h3>
-                <p>左栏列出站点里的文档分组，中间是正文，右栏只反映当前这篇的标题锚点。</p>
-                <h4 id="nav-demo-optional">为什么可选</h4>
-                <p>Docusaurus 已经有文档目录和章节目录时，继续用框架侧栏即可，不必再包一层。</p>
-                <h3 id="nav-demo-host">宿主还要提供什么</h3>
-                <p>文件发现、分组标签和链接地址仍由宿主计算；引擎只负责导航面和滚动高亮。</p>
-              </article>
-            </DocumentFrame>
+            <DocumentNavPlayground />
           </div>
         </section>
       </main>
     </DocumentContent>
+  );
+}
+
+const navDemoDocs = [
+  {
+    id: 'positioning',
+    title: '定位与边界',
+    group: 'product',
+    headings: [
+      {id: 'nav-positioning-layout', level: 1 as const, text: '三栏怎么分工'},
+      {id: 'nav-positioning-optional', level: 2 as const, text: '为什么可选'},
+      {id: 'nav-positioning-host', level: 1 as const, text: '宿主还要提供什么'},
+    ],
+    body: (
+      <>
+        <h3 id="nav-positioning-layout">三栏怎么分工</h3>
+        <p>左栏列出站点里的文档分组，中间是正文，右栏只反映当前这篇的标题锚点。</p>
+        <h4 id="nav-positioning-optional">为什么可选</h4>
+        <p>Docusaurus 已经有文档目录和章节目录时，继续用框架侧栏即可，不必再包一层。</p>
+        <h3 id="nav-positioning-host">宿主还要提供什么</h3>
+        <p>文件发现、分组标签和链接地址仍由宿主计算；引擎只负责导航面和滚动高亮。</p>
+      </>
+    ),
+  },
+  {
+    id: 'model',
+    title: '商业模式',
+    group: 'product',
+    headings: [
+      {id: 'nav-model-who', level: 1 as const, text: '谁在付钱'},
+      {id: 'nav-model-what', level: 2 as const, text: '买到的是什么'},
+      {id: 'nav-model-edge', level: 1 as const, text: '不做什么'},
+    ],
+    body: (
+      <>
+        <h3 id="nav-model-who">谁在付钱</h3>
+        <p>先写清付费方，再写渠道。目录切换时右栏只跟这篇走，不会带着上一篇的章节。</p>
+        <h4 id="nav-model-what">买到的是什么</h4>
+        <p>交付物是可复用的文档语义和版式，不是某一家站点的整页路由。</p>
+        <h3 id="nav-model-edge">不做什么</h3>
+        <p>宿主自己的搜索、下载和文件发现仍留在站点里，不塞进这一层壳。</p>
+      </>
+    ),
+  },
+  {
+    id: 'runtime',
+    title: '运行时边界',
+    group: 'engineering',
+    headings: [
+      {id: 'nav-runtime-client', level: 1 as const, text: '为什么要独立入口'},
+      {id: 'nav-runtime-host', level: 2 as const, text: '宿主还要包一层什么'},
+      {id: 'nav-runtime-keep', level: 1 as const, text: '哪些先不要动'},
+    ],
+    body: (
+      <>
+        <h3 id="nav-runtime-client">为什么要独立入口</h3>
+        <p>Next 会把服务端桶里的客户端组件水合成 undefined。导航壳要从 <code>@ooakloo/docs-engine/nav</code> 进。</p>
+        <h4 id="nav-runtime-host">宿主还要包一层什么</h4>
+        <p>整页跳转会把 <code>DocumentFrame</code> 整棵重挂，跨页接不上淡入。要把目录和壳放到 layout，并传入当前篇的 <code>contentKey</code>。</p>
+        <h3 id="nav-runtime-keep">哪些先不要动</h3>
+        <p>展开按钮的 localStorage、目录滚进视野都留着。左栏滑块和跨页 View Transitions 这次不做。</p>
+      </>
+    ),
+  },
+  {
+    id: 'voice',
+    title: '用户声音',
+    group: 'engineering',
+    headings: [
+      {id: 'nav-voice-collect', level: 1 as const, text: '先收原话'},
+      {id: 'nav-voice-cluster', level: 2 as const, text: '再归到议题'},
+      {id: 'nav-voice-decide', level: 1 as const, text: '最后才改产品'},
+    ],
+    body: (
+      <>
+        <h3 id="nav-voice-collect">先收原话</h3>
+        <p>反馈进画板时先保住原句，不在这一步改写成结论。</p>
+        <h4 id="nav-voice-cluster">再归到议题</h4>
+        <p>同一类抱怨叠在一起，右栏章节跟着这篇的标题走，方便对照。</p>
+        <h3 id="nav-voice-decide">最后才改产品</h3>
+        <p>议题清楚之后再开实验。切篇只换正文和本章，左栏只改当前高亮。</p>
+      </>
+    ),
+  },
+] as const;
+
+const navDemoGroups = [
+  {
+    key: 'product',
+    label: '产品与市场',
+    items: navDemoDocs
+      .filter((doc) => doc.group === 'product')
+      .map((doc) => ({id: doc.id, title: doc.title, href: `#nav-doc-${doc.id}`})),
+  },
+  {
+    key: 'engineering',
+    label: '工程',
+    items: navDemoDocs
+      .filter((doc) => doc.group === 'engineering')
+      .map((doc) => ({id: doc.id, title: doc.title, href: `#nav-doc-${doc.id}`})),
+  },
+];
+
+function DocumentNavPlayground() {
+  const [currentId, setCurrentId] = useState<(typeof navDemoDocs)[number]['id']>('positioning');
+  const doc = navDemoDocs.find((item) => item.id === currentId) ?? navDemoDocs[0];
+
+  function handleCatalogClick(event: MouseEvent<HTMLElement>) {
+    const link = (event.target as HTMLElement).closest('a');
+    if (!link || !event.currentTarget.contains(link)) return;
+    const href = link.getAttribute('href') ?? '';
+    const nextId = navDemoDocs.find((item) => href === `#nav-doc-${item.id}`)?.id;
+    if (!nextId) return;
+    event.preventDefault();
+    setCurrentId(nextId);
+  }
+
+  return (
+    <DocumentFrame
+      persistKey="showcase-document-nav-collapsed"
+      contentKey={currentId}
+      catalog={
+        <DocumentCatalog currentId={currentId} groups={navDemoGroups} onClick={handleCatalogClick} />
+      }
+      outline={<DocumentOutline headings={[...doc.headings]} />}
+    >
+      <article>{doc.body}</article>
+    </DocumentFrame>
   );
 }
 

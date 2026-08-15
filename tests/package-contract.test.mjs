@@ -36,6 +36,10 @@ const catalogSource = await readFile(
   new URL('../src/components/DocumentCatalog.tsx', import.meta.url),
   'utf8',
 );
+const frameSource = await readFile(
+  new URL('../src/components/DocumentFrame.tsx', import.meta.url),
+  'utf8',
+);
 const informationDensityGuidance = await readFile(
   new URL('../skills/author-technical-docs/references/information-density.md', import.meta.url),
   'utf8',
@@ -80,6 +84,11 @@ test('publishes optional document catalog and chapter outline chrome', () => {
   assert.doesNotMatch(navStyles, /--de-catalog-tree/);
   assert.doesNotMatch(catalogSource, /LayoutGrid/);
   assert.match(catalogSource, /scrollIntoView/);
+  assert.match(frameSource, /contentKey/);
+  assert.match(frameSource, /useReducedMotion/);
+  assert.match(showcase, /contentKey=\{currentId\}/);
+  assert.doesNotMatch(showcase, /from 'motion\/react'/);
+  assert.doesNotMatch(showcaseStyles, /\.showcase-document-nav \.de-document-catalog__link/);
   assert.match(navStyles, /data-level='1'/);
   assert.match(navStyles, /data-level='2'/);
   assert.match(navStyles, /data-level='3'/);
