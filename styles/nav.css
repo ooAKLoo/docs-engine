@@ -117,24 +117,52 @@
   overflow: auto;
 }
 
+.de-document-catalog__group {
+  --de-catalog-icon: 0.8125rem;
+  --de-catalog-gap: 0.42rem;
+  --de-catalog-tree-x: calc(var(--de-catalog-icon) / 2);
+  --de-catalog-inset: calc(var(--de-catalog-icon) + var(--de-catalog-gap));
+  --de-catalog-tree: color-mix(in srgb, var(--de-ink) 18%, transparent);
+}
+
 .de-document-catalog__group + .de-document-catalog__group {
-  margin-top: 1.55rem;
+  margin-top: 1.35rem;
 }
 
 .de-document-catalog__group-label {
-  margin: 0 0 0.5rem;
+  display: flex;
+  position: relative;
+  align-items: center;
+  gap: var(--de-catalog-gap);
+  margin: 0;
   color: var(--de-ink);
-  font-size: 0.8rem;
-  font-weight: 660;
-  letter-spacing: 0.01em;
+  font-size: 0.82rem;
+  font-weight: 680;
+  letter-spacing: 0;
   line-height: 1.3;
+}
+
+.de-document-catalog__group-label svg {
+  flex: 0 0 auto;
+  width: var(--de-catalog-icon);
+  height: var(--de-catalog-icon);
+}
+
+.de-document-catalog__group:has(.de-document-catalog__items) .de-document-catalog__group-label::after {
+  position: absolute;
+  top: 100%;
+  left: var(--de-catalog-tree-x);
+  width: 1px;
+  height: 0.38rem;
+  background: var(--de-catalog-tree);
+  content: '';
 }
 
 .de-document-catalog__items {
   display: grid;
-  margin-left: 0.2rem;
-  padding-left: 0.85rem;
-  border-left: 1px solid var(--de-line-strong);
+  position: relative;
+  margin: 0.12rem 0 0;
+  padding-left: var(--de-catalog-inset);
 }
 
 .de-document-catalog__link,
@@ -149,8 +177,33 @@
 }
 
 .de-document-catalog__link {
-  min-height: 1.85rem;
-  padding: 0.32rem 0.5rem;
+  position: relative;
+  min-height: 1.75rem;
+  padding: 0.28rem 0.4rem 0.28rem 0.2rem;
+}
+
+.de-document-catalog__link::before,
+.de-document-catalog__link:not(:last-child)::after {
+  position: absolute;
+  left: calc(var(--de-catalog-tree-x) - var(--de-catalog-inset));
+  pointer-events: none;
+  content: '';
+}
+
+.de-document-catalog__link::before {
+  top: 0;
+  width: 0.82rem;
+  height: 50%;
+  border-left: 1px solid var(--de-catalog-tree);
+  border-bottom: 1px solid var(--de-catalog-tree);
+  border-bottom-left-radius: 6px;
+}
+
+.de-document-catalog__link:not(:last-child)::after {
+  top: 50%;
+  bottom: 0;
+  width: 1px;
+  background: var(--de-catalog-tree);
 }
 
 .de-document-catalog__link:hover,

@@ -32,6 +32,10 @@ const authorTechnicalDocsSkill = await readFile(
   'utf8',
 );
 const navEntry = await readFile(new URL('../src/nav.ts', import.meta.url), 'utf8');
+const catalogSource = await readFile(
+  new URL('../src/components/DocumentCatalog.tsx', import.meta.url),
+  'utf8',
+);
 const informationDensityGuidance = await readFile(
   new URL('../skills/author-technical-docs/references/information-density.md', import.meta.url),
   'utf8',
@@ -73,6 +77,9 @@ test('publishes optional document catalog and chapter outline chrome', () => {
   assert.match(navStyles, /\.de-document-catalog__link/);
   assert.match(navStyles, /\.de-document-catalog__items/);
   assert.match(navStyles, /\.de-document-catalog__group-label/);
+  assert.match(navStyles, /--de-catalog-tree/);
+  assert.match(navStyles, /border-bottom-left-radius/);
+  assert.match(catalogSource, /LayoutGrid/);
   assert.match(navStyles, /data-level='1'/);
   assert.match(navStyles, /data-level='2'/);
   assert.match(navStyles, /data-level='3'/);
