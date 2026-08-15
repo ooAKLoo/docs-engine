@@ -31,6 +31,7 @@ const authorTechnicalDocsSkill = await readFile(
   new URL('../skills/author-technical-docs/SKILL.md', import.meta.url),
   'utf8',
 );
+const navEntry = await readFile(new URL('../src/nav.ts', import.meta.url), 'utf8');
 const informationDensityGuidance = await readFile(
   new URL('../skills/author-technical-docs/references/information-density.md', import.meta.url),
   'utf8',
@@ -47,6 +48,7 @@ test('publishes stable package entry points', () => {
   assert.ok(packageJson.exports['./adapters/docusaurus-theme']);
   assert.ok(packageJson.exports['./agent']);
   assert.ok(packageJson.exports['./markdown']);
+  assert.ok(packageJson.exports['./nav']);
   assert.ok(packageJson.files.includes('skills'));
   assert.equal(packageJson.peerDependencies.react, '>=18 <20');
   assert.equal(packageJson.peerDependencies['react-dom'], '>=18 <20');
@@ -57,6 +59,7 @@ test('publishes stable package entry points', () => {
 });
 
 test('publishes optional document catalog and chapter outline chrome', () => {
+  assert.match(navEntry, /'use client'/);
   assert.match(index, /DocumentFrame/);
   assert.match(index, /DocumentCatalog/);
   assert.match(index, /DocumentOutline/);

@@ -1,3 +1,5 @@
+'use client';
+
 import type {HTMLAttributes, ReactNode} from 'react';
 import {joinClassNames} from '../classnames.js';
 import type {DocumentNavGroup} from '../documentNav.js';

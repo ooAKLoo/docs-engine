@@ -1,6 +1,6 @@
 {
   "name": "@ooakloo/docs-engine",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "private": false,
   "type": "module",
   "description": "Shared document semantics, React primitives and visual system for ooAKLoo projects.",
@@ -49,6 +49,11 @@
       "types": "./dist/markdown.d.ts",
       "import": "./dist/markdown.js",
       "default": "./dist/markdown.js"
+    },
+    "./nav": {
+      "types": "./dist/nav.d.ts",
+      "import": "./dist/nav.js",
+      "default": "./dist/nav.js"
     },
     "./styles.css": "./styles/index.css",
     "./tokens.css": "./styles/tokens.css",
