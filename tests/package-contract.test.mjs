@@ -77,9 +77,8 @@ test('publishes optional document catalog and chapter outline chrome', () => {
   assert.match(navStyles, /\.de-document-catalog__link/);
   assert.match(navStyles, /\.de-document-catalog__items/);
   assert.match(navStyles, /\.de-document-catalog__group-label/);
-  assert.match(navStyles, /--de-catalog-tree/);
-  assert.match(navStyles, /border-bottom-left-radius/);
-  assert.match(catalogSource, /LayoutGrid/);
+  assert.doesNotMatch(navStyles, /--de-catalog-tree/);
+  assert.doesNotMatch(catalogSource, /LayoutGrid/);
   assert.match(navStyles, /data-level='1'/);
   assert.match(navStyles, /data-level='2'/);
   assert.match(navStyles, /data-level='3'/);

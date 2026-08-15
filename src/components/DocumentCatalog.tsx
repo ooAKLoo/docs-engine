@@ -1,6 +1,5 @@
 'use client';
 
-import {LayoutGrid} from 'lucide-react';
 import type {HTMLAttributes, ReactNode} from 'react';
 import {joinClassNames} from '../classnames.js';
 import type {DocumentNavGroup} from '../documentNav.js';
@@ -40,10 +39,7 @@ export function DocumentCatalog({
       <div className="de-document-catalog__groups">
         {groups.map((group) => (
           <section key={group.key} className="de-document-catalog__group" aria-label={group.label}>
-            <p className="de-document-catalog__group-label">
-              <LayoutGrid size={13} strokeWidth={2.15} aria-hidden />
-              <span>{group.label}</span>
-            </p>
+            <p className="de-document-catalog__group-label">{group.label}</p>
             {group.items.length > 0 ? (
               <div className="de-document-catalog__items">
                 {group.items.map((item) => (
