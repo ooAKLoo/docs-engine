@@ -22,6 +22,39 @@ test('keeps authored flowchart labels and shapes when later edges use bare ids',
   assert.equal(nodes.get('kol')?.label, 'KOL 推广\n场景化内容');
 });
 
+test('normalizes explicit escaped line breaks in Mermaid labels', async () => {
+  const graph = await importMermaid(String.raw`flowchart LR
+    source[第一行\n第二行] --> target[完成]`);
+
+  assert.equal(graph.nodes.find(({id}) => id === 'source')?.label, '第一行\n第二行');
+});
+
+test('routes rooted branching trees through the public built-in layout path', async () => {
+  const document = await importMermaid(`flowchart TB
+    root[商业模式] --> who[WHO]
+    root --> what[WHAT]
+    root --> how[HOW]
+    who --> actor[参与者]
+    what --> value[价值]
+    how --> carrier[价值载体]`);
+
+  assert.equal(document.canvas, undefined);
+  assert.ok(document.nodes.every(({position}) => position === undefined));
+  assert.ok(document.edges.every(({points}) => points === undefined));
+});
+
+test('keeps general merge graphs on the ELK authored-layout path', async () => {
+  const document = await importMermaid(`flowchart LR
+    start[开始] --> left[左分支]
+    start --> right[右分支]
+    left --> end[结束]
+    right --> end`);
+
+  assert.ok(document.canvas);
+  assert.ok(document.nodes.every(({position}) => position));
+  assert.ok(document.edges.every(({points}) => (points?.length ?? 0) >= 2));
+});
+
 test('parses labelled feedback edges and chained flowchart edges', async () => {
   const graph = await importMermaid(`flowchart LR
     mic[麦克风] --> afe[音频前端] --> preroll[预录缓冲]

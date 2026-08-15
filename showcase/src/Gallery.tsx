@@ -1,9 +1,7 @@
-import {useEffect, useState, type CSSProperties} from 'react';
+import {useState, type CSSProperties} from 'react';
 import {
   Annotation,
   Board,
-  type BoardDocument,
-  importMermaid,
   Callout,
   CodeBlock,
   DocumentContent,
@@ -472,7 +470,7 @@ export function Gallery() {
           />
           <h3>内置自动排线回归：商业模式树</h3>
           <p>
-            这棵树刻意打乱叶子节点的声明顺序，并剥离导入几何，完全交给内置自动布局与排线引擎。层内节点会按重心法重排并与父节点对齐，跨层边沿布局方向锚定，因此扇出干线之间不再出现交叉或重叠。
+            这棵树刻意打乱叶子节点的声明顺序，并通过与依赖项目相同的公开 <code>importSource</code> 路径导入。导入器会识别有分支的有根树，交给内置自动布局与排线引擎；层内节点按重心法重排并与父节点对齐，跨层边沿布局方向锚定，因此扇出干线之间不再出现交叉或重叠。
           </p>
           <AutoRoutedTreeExample />
           <h3>设计布局，同一 Board</h3>
@@ -493,36 +491,10 @@ export function Gallery() {
   );
 }
 
-// Strip the ELK-authored import geometry so the Board exercises the built-in
-// automatic layout and edge routing, exactly like documents without authored
-// positions (for example mindmaps) do.
 function AutoRoutedTreeExample() {
-  const [document, setDocument] = useState<BoardDocument>();
-
-  useEffect(() => {
-    let cancelled = false;
-    void importMermaid(businessModelMermaidSource).then((imported) => {
-      if (cancelled) return;
-      setDocument({
-        ...imported,
-        canvas: undefined,
-        edges: imported.edges.map(
-          ({labelPosition, points, sourceSide, targetSide, ...edge}) => edge,
-        ),
-        nodes: imported.nodes.map(
-          ({height, position, width, ...node}) => node,
-        ),
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!document) return null;
   return (
     <Board
-      defaultDocument={document}
+      importSource={{format: 'mermaid', source: businessModelMermaidSource}}
       aria-label="商业模式 12 要素的自动布局树"
     />
   );

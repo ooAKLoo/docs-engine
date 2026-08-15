@@ -215,6 +215,12 @@ test('keeps the Urban and Uber Board demo in the visual showcase', () => {
   assert.match(showcase, /Urban \/ Uber 因果链路/);
 });
 
+test('exercises automatic tree routing through the same public import path as consumers', () => {
+  assert.match(showcase, /importSource=\{\{format: 'mermaid', source: businessModelMermaidSource\}\}/);
+  assert.doesNotMatch(showcase, /canvas:\s*undefined/);
+  assert.doesNotMatch(showcase, /labelPosition, points, sourceSide, targetSide/);
+});
+
 test('wraps markdown tables with the shared table component', () => {
   assert.match(docusaurusAdapter, /table:\s*Table/);
 });

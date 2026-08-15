@@ -39,14 +39,55 @@ export async function importMermaid(source, options = {}) {
         nodes: graph.nodes,
         version: 1,
     };
-    // Without authored geometry, general graphs receive an ELK layered layout:
-    // container-aware layers, crossing minimisation and separated orthogonal
-    // lanes. On any failure the renderer falls back to its built-in layout.
+    // Rooted branching trees are intentionally left semantic so the same
+    // built-in layout and bundled edge router used by BoardCanvas can align
+    // parents, reorder ranks and share fan-out trunks. General graphs still use
+    // ELK for container-aware layers and separated orthogonal lanes. On any
+    // failure the renderer falls back to its built-in layout.
     const layout = options.layout
-        ?? (supportsElkBoardLayout(graph.kind)
+        ?? (supportsElkBoardLayout(graph.kind) && !prefersBuiltInTreeLayout(document)
             ? await computeElkBoardLayout(document).catch(() => undefined)
             : undefined);
     return applyBoardLayout(document, layout);
+}
+function prefersBuiltInTreeLayout(document) {
+    if (document.diagramKind !== 'flowchart'
+        || document.groups?.length
+        || document.nodes.length < 4)
+        return false;
+    const nodeIds = new Set(document.nodes.map(({ id }) => id));
+    const edges = document.edges.filter(({ stroke }) => stroke !== 'invisible');
+    if (edges.length !== document.nodes.length - 1)
+        return false;
+    const incoming = new Map(document.nodes.map(({ id }) => [id, 0]));
+    const outgoing = new Map(document.nodes.map(({ id }) => [id, []]));
+    for (const edge of edges) {
+        if (!edge.arrow
+            || edge.sourceArrow
+            || edge.sourceId === edge.targetId
+            || !nodeIds.has(edge.sourceId)
+            || !nodeIds.has(edge.targetId))
+            return false;
+        incoming.set(edge.targetId, (incoming.get(edge.targetId) ?? 0) + 1);
+        if ((incoming.get(edge.targetId) ?? 0) > 1)
+            return false;
+        outgoing.get(edge.sourceId)?.push(edge.targetId);
+    }
+    const roots = [...incoming].filter(([, count]) => count === 0).map(([id]) => id);
+    if (roots.length !== 1)
+        return false;
+    if (![...outgoing.values()].some((targets) => targets.length > 1))
+        return false;
+    const visited = new Set();
+    const pending = [roots[0]];
+    while (pending.length) {
+        const nodeId = pending.pop();
+        if (!nodeId || visited.has(nodeId))
+            continue;
+        visited.add(nodeId);
+        pending.push(...(outgoing.get(nodeId) ?? []));
+    }
+    return visited.size === document.nodes.length;
 }
 export function detectMermaidDiagramKind(source) {
     const first = sourceLines(source)[0]?.trim().toLowerCase() ?? '';
@@ -595,7 +636,8 @@ function sourceLines(source) {
         .filter((line) => line.trim());
 }
 function normalizeLabel(value) {
-    return value.replace(/<br\s*\/?\s*>/giu, '\n')
+    return value.replace(/\\n/gu, '\n')
+        .replace(/<br\s*\/?\s*>/giu, '\n')
         .replace(/<[^>]+>/gu, '')
         .replace(/&nbsp;/giu, ' ')
         .replace(/&amp;/giu, '&')
