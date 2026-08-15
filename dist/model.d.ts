@@ -51,6 +51,10 @@ export type DocBlock = {
     title: string;
     poster?: string;
 } | {
+    type: 'annotation';
+    text: string;
+    label?: string;
+} | {
     type: 'callout';
     variant: CalloutVariant;
     title: string;

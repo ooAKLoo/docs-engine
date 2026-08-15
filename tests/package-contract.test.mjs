@@ -15,6 +15,10 @@ const docusaurusMdxComponents = await readFile(
   'utf8',
 );
 const showcase = await readFile(new URL('../showcase/src/Gallery.tsx', import.meta.url), 'utf8');
+const annotationSource = await readFile(
+  new URL('../src/components/Annotation.tsx', import.meta.url),
+  'utf8',
+);
 const showcaseStyles = await readFile(
   new URL('../showcase/src/gallery.css', import.meta.url),
   'utf8',
@@ -27,6 +31,10 @@ const authorTechnicalDocsSkill = await readFile(
 );
 const informationDensityGuidance = await readFile(
   new URL('../skills/author-technical-docs/references/information-density.md', import.meta.url),
+  'utf8',
+);
+const structureGuidance = await readFile(
+  new URL('../skills/author-technical-docs/references/structure-and-semantics.md', import.meta.url),
   'utf8',
 );
 
@@ -67,6 +75,16 @@ test('keeps annotation and table visuals borderless', () => {
   assert.match(styles, /border-bottom:\s*1px solid var\(--de-line\)/);
   assert.doesNotMatch(styles, /border-right:/);
   assert.doesNotMatch(styles, /:where\(\.de-prose\) table/);
+});
+
+test('keeps a labeled judgment inside one Annotation instead of a tag plus quote', () => {
+  assert.match(annotationSource, /label\?:/);
+  assert.match(model, /type: 'annotation'; text: string; label\?: string/);
+  assert.match(styles, /\.de-annotation-label/);
+  assert.match(styles, /\.de-annotation-line/);
+  assert.match(showcase, /label="用户购买原因"/);
+  assert.match(structureGuidance, /有稳定维度名时用 `label`/);
+  assert.match(authorTechnicalDocsSkill, /\[!annotation\]/);
 });
 
 test('owns strict CJK line breaking across host prose styles', () => {

@@ -17,7 +17,7 @@ pnpm showcase
 ## 单一真源
 
 - `styles/tokens.css`：颜色、排版与组件 token。
-- `styles/content.css`：Annotation、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
+- `styles/content.css`：Annotation、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Annotation 可带 `label` 把维度名和判断写在同一条里；Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board 与导入器）。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。

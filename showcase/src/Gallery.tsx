@@ -294,6 +294,13 @@ export function Gallery() {
             多行 Annotation 用于验证圆头竖线会随内容高度自然伸展，同时保持 3px 宽度和中性灰色。
           </Annotation>
           <p>
+            判断如果有稳定的维度名，把维度名写在同一条 Annotation 的 <code>label</code>{' '}
+            里，不要拆成「标签段落 + 引用」。引用只用于来源原话。
+          </p>
+          <Annotation label="用户购买原因">我太麻烦了。</Annotation>
+          <Annotation label="用户购买原因">我想拥有这个能力，但是我不会。</Annotation>
+          <Annotation label="用户购买原因">我获得一种新的能力。</Annotation>
+          <p>
             Markdown 引用块由引擎直接接管语义化的 <code>blockquote</code>{' '}
             元素，宿主不需要自己写引用样式：竖线与 Annotation 一致，但字重更轻，用于原文引述而不是本方判断。
           </p>
