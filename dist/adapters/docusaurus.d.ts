@@ -7,7 +7,6 @@ import { Priority } from '../components/Priority.js';
 import { ResourceLink } from '../components/ResourceLink.js';
 import { RiskGrid, RiskItem } from '../components/RiskGrid.js';
 import { Status } from '../components/Status.js';
-import { SummaryPanel } from '../components/SummaryPanel.js';
 import { Table } from '../components/Table.js';
 import { TableScroll } from '../components/TableScroll.js';
 import { Timeline } from '../components/Timeline.js';
@@ -23,7 +22,6 @@ export declare const docusaurusMdxComponents: {
     RiskGrid: typeof RiskGrid;
     RiskItem: typeof RiskItem;
     Status: typeof Status;
-    SummaryPanel: typeof SummaryPanel;
     pre: typeof CodeBlock;
     table: typeof Table;
     TableScroll: typeof TableScroll;

@@ -16,7 +16,6 @@ declare const _default: {
     RiskGrid: typeof import("../../index.js").RiskGrid;
     RiskItem: typeof import("../../index.js").RiskItem;
     Status: typeof import("../../index.js").Status;
-    SummaryPanel: typeof import("../../index.js").SummaryPanel;
     pre: typeof import("../../index.js").CodeBlock;
     table: typeof import("../../index.js").Table;
     TableScroll: typeof import("../../index.js").TableScroll;

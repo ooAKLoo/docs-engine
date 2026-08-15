@@ -73,13 +73,27 @@ test('owns strict CJK line breaking across host prose styles', () => {
   assert.doesNotMatch(styles, /line-break:\s*loose/);
 });
 
-test('uses one neutral GPT-style surface for document summaries', () => {
-  assert.match(tokens, /--de-summary-background:\s*#f3f3f3/);
-  assert.match(
-    styles,
-    /\.de-summary-panel\s*\{[^}]*background:\s*var\(--de-summary-background\);/s,
-  );
-  assert.doesNotMatch(styles, /\.de-summary-panel\s*\{[^}]*(?:linear|radial)-gradient/s);
+test('carries document summaries with Callout instead of a separate panel', () => {
+  assert.doesNotMatch(index, /SummaryPanel/);
+  assert.doesNotMatch(docusaurusAdapter, /SummaryPanel/);
+  assert.doesNotMatch(styles, /de-summary-panel/);
+  assert.doesNotMatch(tokens, /--de-summary-background/);
+});
+
+test('keeps every semantic surface opaque and equally light', () => {
+  const semantic = [
+    ['done', '#ccedd8'],
+    ['progress', '#dce5fe'],
+    ['warning', '#fde1c5'],
+    ['danger', '#fededb'],
+  ];
+  for (const [name, value] of semantic) {
+    assert.match(tokens, new RegExp(`--de-status-${name}-background:\\s*${value};`));
+  }
+  // Translucent semantic surfaces composite towards the page colour and read as
+  // grey, so the light theme keeps them opaque.
+  const lightTheme = tokens.slice(0, tokens.indexOf("[data-theme='dark']"));
+  assert.doesNotMatch(lightTheme, /--de-status-[a-z]+-background:\s*rgba\(/);
 });
 
 test('keeps table identifiers intact and lets dense tables scroll', () => {

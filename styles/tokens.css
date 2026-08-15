@@ -2,7 +2,6 @@
   --de-page: #fcfcfc;
   --de-surface: #ffffff;
   --de-surface-soft: #f8f8f8;
-  --de-summary-background: #f3f3f3;
   --de-ink: #101828;
   --de-ink-soft: #475467;
   --de-muted: #667085;
@@ -14,15 +13,18 @@
   --de-annotation-line: #d6d6d6;
   --de-risk-background: #f2f2f2;
   --de-resource-link-icon: #98a2b3;
+  /* Semantic surfaces are opaque and share one lightness (CIELAB L* 91) so no
+   * variant reads heavier than another, and each hue keeps enough chroma to be
+   * recognisable instead of washing out into grey over a near-white page. */
   --de-status-neutral-background: rgb(241, 241, 241);
   --de-status-neutral-ink: #5f5e5b;
-  --de-status-done-background: rgba(45, 153, 100, 0.14);
-  --de-status-done-ink: #18794e;
-  --de-status-progress-background: rgba(35, 131, 226, 0.14);
-  --de-status-progress-ink: #0b6e99;
-  --de-status-warning-background: rgba(245, 158, 11, 0.16);
-  --de-status-warning-ink: #a15c00;
-  --de-status-danger-background: rgba(235, 87, 87, 0.14);
+  --de-status-done-background: #ccedd8;
+  --de-status-done-ink: #17734a;
+  --de-status-progress-background: #dce5fe;
+  --de-status-progress-ink: #0b6c96;
+  --de-status-warning-background: #fde1c5;
+  --de-status-warning-ink: #965600;
+  --de-status-danger-background: #fededb;
   --de-status-danger-ink: #b42318;
   --de-callout-red-background: var(--de-status-danger-background);
   --de-callout-orange-background: var(--de-status-warning-background);
@@ -50,7 +52,6 @@
   --de-page: #0b1220;
   --de-surface: #111827;
   --de-surface-soft: #172033;
-  --de-summary-background: rgba(255, 255, 255, 0.08);
   --de-ink: #f8fafc;
   --de-ink-soft: #cbd5e1;
   --de-muted: #94a3b8;

@@ -15,7 +15,6 @@ import {
   StatusFieldEditor,
   type BoardImportLayout,
   type StatusOption,
-  SummaryPanel,
   Table,
   Timeline,
   type TimelineItem,
@@ -286,10 +285,10 @@ export function Gallery() {
 
         <section className="showcase-section" id="summary">
           <h2>三、摘要与关键判断</h2>
-          <SummaryPanel>
-            <h2>整体结论</h2>
-            <p>SummaryPanel 用于文档级摘要；标题、正文和背景都由共享引擎维护。</p>
-          </SummaryPanel>
+          <Callout variant="neutral">
+            <strong>整体结论：</strong>
+            页面级摘要由 Callout 承载，不再有独立的摘要面板；正文与背景都由同一套语义色维护。
+          </Callout>
           <Annotation>本期判断：Annotation 是加粗正文，不是标题，不生成目录锚点。</Annotation>
           <Annotation>
             多行 Annotation 用于验证圆头竖线会随内容高度自然伸展，同时保持 3px 宽度和中性灰色。
@@ -298,7 +297,9 @@ export function Gallery() {
 
         <section className="showcase-section" id="callout">
           <h2>四、Callout</h2>
-          <p>Callout 与状态、优先级共用同一套低饱和语义色，不显示描边。</p>
+          <p>
+            Callout 与状态、优先级共用同一套语义色：所有变体保持同一明度，因此没有哪一种看起来更重；每个色相保留足够色度，不会在接近白色的页面上褪成灰色。Callout 也承载页面级摘要，不显示描边。
+          </p>
           <Callout variant="green">已完成：用于已验证结论、达成结果和推荐方案。</Callout>
           <Callout variant="blue">进行中：用于背景信息、当前口径和推进说明。</Callout>
           <Callout variant="neutral">待处理 / P2：用于普通备注、未设置状态和次要说明。</Callout>

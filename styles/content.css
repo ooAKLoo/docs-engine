@@ -399,34 +399,6 @@
   background: var(--de-callout-neutral-background);
 }
 
-:where(.de-prose) .de-summary-panel {
-  position: relative;
-  overflow: hidden;
-  margin: 0 0 1.8rem;
-  padding: 2rem 2.25rem;
-  border: 0;
-  border-radius: 22px;
-  background: var(--de-summary-background);
-  box-shadow: none;
-}
-
-:where(.de-prose) .de-summary-panel > h2 {
-  margin: 0 0 0.8rem;
-  color: var(--de-ink);
-  font-size: clamp(1.7rem, 3vw, 2.35rem);
-  font-weight: 820;
-  letter-spacing: -0.035em;
-  line-height: 1.24;
-}
-
-:where(.de-prose) .de-summary-panel > p {
-  max-width: 90%;
-  margin: 0;
-  color: var(--de-ink-soft);
-  font-size: 1rem;
-  line-height: 1.72;
-}
-
 :where(.de-prose) .de-badge {
   display: inline-flex;
   min-height: 22px;
@@ -2697,10 +2669,6 @@
 
   .de-table-shell .de-table th {
     white-space: normal;
-  }
-
-  :where(.de-prose) .de-summary-panel {
-    padding: 1.5rem;
   }
 
   :where(.de-prose) .de-transition {

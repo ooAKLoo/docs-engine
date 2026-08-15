@@ -17,7 +17,7 @@ pnpm showcase
 ## 单一真源
 
 - `styles/tokens.css`：颜色、排版与组件 token。
-- `styles/content.css`：Annotation、Callout、Table、SummaryPanel、Status、Priority、RiskGrid、转换比较与图表容器。
+- `styles/content.css`：Annotation、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board 与导入器）。
 - `src/model.ts`：两端共用的基础文档块模型；目录扫描、状态写回等业务字段仍由宿主扩展。
@@ -26,7 +26,7 @@ pnpm showcase
 
 ### 飞书高亮块色系
 
-`Callout` 支持飞书高亮块一致的 `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`neutral` 七组浅色填充，并按本项目视觉规范统一取消描边。兼容别名 `brand`、`info`、`note` 分别映射为紫色、蓝色和中性灰，不影响已有调用。
+`Callout` 支持飞书高亮块一致的 `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`neutral` 七组浅色填充，并按本项目视觉规范统一取消描边。兼容别名 `brand`、`info`、`note` 分别映射为紫色、蓝色和中性灰，不影响已有调用。语义填充与 `Status`、`Priority` 共用一组不透明色：所有变体固定在同一明度（CIELAB L\* 91），因此没有哪一种看起来更重；每个色相保留可辨识的色度，不会像半透明叠加那样在接近白色的页面上褪成灰色。页面级摘要同样使用 `Callout`，引擎不再提供独立的摘要面板组件。
 
 ### ChatGPT 风格代码块
 
