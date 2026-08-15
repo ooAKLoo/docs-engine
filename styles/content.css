@@ -1,11 +1,13 @@
-:where(.de-root.de-prose) {
+:where(.de-prose) {
   line-break: strict;
   word-break: normal;
 }
 
 /* Keep CJK forbidden punctuation attached to the preceding line even when a host
- * applies a looser element-level prose rule after Docs Engine's stylesheet. */
-.de-root.de-prose :is(p, li, h1, h2, h3, h4, td, th, figcaption) {
+ * applies a looser element-level prose rule after Docs Engine's stylesheet. The
+ * class is repeated to outrank such rules without also requiring de-root on the
+ * same element, which hosts are free to place on an ancestor instead. */
+.de-prose.de-prose :is(p, li, h1, h2, h3, h4, td, th, figcaption) {
   line-break: strict;
   word-break: normal;
 }
@@ -22,8 +24,36 @@
   line-height: 1.65;
 }
 
+/* Markdown blockquotes are styled here so hosts never need their own quote
+ * treatment: the left rule matches Annotation, without its heavier weight. A bare
+ * element selector inside :where() would lose to any host `.markdown blockquote`
+ * rule, so the class is repeated to match the specificity used for CJK breaking. */
+.de-prose.de-prose blockquote {
+  position: relative;
+  max-width: 92%;
+  margin: 0.8rem 0 1rem;
+  padding: 0.12rem 0 0.12rem 1.125rem;
+  border: 0;
+  color: var(--de-ink-soft);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.78;
+}
+
+.de-prose.de-prose blockquote > * {
+  margin: 0.375rem 0 0;
+}
+
+.de-prose.de-prose blockquote > :first-child {
+  margin-top: 0;
+}
+
+.de-prose.de-prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
 :where(.de-prose) .de-annotation::before,
-:where(.de-prose) .callout.annotation::before {
+.de-prose.de-prose blockquote::before {
   position: absolute;
   top: 50%;
   left: 0;
@@ -281,14 +311,16 @@
 }
 
 /* Host framework rules often target `.markdown pre` with greater specificity. Keep this
- * surface self-contained, so every Docs Engine code block stays a single dark GPT-style pane. */
-.de-root.de-prose .de-code-block,
-.de-root.de-prose .de-code-block .de-code-block__pre,
-.de-root.de-prose .de-code-block .de-code-block__pre code {
+ * surface self-contained, so every Docs Engine code block stays a single dark GPT-style pane.
+ * The repeated class carries the specificity that de-root used to add, so hosts may keep
+ * de-root on an ancestor of the prose container. */
+.de-prose.de-prose .de-code-block,
+.de-prose.de-prose .de-code-block .de-code-block__pre,
+.de-prose.de-prose .de-code-block .de-code-block__pre code {
   background: var(--de-code-background) !important;
 }
 
-.de-root.de-prose .de-code-block .de-code-block__pre {
+.de-prose.de-prose .de-code-block .de-code-block__pre {
   box-sizing: border-box !important;
   max-width: 100% !important;
   margin: 0 !important;
@@ -302,7 +334,7 @@
   white-space: pre !important;
 }
 
-.de-root.de-prose .de-code-block > .de-code-block__pre > code {
+.de-prose.de-prose .de-code-block > .de-code-block__pre > code {
   display: block !important;
   box-sizing: border-box !important;
   margin: 0 !important;
@@ -2624,31 +2656,6 @@
   .de-diagram-inline-toolbar {
     transition: none;
   }
-}
-
-:where(.de-prose) .callout.annotation {
-  position: relative;
-  max-width: 92%;
-  margin: 2px 0 8px;
-  padding: 2px 0 2px 18px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-:where(.de-prose) .callout.annotation .callout-title {
-  margin: 0;
-  color: var(--de-ink-soft);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.78;
-}
-
-:where(.de-prose) .callout.annotation .callout-body {
-  margin: 6px 0 0;
-  color: var(--de-muted);
-  font-size: 14px;
-  line-height: 1.68;
 }
 
 @media (max-width: 760px) {

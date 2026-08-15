@@ -15,6 +15,10 @@ const docusaurusMdxComponents = await readFile(
   'utf8',
 );
 const showcase = await readFile(new URL('../showcase/src/Gallery.tsx', import.meta.url), 'utf8');
+const showcaseStyles = await readFile(
+  new URL('../showcase/src/gallery.css', import.meta.url),
+  'utf8',
+);
 const model = await readFile(new URL('../src/model.ts', import.meta.url), 'utf8');
 const agent = await readFile(new URL('../src/agent.ts', import.meta.url), 'utf8');
 const authorTechnicalDocsSkill = await readFile(
@@ -68,9 +72,34 @@ test('keeps annotation and table visuals borderless', () => {
 test('owns strict CJK line breaking across host prose styles', () => {
   assert.match(
     styles,
-    /\.de-root\.de-prose :is\(p, li, h1, h2, h3, h4, td, th, figcaption\)\s*\{[^}]*line-break:\s*strict;[^}]*word-break:\s*normal;/s,
+    /\.de-prose\.de-prose :is\(p, li, h1, h2, h3, h4, td, th, figcaption\)\s*\{[^}]*line-break:\s*strict;[^}]*word-break:\s*normal;/s,
   );
   assert.doesNotMatch(styles, /line-break:\s*loose/);
+});
+
+test('reaches prose content without requiring de-root on the same element', () => {
+  // Hosts commonly mark a wrapper as de-root and the article as de-prose, so any
+  // rule demanding both classes on one element silently skips those documents.
+  assert.doesNotMatch(styles, /\.de-root\.de-prose/);
+});
+
+test('styles semantic blockquotes so hosts need no quote treatment of their own', () => {
+  assert.match(
+    styles,
+    /\.de-prose\.de-prose blockquote\s*\{[^}]*color:\s*var\(--de-ink-soft\)/s,
+  );
+  assert.match(styles, /\.de-prose\.de-prose blockquote::before/);
+  // The showcase must not restate the quote treatment, or a host-only regression
+  // would stay invisible in the demo.
+  assert.doesNotMatch(showcaseStyles, /blockquote/);
+});
+
+test('carries no host-specific class names', () => {
+  // Compatibility shims for a consumer's private markup make the engine and that
+  // consumer drift apart, and the showcase cannot catch the regression.
+  for (const hostClass of ['.callout', 'callout-title', 'callout-body', '.doc-summary']) {
+    assert.doesNotMatch(styles, new RegExp(hostClass.replace('.', '\\.')));
+  }
 });
 
 test('carries document summaries with Callout instead of a separate panel', () => {

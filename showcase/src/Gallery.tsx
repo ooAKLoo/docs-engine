@@ -293,6 +293,14 @@ export function Gallery() {
           <Annotation>
             多行 Annotation 用于验证圆头竖线会随内容高度自然伸展，同时保持 3px 宽度和中性灰色。
           </Annotation>
+          <p>
+            Markdown 引用块由引擎直接接管语义化的 <code>blockquote</code>{' '}
+            元素，宿主不需要自己写引用样式：竖线与 Annotation 一致，但字重更轻，用于原文引述而不是本方判断。
+          </p>
+          <blockquote>
+            <p>某些参与者拥有某种需求，有人组织资源创造价值，通过某种方式交付价值，获得某种权利交换。</p>
+            <p>多段引用用于验证段间距与竖线高度，首末段不额外增加外边距。</p>
+          </blockquote>
         </section>
 
         <section className="showcase-section" id="callout">
