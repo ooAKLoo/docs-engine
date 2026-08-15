@@ -68,6 +68,8 @@ test('publishes optional document catalog and chapter outline chrome', () => {
   assert.match(authorTechnicalDocsSkill, /DocumentOutline/);
   assert.match(styleEntry, /nav\.css/);
   assert.match(navStyles, /\.de-document-frame/);
+  assert.match(navStyles, /width:\s*100%/);
+  assert.doesNotMatch(navStyles, /88rem/);
   assert.match(navStyles, /\.de-document-catalog__link/);
   assert.match(navStyles, /\.de-document-outline__link/);
   assert.doesNotMatch(navStyles, /\.doc-sidebar/);
