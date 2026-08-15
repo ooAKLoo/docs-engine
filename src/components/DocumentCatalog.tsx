@@ -1,6 +1,6 @@
 'use client';
 
-import type {HTMLAttributes, ReactNode} from 'react';
+import {useEffect, useRef, type HTMLAttributes, type ReactNode} from 'react';
 import {joinClassNames} from '../classnames.js';
 import type {DocumentNavGroup} from '../documentNav.js';
 
@@ -25,6 +25,18 @@ export function DocumentCatalog({
   label = '目录',
   ...props
 }: DocumentCatalogProps) {
+  const currentRef = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    const node = currentRef.current;
+    if (!node) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      node.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'auto'});
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentId]);
+
   return (
     <nav
       {...props}
@@ -45,6 +57,7 @@ export function DocumentCatalog({
                 {group.items.map((item) => (
                   <a
                     key={item.id}
+                    ref={item.id === currentId ? currentRef : undefined}
                     className="de-document-catalog__link"
                     href={item.href}
                     aria-current={item.id === currentId ? 'page' : undefined}

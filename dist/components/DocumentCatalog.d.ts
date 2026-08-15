@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import { type HTMLAttributes, type ReactNode } from 'react';
 import type { DocumentNavGroup } from '../documentNav.js';
 export type DocumentCatalogProps = HTMLAttributes<HTMLElement> & {
     groups: DocumentNavGroup[];
