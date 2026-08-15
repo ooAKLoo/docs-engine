@@ -57,8 +57,6 @@ function prefersBuiltInTreeLayout(document) {
         return false;
     const nodeIds = new Set(document.nodes.map(({ id }) => id));
     const edges = document.edges.filter(({ stroke }) => stroke !== 'invisible');
-    if (edges.length !== document.nodes.length - 1)
-        return false;
     const incoming = new Map(document.nodes.map(({ id }) => [id, 0]));
     const outgoing = new Map(document.nodes.map(({ id }) => [id, []]));
     for (const edge of edges) {
@@ -69,10 +67,22 @@ function prefersBuiltInTreeLayout(document) {
             || !nodeIds.has(edge.targetId))
             return false;
         incoming.set(edge.targetId, (incoming.get(edge.targetId) ?? 0) + 1);
-        if ((incoming.get(edge.targetId) ?? 0) > 1)
-            return false;
         outgoing.get(edge.sourceId)?.push(edge.targetId);
     }
+    // The built-in router also bundles a symmetric fan-in, so a rooted branching
+    // tree may end in one shared convergence sink. Every other node must keep a
+    // single parent; graphs with several merges or a merge that keeps flowing
+    // stay on the ELK authored-layout path.
+    const mergeIds = [...incoming].filter(([, count]) => count > 1).map(([id]) => id);
+    if (mergeIds.length > 1)
+        return false;
+    const mergeId = mergeIds[0];
+    if (mergeId !== undefined && (outgoing.get(mergeId)?.length ?? 0) > 0)
+        return false;
+    const treeEdges = edges.filter(({ targetId }) => targetId !== mergeId);
+    const treeNodeCount = document.nodes.length - (mergeId === undefined ? 0 : 1);
+    if (treeEdges.length !== treeNodeCount - 1)
+        return false;
     const roots = [...incoming].filter(([, count]) => count === 0).map(([id]) => id);
     if (roots.length !== 1)
         return false;

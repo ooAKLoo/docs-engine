@@ -43,12 +43,27 @@ test('routes rooted branching trees through the public built-in layout path', as
   assert.ok(document.edges.every(({points}) => points === undefined));
 });
 
+test('routes rooted trees with one convergence sink through the built-in layout path', async () => {
+  const document = await importMermaid(`flowchart LR
+    start[新品类] --> source[需求来源]
+    start --> value[购买价值]
+    source --> education[教育成本]
+    value --> promise[价值主张]
+    education --> strategy[品类战略]
+    promise --> strategy`);
+
+  assert.equal(document.canvas, undefined);
+  assert.ok(document.nodes.every(({position}) => position === undefined));
+  assert.ok(document.edges.every(({points}) => points === undefined));
+});
+
 test('keeps general merge graphs on the ELK authored-layout path', async () => {
   const document = await importMermaid(`flowchart LR
     start[开始] --> left[左分支]
     start --> right[右分支]
-    left --> end[结束]
-    right --> end`);
+    left --> merge[汇合]
+    right --> merge
+    merge --> tail[后续动作]`);
 
   assert.ok(document.canvas);
   assert.ok(document.nodes.every(({position}) => position));
