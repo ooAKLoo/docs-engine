@@ -40,16 +40,18 @@ export function DocumentCatalog({
         {groups.map((group) => (
           <section key={group.key} className="de-document-catalog__group" aria-label={group.label}>
             <p className="de-document-catalog__group-label">{group.label}</p>
-            {group.items.map((item) => (
-              <a
-                key={item.id}
-                className="de-document-catalog__link"
-                href={item.href}
-                aria-current={item.id === currentId ? 'page' : undefined}
-              >
-                {item.title}
-              </a>
-            ))}
+            <div className="de-document-catalog__items">
+              {group.items.map((item) => (
+                <a
+                  key={item.id}
+                  className="de-document-catalog__link"
+                  href={item.href}
+                  aria-current={item.id === currentId ? 'page' : undefined}
+                >
+                  {item.title}
+                </a>
+              ))}
+            </div>
           </section>
         ))}
       </div>
