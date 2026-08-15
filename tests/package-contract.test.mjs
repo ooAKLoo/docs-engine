@@ -5,6 +5,8 @@ import test from 'node:test';
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles/content.css', import.meta.url), 'utf8');
+const navStyles = await readFile(new URL('../styles/nav.css', import.meta.url), 'utf8');
+const styleEntry = await readFile(new URL('../styles/index.css', import.meta.url), 'utf8');
 const tokens = await readFile(new URL('../styles/tokens.css', import.meta.url), 'utf8');
 const docusaurusAdapter = await readFile(
   new URL('../src/adapters/docusaurus.ts', import.meta.url),
@@ -52,6 +54,22 @@ test('publishes stable package entry points', () => {
   assert.equal(packageJson.dependencies['lucide-react'], '^1.24.0');
   assert.equal(packageJson.dependencies.mermaid, undefined);
   assert.equal(packageJson.dependencies.katex, '^0.16.47');
+});
+
+test('publishes optional document catalog and chapter outline chrome', () => {
+  assert.match(index, /DocumentFrame/);
+  assert.match(index, /DocumentCatalog/);
+  assert.match(index, /DocumentOutline/);
+  assert.match(authorTechnicalDocsSkill, /DocumentFrame/);
+  assert.match(authorTechnicalDocsSkill, /DocumentCatalog/);
+  assert.match(authorTechnicalDocsSkill, /DocumentOutline/);
+  assert.match(styleEntry, /nav\.css/);
+  assert.match(navStyles, /\.de-document-frame/);
+  assert.match(navStyles, /\.de-document-catalog__link/);
+  assert.match(navStyles, /\.de-document-outline__link/);
+  assert.doesNotMatch(navStyles, /\.doc-sidebar/);
+  assert.doesNotMatch(navStyles, /\.stack-panel/);
+  assert.match(showcase, /DocumentFrame/);
 });
 
 test('publishes document markdown parsing so hosts do not copy a renderer', () => {

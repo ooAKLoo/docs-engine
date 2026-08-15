@@ -108,6 +108,26 @@ body {
   text-underline-offset: 0.18em;
 }
 
+.showcase-document-nav {
+  margin-top: 1.5rem;
+}
+
+.showcase-document-nav .de-document-frame {
+  width: 100%;
+  padding: 0;
+}
+
+.showcase-document-nav .de-document-catalog__link,
+.showcase-document-nav .de-document-outline__link {
+  color: var(--de-muted);
+  text-decoration: none;
+}
+
+.showcase-document-nav .de-document-catalog__link[aria-current='page'],
+.showcase-document-nav .de-document-outline__link[aria-current='location'] {
+  color: var(--de-brand);
+}
+
 @media (max-width: 720px) {
   .showcase-page {
     width: min(100% - 28px, 1120px);

@@ -75,6 +75,7 @@
 
 - [ ] 内容项目没有复制 Docs Engine CSS、解析器或组件实现。
 - [ ] Markdown 宿主通过 `parseDocumentMarkdown` 与 `DocumentBlock` 渲染正文，只用 `renderBlock` 覆盖宿主业务块。
+- [ ] 需要左右栏导航时使用 `DocumentFrame` / `DocumentCatalog` / `DocumentOutline`，没有再复制目录或章节目录。
 - [ ] 内容项目没有添加基于文本特征的兼容转换。
 - [ ] 共享缺口在 Docs Engine 中解决，并由包版本向依赖项目交付。
 - [ ] 宿主只保留框架启动、内容发现和业务数据职责。

@@ -4,7 +4,10 @@ import {
   Board,
   Callout,
   CodeBlock,
+  DocumentCatalog,
   DocumentContent,
+  DocumentFrame,
+  DocumentOutline,
   Formula,
   Priority,
   ResourceLink,
@@ -244,6 +247,7 @@ export function Gallery() {
         <a href="#check-grid">检查网格</a>
         <a href="#timeline">交互时间轴</a>
         <a href="#diagram">图表</a>
+        <a href="#document-nav">目录导航</a>
       </nav>
 
       <main>
@@ -501,6 +505,55 @@ export function Gallery() {
             }}
             aria-label="用户反馈到实验决策的统一画板"
           />
+        </section>
+
+        <section className="showcase-section" id="document-nav">
+          <h2>十一、文档目录与章节目录</h2>
+          <p>
+            非 Docusaurus 宿主可以可选接入三栏文档壳：左边是文档目录，右边是本章章节并跟踪阅读位置。框架已经提供侧栏的宿主不必改用这组组件。
+          </p>
+          <div className="showcase-document-nav">
+            <DocumentFrame
+              catalog={
+                <DocumentCatalog
+                  currentId="positioning"
+                  groups={[
+                    {
+                      key: 'product',
+                      label: '产品与市场',
+                      items: [
+                        {id: 'positioning', title: '定位与边界', href: '#document-nav'},
+                        {id: 'model', title: '商业模式', href: '#document-nav'},
+                      ],
+                    },
+                    {
+                      key: 'engineering',
+                      label: '工程',
+                      items: [{id: 'runtime', title: '运行时边界', href: '#document-nav'}],
+                    },
+                  ]}
+                />
+              }
+              outline={
+                <DocumentOutline
+                  headings={[
+                    {id: 'nav-demo-layout', level: 1, text: '三栏怎么分工'},
+                    {id: 'nav-demo-optional', level: 2, text: '为什么可选'},
+                    {id: 'nav-demo-host', level: 1, text: '宿主还要提供什么'},
+                  ]}
+                />
+              }
+            >
+              <article>
+                <h3 id="nav-demo-layout">三栏怎么分工</h3>
+                <p>左栏列出站点里的文档分组，中间是正文，右栏只反映当前这篇的标题锚点。</p>
+                <h4 id="nav-demo-optional">为什么可选</h4>
+                <p>Docusaurus 已经有文档目录和章节目录时，继续用框架侧栏即可，不必再包一层。</p>
+                <h3 id="nav-demo-host">宿主还要提供什么</h3>
+                <p>文件发现、分组标签和链接地址仍由宿主计算；引擎只负责导航面和滚动高亮。</p>
+              </article>
+            </DocumentFrame>
+          </div>
         </section>
       </main>
     </DocumentContent>

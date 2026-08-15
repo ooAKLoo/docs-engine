@@ -50,7 +50,10 @@ export type {
   BoardPoint,
 } from './components/BoardModel.js';
 export {DocumentBlock, type DocumentBlockProps} from './components/DocumentBlock.js';
+export {DocumentCatalog, type DocumentCatalogProps} from './components/DocumentCatalog.js';
 export {DocumentContent, type DocumentContentProps} from './components/DocumentContent.js';
+export {DocumentFrame, type DocumentFrameProps} from './components/DocumentFrame.js';
+export {DocumentOutline, type DocumentOutlineProps} from './components/DocumentOutline.js';
 export {Formula, type FormulaProps} from './components/Formula.js';
 export {MarkdownInline} from './components/MarkdownInline.js';
 export {Priority, type PriorityLevel, type PriorityProps} from './components/Priority.js';
@@ -88,6 +91,7 @@ export {markdownInlineToPlainText} from './markdown.js';
 export {parseDocumentMarkdown, type ParseDocumentMarkdownResult} from './parseDocumentMarkdown.js';
 export {serializeDocBlock} from './serializeDocumentMarkdown.js';
 export {collectHeadings, slugifyHeading} from './collectHeadings.js';
+export type {DocumentNavGroup, DocumentNavItem} from './documentNav.js';
 export type {
   CalloutVariant,
   DocBlock,

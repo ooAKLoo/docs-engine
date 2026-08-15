@@ -7,7 +7,10 @@ export { importMermaid, detectMermaidDiagramKind } from './components/MermaidImp
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
 export { applyBoardOperation, serializeBoardDocument, } from './components/BoardModel.js';
 export { DocumentBlock } from './components/DocumentBlock.js';
+export { DocumentCatalog } from './components/DocumentCatalog.js';
 export { DocumentContent } from './components/DocumentContent.js';
+export { DocumentFrame } from './components/DocumentFrame.js';
+export { DocumentOutline } from './components/DocumentOutline.js';
 export { Formula } from './components/Formula.js';
 export { MarkdownInline } from './components/MarkdownInline.js';
 export { Priority } from './components/Priority.js';
