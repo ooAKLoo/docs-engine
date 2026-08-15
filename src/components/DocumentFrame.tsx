@@ -14,6 +14,9 @@ export type DocumentFrameProps = HTMLAttributes<HTMLElement> & {
    * When the frame stays mounted and this key changes, fade the main column
    * and chapter outline. Full-page remounts cannot interpolate; keep the
    * catalog and frame in a layout, then pass the current document id.
+   *
+   * The main column uses a CSS enter animation so Next.js page children stay
+   * a server slot. AnimatePresence around that slot hydrates as undefined.
    */
   contentKey?: string;
 };
@@ -44,17 +47,6 @@ export function DocumentFrame({
     setCollapsed(nextCollapsed);
     window.localStorage.setItem(persistKey, String(nextCollapsed));
   }
-
-  const main = (
-    <div className="de-document-frame__main">
-      <DocumentFrameSwitch contentKey={contentKey}>{children}</DocumentFrameSwitch>
-    </div>
-  );
-  const outlinePane = outline ? (
-    <div className="de-document-frame__outline">
-      <DocumentFrameSwitch contentKey={contentKey}>{outline}</DocumentFrameSwitch>
-    </div>
-  ) : null;
 
   return (
     <div
@@ -90,34 +82,39 @@ export function DocumentFrame({
         </button>
       ) : null}
 
-      {contentKey != null ? (
-        <LazyMotion features={domAnimation} strict>
-          {main}
-          {outlinePane}
-        </LazyMotion>
-      ) : (
-        <>
-          {main}
-          {outlinePane}
-        </>
-      )}
+      <div className="de-document-frame__main">
+        {contentKey != null ? (
+          <div key={contentKey} className="de-document-frame__switch">
+            {children}
+          </div>
+        ) : (
+          children
+        )}
+      </div>
+
+      {outline ? (
+        <div className="de-document-frame__outline">
+          {contentKey != null ? (
+            <LazyMotion features={domAnimation} strict>
+              <DocumentOutlineSwitch contentKey={contentKey}>{outline}</DocumentOutlineSwitch>
+            </LazyMotion>
+          ) : (
+            outline
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function DocumentFrameSwitch({
+function DocumentOutlineSwitch({
   children,
   contentKey,
 }: {
   children: ReactNode;
-  contentKey?: string;
+  contentKey: string;
 }) {
   const prefersReducedMotion = useReducedMotion();
-
-  if (contentKey == null) {
-    return children;
-  }
-
   const instant = prefersReducedMotion === true;
   const transition = instant ? {duration: 0} : {duration: 0.2, ease: [0.22, 1, 0.36, 1] as const};
   const initial = instant ? {opacity: 0} : {opacity: 0, y: 6};

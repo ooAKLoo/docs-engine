@@ -8,6 +8,9 @@ export type DocumentFrameProps = HTMLAttributes<HTMLElement> & {
      * When the frame stays mounted and this key changes, fade the main column
      * and chapter outline. Full-page remounts cannot interpolate; keep the
      * catalog and frame in a layout, then pass the current document id.
+     *
+     * The main column uses a CSS enter animation so Next.js page children stay
+     * a server slot. AnimatePresence around that slot hydrates as undefined.
      */
     contentKey?: string;
 };
