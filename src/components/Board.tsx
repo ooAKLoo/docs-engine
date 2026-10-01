@@ -1306,7 +1306,6 @@ export function Board({
           <span className="de-diagram-inline-divider" aria-hidden="true" />
           <button
             type="button"
-            className="de-diagram-inline-entry"
             aria-label={`回到原位：${accessibleTitle}`}
             title="恢复初始位置和缩放"
             onClick={(event) => {
@@ -1315,7 +1314,6 @@ export function Board({
             }}
           >
             <RotateCcw aria-hidden="true" size={18} strokeWidth={1.9} />
-            <span>回到原位</span>
           </button>
           <button
             type="button"
