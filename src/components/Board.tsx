@@ -10,6 +10,7 @@ import {
   MousePointer2,
   PenLine,
   Plus,
+  RotateCcw,
   Workflow,
   X,
 } from 'lucide-react';
@@ -964,6 +965,8 @@ export function Board({
   const handleFigureKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || !zoomable) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('a, button, input, select, textarea')) return;
     if (event.key === 'Enter') {
       event.preventDefault();
       openViewer(canEdit ? 'edit' : 'view');
@@ -1301,6 +1304,19 @@ export function Board({
             <span>{canEdit ? '编辑' : '查看'}</span>
           </button>
           <span className="de-diagram-inline-divider" aria-hidden="true" />
+          <button
+            type="button"
+            className="de-diagram-inline-entry"
+            aria-label={`回到原位：${accessibleTitle}`}
+            title="恢复初始位置和缩放"
+            onClick={(event) => {
+              event.stopPropagation();
+              updateInlineViewport({x: 0, y: 0, scale: 1});
+            }}
+          >
+            <RotateCcw aria-hidden="true" size={18} strokeWidth={1.9} />
+            <span>回到原位</span>
+          </button>
           <button
             type="button"
             aria-label={`全屏打开画板：${accessibleTitle}`}
