@@ -48,7 +48,7 @@ export async function computeElkBoardLayout(document, options = {}) {
         // drifting below the wrap threshold through float round-trips.
         return [node.id, { height: Math.ceil(measured.height), width: Math.ceil(measured.width) }];
     }));
-    const graph = buildElkGraph(usesFlowRouting(document) ? canonicalLayoutOrder(document) : document, nodeSizes);
+    const graph = buildElkGraph(usesFlowRouting(document) ? canonicalLayoutOrder(document) : document, nodeSizes, prefersChainWrapping(document, nodeSizes));
     if (!graph)
         return undefined;
     const result = await new Elk().layout(graph);
@@ -100,7 +100,75 @@ function canonicalLayoutOrder(document) {
         })),
     };
 }
-function buildElkGraph(document, nodeSizes) {
+const CHAIN_WRAP_MIN_RANKS = 4;
+const CHAIN_WRAP_MIN_RATIO = 3.2;
+const CHAIN_WRAP_TARGET_RATIO = '2.4';
+/**
+ * A long horizontal chain fitted into a document column shrinks its text until
+ * it is unreadable. When every rank between the first and the last holds one
+ * node, ELK can cut between ranks without severing parallel lanes and wrap the
+ * chain into rows. Branching, grouped or cyclic graphs keep a single row,
+ * because wrapping them sends several long return edges across the board.
+ */
+function prefersChainWrapping(document, nodeSizes) {
+    if (document.direction !== 'LR' && document.direction !== 'RL')
+        return false;
+    if (document.groups?.length || document.nodes.length < CHAIN_WRAP_MIN_RANKS)
+        return false;
+    const edges = document.edges.filter(({ stroke }) => stroke !== 'invisible');
+    if (edges.some(({ role, sourceId, targetId }) => role === 'feedback' || sourceId === targetId))
+        return false;
+    const incoming = new Map(document.nodes.map(({ id }) => [id, []]));
+    const connected = new Set();
+    for (const edge of edges) {
+        incoming.get(edge.targetId)?.push(edge.sourceId);
+        connected.add(edge.sourceId);
+        connected.add(edge.targetId);
+    }
+    if (document.nodes.some(({ id }) => !connected.has(id)))
+        return false;
+    // Longest-path ranks; a cycle without a feedback role disqualifies the graph.
+    const ranks = new Map();
+    const visiting = new Set();
+    const rankOf = (id) => {
+        const known = ranks.get(id);
+        if (known !== undefined)
+            return known;
+        if (visiting.has(id))
+            return Number.NaN;
+        visiting.add(id);
+        const rank = Math.max(-1, ...(incoming.get(id) ?? []).map(rankOf)) + 1;
+        visiting.delete(id);
+        ranks.set(id, rank);
+        return rank;
+    };
+    const layers = [];
+    for (const { id } of document.nodes) {
+        const rank = rankOf(id);
+        if (!Number.isFinite(rank))
+            return false;
+        (layers[rank] ??= []).push(id);
+    }
+    if (layers.length < CHAIN_WRAP_MIN_RANKS)
+        return false;
+    if (layers.slice(1, -1).some((layer) => layer?.length !== 1))
+        return false;
+    const size = (id) => nodeSizes.get(id) ?? { height: 0, width: 0 };
+    // Inline edge labels widen the gap between ranks; count the widest per gap.
+    const gaps = new Map();
+    for (const edge of edges) {
+        if (!edge.label)
+            continue;
+        const rank = ranks.get(edge.sourceId) ?? 0;
+        const labelWidth = measureDiagramEdgeLabel(edge.label, edge.bareLabel).width + EDGE_LABEL_MARGIN * 2;
+        gaps.set(rank, Math.max(gaps.get(rank) ?? 0, labelWidth));
+    }
+    const width = layers.reduce((sum, layer) => sum + Math.max(...layer.map((id) => size(id).width)), 0)
+        + layers.slice(1).reduce((sum, _, rank) => sum + Math.max(92, gaps.get(rank) ?? 0), 0);
+    const height = Math.max(...layers.map((layer) => layer.reduce((sum, id) => sum + size(id).height, 0) + (layer.length - 1) * 44));
+    return width / Math.max(1, height) >= CHAIN_WRAP_MIN_RATIO;
+}
+function buildElkGraph(document, nodeSizes, wrapChain = false) {
     const groups = document.groups ?? [];
     const groupById = new Map(groups.map((group) => [group.id, group]));
     const parentGroupByNode = new Map();
@@ -144,6 +212,12 @@ function buildElkGraph(document, nodeSizes) {
             'elk.spacing.labelLabel': '8',
             'elk.spacing.labelNode': '18',
             'elk.spacing.nodeNode': '44',
+            ...(wrapChain
+                ? {
+                    'elk.aspectRatio': CHAIN_WRAP_TARGET_RATIO,
+                    'elk.layered.wrapping.strategy': 'MULTI_EDGE',
+                }
+                : null),
         },
     };
     const containerOf = (groupId) => {
