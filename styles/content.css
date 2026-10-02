@@ -1908,10 +1908,16 @@
   vector-effect: non-scaling-stroke;
 }
 
-.de-board__group text {
+.de-board__group-titles text {
   fill: #6b6f7b;
   font: 650 12px/1 var(--de-font-sans);
   letter-spacing: 0.02em;
+  /* A halo in the group fill keeps the title legible over any line beneath. */
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
 .de-board__lifelines line {

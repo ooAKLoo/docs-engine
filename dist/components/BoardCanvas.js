@@ -395,6 +395,10 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
         : boardLayout?.width && boardLayout.height
             ? unionDiagramBounds({ height: boardLayout.height, left: 0, top: 0, width: boardLayout.width }, editedContentBounds)
             : displayBounds;
+    const groupTitleSegments = [
+        ...routedEdges.filter(({ edge }) => edge.stroke !== 'invisible').map(({ route }) => route.points),
+        ...routedTrunks.map((trunk) => trunk.points),
+    ];
     const draftSource = connectionDraft ? nodesById.get(connectionDraft.sourceId) : undefined;
     const draftTarget = connectionDraft?.targetId
         ? nodesById.get(connectionDraft.targetId)
@@ -403,7 +407,7 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
         ? routeDraftConnection(draftSource, draftTarget, connectionDraft, layout.nodes)
         : null;
     const guideBounds = getLayoutBounds(layout.nodes, 34, layout.groups);
-    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [layout.groups.length > 0 ? (_jsx("g", { className: "de-board__groups", children: layout.groups.map((group) => (_jsxs("g", { className: "de-board__group", "data-de-group-id": group.id, "data-tone": group.tone ?? 'neutral', children: [_jsx("rect", { x: group.bounds.left, y: group.bounds.top, width: group.bounds.right - group.bounds.left, height: group.bounds.bottom - group.bounds.top, rx: "18", ry: "18" }), _jsx("text", { x: group.bounds.left + 18, y: group.bounds.top + 24, children: group.label })] }, group.id))) })) : null, boardDocument.diagramKind === 'sequence' ? (_jsx("g", { className: "de-board__lifelines", children: layout.nodes.map((node) => (_jsx("line", { x1: node.position.x, x2: node.position.x, y1: node.position.y + node.height / 2 + 10, y2: layout.height - 28 }, `${node.id}:lifeline`))) })) : null, _jsxs("g", { className: "de-board__edges", children: [routedTrunks.map((trunk) => (_jsx("g", { className: "de-board__edge-trunk", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), children: _jsx("path", { d: trunk.path, className: "de-board__edge-path", "data-stroke": trunk.stroke }) }, trunk.key))), routedEdges.map(({ edge, route }) => {
+    return (_jsx("div", { className: "de-board", "data-authored-layout": boardLayout ? 'true' : undefined, role: "img", "aria-label": accessibleLabel, children: _jsxs("svg", { ref: svgRef, className: "de-board__svg", viewBox: `${format(renderedDisplayBounds.left)} ${format(renderedDisplayBounds.top)} ${format(renderedDisplayBounds.width)} ${format(renderedDisplayBounds.height)}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": "true", children: [layout.groups.length > 0 ? (_jsx("g", { className: "de-board__groups", children: layout.groups.map((group) => (_jsx("g", { className: "de-board__group", "data-de-group-id": group.id, "data-tone": group.tone ?? 'neutral', children: _jsx("rect", { x: group.bounds.left, y: group.bounds.top, width: group.bounds.right - group.bounds.left, height: group.bounds.bottom - group.bounds.top, rx: "18", ry: "18" }) }, group.id))) })) : null, boardDocument.diagramKind === 'sequence' ? (_jsx("g", { className: "de-board__lifelines", children: layout.nodes.map((node) => (_jsx("line", { x1: node.position.x, x2: node.position.x, y1: node.position.y + node.height / 2 + 10, y2: layout.height - 28 }, `${node.id}:lifeline`))) })) : null, _jsxs("g", { className: "de-board__edges", children: [routedTrunks.map((trunk) => (_jsx("g", { className: "de-board__edge-trunk", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), children: _jsx("path", { d: trunk.path, className: "de-board__edge-path", "data-stroke": trunk.stroke }) }, trunk.key))), routedEdges.map(({ edge, route }) => {
                             const sourceNode = nodesById.get(edge.sourceId);
                             const targetNode = nodesById.get(edge.targetId);
                             if (!sourceNode || !targetNode || edge.stroke === 'invisible')
@@ -418,7 +422,10 @@ export function BoardCanvas({ accessibleLabel, document: boardDocument, editable
                                         setHoveredEdgeId((current) => (current === edge.id ? null : current));
                                     }
                                 }, children: [_jsx("path", { d: route.path, className: "de-board__edge-hit" }), _jsx("path", { d: route.path, className: "de-board__edge-path", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, "data-source-id": edge.sourceId, "data-target-id": edge.targetId, "data-stroke": edge.stroke, "data-source-side": route.sourceSide, "data-target-side": route.targetSide }), showEdgeHandles ? (_jsx("g", { className: "de-board__edge-handles", "aria-hidden": "true", children: getRouteSegmentHandles(route.points).map((handle) => (_jsxs("g", { className: "de-board__edge-handle", "data-orientation": handle.orientation, transform: `translate(${format(handle.x)} ${format(handle.y)})`, onPointerDown: (event) => beginEdgeRouteDrag(event, edge.id, handle, route.points), onPointerMove: moveEdgeRouteDrag, onPointerUp: finishEdgeRouteDrag, onPointerCancel: cancelEdgeRouteDrag, children: [_jsx("circle", { className: "de-board__edge-handle-hit", r: "12" }), _jsx("circle", { className: "de-board__edge-handle-dot", r: "4.5" })] }, `${edge.id}-${handle.segmentIndex}`))) })) : null] }, edge.id));
-                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.sourceArrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.sourceArrowPoints }, `${trunk.key}:source`)) : null), routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.sourceArrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.sourceArrowPoints }, `${edge.id}:source`)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "target", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
+                        }), draftRoute ? (_jsx("g", { className: "de-board__connection-preview", "aria-hidden": "true", children: _jsx("path", { d: draftRoute.path, className: "de-board__edge-path" }) })) : null] }), _jsxs("g", { className: "de-board__arrows", children: [routedTrunks.map((trunk) => trunk.sourceArrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.sourceArrowPoints }, `${trunk.key}:source`)) : null), routedTrunks.map((trunk) => trunk.arrowPoints ? (_jsx("polygon", { className: "de-board__arrow", "data-de-bundle-key": trunk.key, "data-edge-ids": trunk.edgeIds.join(' '), points: trunk.arrowPoints }, trunk.key)) : null), routedEdges.map(({ edge, route }) => route.sourceArrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "source", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.sourceArrowPoints }, `${edge.id}:source`)) : null), routedEdges.map(({ edge, route }) => route.arrowPoints && edge.stroke !== 'invisible' ? (_jsx("polygon", { className: "de-board__arrow", "data-arrow-end": "target", "data-edge-id": edge.id, "data-feedback": isFeedbackEdge(edge) ? 'true' : undefined, points: route.arrowPoints }, edge.id)) : null), draftRoute?.arrowPoints ? (_jsx("g", { className: "de-board__connection-preview", children: _jsx("polygon", { className: "de-board__arrow", points: draftRoute.arrowPoints }) })) : null] }), layout.groups.length > 0 ? (
+                // Titles sit above the edges so a line that must enter a group never
+                // strikes through its name; placement first moves the title clear.
+                _jsx("g", { className: "de-board__group-titles", children: layout.groups.map((group) => (_jsx("text", { x: placeGroupTitle(group, groupTitleSegments).x, y: group.bounds.top + 24, children: group.label }, group.id))) })) : null, _jsx("g", { className: "de-board__edge-labels", children: routedEdges.map(({ edge, route }) => edge.label && edge.stroke !== 'invisible' ? (_jsx(BoardEdgeLabel, { edge: edge, onMeasure: recordEdgeLabelMeasurement, route: route }, edge.id)) : null) }), guides.x !== undefined || guides.y !== undefined ? (_jsxs("g", { className: "de-board__guides", children: [guides.x !== undefined ? (_jsx("line", { x1: guides.x, x2: guides.x, y1: guideBounds.top, y2: guideBounds.top + guideBounds.height })) : null, guides.y !== undefined ? (_jsx("line", { x1: guideBounds.left, x2: guideBounds.left + guideBounds.width, y1: guides.y, y2: guides.y })) : null] })) : null, _jsx("g", { className: "de-board__nodes", children: layout.nodes.map((node) => {
                         const selected = selectedNodeIds.includes(node.id);
                         const editing = editingNodeId === node.id;
                         const badge = resolveNodeBadge(node.classes);
@@ -2967,5 +2974,47 @@ function clamp(value, minimum, maximum) {
 function format(value) {
     const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
     return Number(safeValue.toFixed(2));
+}
+const GROUP_TITLE_INSET = 18;
+const GROUP_TITLE_CLEARANCE = 6;
+/**
+ * Keep a group title on its top edge but clear of any edge that crosses the
+ * title band: try the default inset, then just right of each crossing line,
+ * then the right inset. When nothing fits the default stays and the title's
+ * halo keeps it readable above the line.
+ */
+function placeGroupTitle(group, routes) {
+    const { left, right, top } = group.bounds;
+    const width = measureDiagramTextWidth(group.label, 12 / 14) + [...group.label].length * 0.24;
+    const bandTop = top + 10;
+    const bandBottom = top + 30;
+    const crossings = [];
+    const blocked = (x) => routes.some((points) => points.slice(1).some((end, index) => {
+        const start = points[index];
+        const x0 = Math.min(start.x, end.x);
+        const x1 = Math.max(start.x, end.x);
+        const y0 = Math.min(start.y, end.y);
+        const y1 = Math.max(start.y, end.y);
+        return x1 >= x - GROUP_TITLE_CLEARANCE
+            && x0 <= x + width + GROUP_TITLE_CLEARANCE
+            && y1 >= bandTop
+            && y0 <= bandBottom;
+    }));
+    routes.forEach((points) => points.slice(1).forEach((end, index) => {
+        const start = points[index];
+        if (Math.abs(start.x - end.x) > 0.5)
+            return;
+        if (Math.max(start.y, end.y) < bandTop || Math.min(start.y, end.y) > bandBottom)
+            return;
+        if (start.x > left && start.x < right)
+            crossings.push(start.x);
+    }));
+    const candidates = [
+        left + GROUP_TITLE_INSET,
+        ...crossings.sort((a, b) => a - b).map((x) => x + GROUP_TITLE_CLEARANCE + 6),
+        right - GROUP_TITLE_INSET - width,
+    ].filter((x) => x >= left + GROUP_TITLE_INSET - 0.5 && x + width <= right - GROUP_TITLE_INSET + 0.5);
+    const x = candidates.find((candidate) => !blocked(candidate)) ?? left + GROUP_TITLE_INSET;
+    return { x, width };
 }
 //# sourceMappingURL=BoardCanvas.js.map

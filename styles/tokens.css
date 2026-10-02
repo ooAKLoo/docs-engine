@@ -1,3 +1,11 @@
+/* Board chrome (group titles, toolbars, menus) uses this stack, including the
+ * full-screen viewer that is portalled outside `.de-root`. Zero specificity
+ * lets a host override it with its own font. */
+:where(:root) {
+  --de-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
 :where(.de-root) {
   --de-page: #fcfcfc;
   --de-surface: #ffffff;

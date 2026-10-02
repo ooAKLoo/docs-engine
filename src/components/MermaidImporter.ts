@@ -176,11 +176,18 @@ function parseFlowchart(source: string): ParsedDiagramGraph {
   const groups: BoardGroup[] = [];
   const groupStack: string[] = [];
 
+  const groupByNode = new Map<string, string>();
+
+  // A node belongs to the first group that mentions it. A later subgraph may
+  // draw an edge to it without claiming it, otherwise two group frames would
+  // both enclose the node and paint over each other.
   const attachToActiveGroup = (nodeId: string) => {
     const groupId = groupStack.at(-1);
-    if (!groupId) return;
+    if (!groupId || groupByNode.has(nodeId)) return;
     const group = groups.find((candidate) => candidate.id === groupId);
-    if (group && !group.nodeIds.includes(nodeId)) group.nodeIds.push(nodeId);
+    if (!group) return;
+    group.nodeIds.push(nodeId);
+    groupByNode.set(nodeId, groupId);
   };
 
   const ensureNode = (token: string) => {

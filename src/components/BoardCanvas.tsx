@@ -675,6 +675,10 @@ export function BoardCanvas({
           editedContentBounds,
         )
       : displayBounds;
+  const groupTitleSegments = [
+    ...routedEdges.filter(({edge}) => edge.stroke !== 'invisible').map(({route}) => route.points),
+    ...routedTrunks.map((trunk) => trunk.points),
+  ];
   const draftSource = connectionDraft ? nodesById.get(connectionDraft.sourceId) : undefined;
   const draftTarget = connectionDraft?.targetId
     ? nodesById.get(connectionDraft.targetId)
@@ -716,9 +720,6 @@ export function BoardCanvas({
                   rx="18"
                   ry="18"
                 />
-                <text x={group.bounds.left + 18} y={group.bounds.top + 24}>
-                  {group.label}
-                </text>
               </g>
             ))}
           </g>
@@ -874,6 +875,22 @@ export function BoardCanvas({
             </g>
           ) : null}
         </g>
+
+        {layout.groups.length > 0 ? (
+          // Titles sit above the edges so a line that must enter a group never
+          // strikes through its name; placement first moves the title clear.
+          <g className="de-board__group-titles">
+            {layout.groups.map((group) => (
+              <text
+                key={group.id}
+                x={placeGroupTitle(group, groupTitleSegments).x}
+                y={group.bounds.top + 24}
+              >
+                {group.label}
+              </text>
+            ))}
+          </g>
+        ) : null}
 
         <g className="de-board__edge-labels">
           {routedEdges.map(({edge, route}) =>
@@ -4248,4 +4265,45 @@ function clamp(value: number, minimum: number, maximum: number) {
 function format(value: number | undefined | null) {
   const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
   return Number(safeValue.toFixed(2));
+}
+
+const GROUP_TITLE_INSET = 18;
+const GROUP_TITLE_CLEARANCE = 6;
+
+/**
+ * Keep a group title on its top edge but clear of any edge that crosses the
+ * title band: try the default inset, then just right of each crossing line,
+ * then the right inset. When nothing fits the default stays and the title's
+ * halo keeps it readable above the line.
+ */
+function placeGroupTitle(group: LayoutGroup, routes: DiagramNodePosition[][]) {
+  const {left, right, top} = group.bounds;
+  const width = measureDiagramTextWidth(group.label, 12 / 14) + [...group.label].length * 0.24;
+  const bandTop = top + 10;
+  const bandBottom = top + 30;
+  const crossings: number[] = [];
+  const blocked = (x: number) => routes.some((points) => points.slice(1).some((end, index) => {
+    const start = points[index];
+    const x0 = Math.min(start.x, end.x);
+    const x1 = Math.max(start.x, end.x);
+    const y0 = Math.min(start.y, end.y);
+    const y1 = Math.max(start.y, end.y);
+    return x1 >= x - GROUP_TITLE_CLEARANCE
+      && x0 <= x + width + GROUP_TITLE_CLEARANCE
+      && y1 >= bandTop
+      && y0 <= bandBottom;
+  }));
+  routes.forEach((points) => points.slice(1).forEach((end, index) => {
+    const start = points[index];
+    if (Math.abs(start.x - end.x) > 0.5) return;
+    if (Math.max(start.y, end.y) < bandTop || Math.min(start.y, end.y) > bandBottom) return;
+    if (start.x > left && start.x < right) crossings.push(start.x);
+  }));
+  const candidates = [
+    left + GROUP_TITLE_INSET,
+    ...crossings.sort((a, b) => a - b).map((x) => x + GROUP_TITLE_CLEARANCE + 6),
+    right - GROUP_TITLE_INSET - width,
+  ].filter((x) => x >= left + GROUP_TITLE_INSET - 0.5 && x + width <= right - GROUP_TITLE_INSET + 0.5);
+  const x = candidates.find((candidate) => !blocked(candidate)) ?? left + GROUP_TITLE_INSET;
+  return {x, width};
 }
