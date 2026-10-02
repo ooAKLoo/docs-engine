@@ -8,6 +8,7 @@ import type {
 } from './BoardModel.js';
 import {measureDiagramEdgeLabel} from './BoardAutoLayout.js';
 import {measureNode} from './BoardNodeMetrics.js';
+import {refineBoardRoutes} from './BoardRouteRefine.js';
 
 type ElkPoint = {x: number; y: number};
 
@@ -85,15 +86,21 @@ export function supportsElkBoardLayout(kind: BoardDocument['diagramKind']) {
   return kind === 'flowchart' || kind === 'state' || kind === 'class' || kind === 'er';
 }
 
+function usesFlowRouting(document: BoardDocument) {
+  return document.diagramKind === 'flowchart' || document.diagramKind === 'state';
+}
+
 /**
  * Compute authored-quality geometry for an imported diagram with ELK layered:
  * container-aware layer assignment, crossing minimisation, orthogonal routing
  * with separated lanes and inline label reservations. Returns undefined when
  * the engine is unavailable or the result is incomplete, so callers can fall
  * back to the built-in automatic layout.
+ * Set refineRoutes to false to inspect the raw ELK geometry and diagnostics.
  */
 export async function computeElkBoardLayout(
   document: BoardDocument,
+  options: {refineRoutes?: boolean} = {},
 ): Promise<BoardImportLayout | undefined> {
   const Elk = await loadElk();
   if (!Elk) return undefined;
@@ -105,11 +112,62 @@ export async function computeElkBoardLayout(
     return [node.id, {height: Math.ceil(measured.height), width: Math.ceil(measured.width)}];
   }));
 
-  const graph = buildElkGraph(document, nodeSizes);
+  const graph = buildElkGraph(usesFlowRouting(document) ? canonicalLayoutOrder(document) : document, nodeSizes);
   if (!graph) return undefined;
 
   const result = await new Elk().layout(graph);
-  return convertElkResult(document, result, nodeSizes);
+  const layout = convertElkResult(document, result, nodeSizes);
+  return layout && options.refineRoutes !== false && usesFlowRouting(document)
+    ? refineBoardRoutes(document, layout)
+    : layout;
+}
+
+/**
+ * ELK's model-order tie breakers must not depend on edge statement order.
+ * Nodes follow the flow topologically; the author's node declaration order
+ * only breaks the remaining ties, so renaming an ID never moves a node.
+ */
+function canonicalLayoutOrder(document: BoardDocument): BoardDocument {
+  const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+  const declared = new Map(document.nodes.map(({id}, index) => [id, index]));
+  const remaining = new Set(document.nodes.map(({id}) => id));
+  const incoming = new Map(document.nodes.map(({id}) => [id, new Set<string>()]));
+  const outgoing = new Map(document.nodes.map(({id}) => [id, new Set<string>()]));
+  for (const edge of document.edges) {
+    const source = edge.role === 'feedback' ? edge.targetId : edge.sourceId;
+    const target = edge.role === 'feedback' ? edge.sourceId : edge.targetId;
+    if (source !== target) incoming.get(target)?.add(source);
+    if (source !== target) outgoing.get(source)?.add(target);
+  }
+  const order = new Map<string, number>();
+  while (remaining.size) {
+    const ready = [...remaining].filter((id) =>
+      ![...(incoming.get(id) ?? [])].some((parent) => remaining.has(parent)),
+    );
+    // Among nodes whose predecessors are placed, keep the author's order.
+    const id = (ready.length ? ready : [...remaining]).sort((a, b) =>
+      declared.get(a)! - declared.get(b)!,
+    )[0];
+    order.set(id, order.size);
+    remaining.delete(id);
+  }
+  return {
+    ...document,
+    nodes: [...document.nodes].sort((a, b) => order.get(a.id)! - order.get(b.id)!),
+    edges: [...document.edges].sort((a, b) =>
+      order.get(a.sourceId)! - order.get(b.sourceId)!
+      || order.get(a.targetId)! - order.get(b.targetId)!
+      || compare(a.label, b.label)
+      || compare(a.stroke, b.stroke)
+      || compare(a.role ?? '', b.role ?? '')
+      || Number(a.arrow) - Number(b.arrow)
+      || Number(Boolean(a.sourceArrow)) - Number(Boolean(b.sourceArrow)),
+    ),
+    groups: document.groups?.map((group) => ({
+      ...group,
+      nodeIds: [...group.nodeIds].sort((a, b) => (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER)),
+    })),
+  };
 }
 
 function buildElkGraph(
@@ -147,6 +205,8 @@ function buildElkGraph(
       'elk.json.edgeCoords': 'ROOT',
       'elk.json.shapeCoords': 'ROOT',
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      // A stable model order still needs enough crossing-minimisation sweeps.
+      ...(usesFlowRouting(document) ? {'elk.layered.thoroughness': '20'} : null),
       'elk.layered.spacing.edgeEdgeBetweenLayers': '14',
       'elk.layered.spacing.edgeNodeBetweenLayers': '26',
       'elk.layered.spacing.nodeNodeBetweenLayers': '92',
@@ -205,6 +265,7 @@ function buildElkGraph(
     const labelMetrics = edge.label
       ? measureDiagramEdgeLabel(edge.label, edge.bareLabel)
       : undefined;
+    const reverse = usesFlowRouting(document) && edge.role === 'feedback';
     containerOf(commonAncestor).edges?.push({
       id: edge.id,
       ...(labelMetrics
@@ -220,8 +281,10 @@ function buildElkGraph(
             }],
           }
         : null),
-      sources: [edge.sourceId],
-      targets: [edge.targetId],
+      // Rank feedback in the forward direction instead of letting ELK's cycle
+      // breaker choose an arbitrary edge of the main flow to reverse.
+      sources: [reverse ? edge.targetId : edge.sourceId],
+      targets: [reverse ? edge.sourceId : edge.targetId],
     });
   });
 
@@ -275,6 +338,9 @@ function convertElkResult(
     if (points.length < 2 || points.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
       return undefined;
     }
+    // Restore semantic direction before resolving the two endpoint sides.
+    // This also swaps ELK's source/target sides without changing arrow flags.
+    if (usesFlowRouting(document) && edge.role === 'feedback') points.reverse();
     const label = elkEdge.labels?.[0];
     const labelPosition = label && label.x !== undefined && label.y !== undefined
       ? {

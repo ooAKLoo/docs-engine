@@ -1882,11 +1882,6 @@
   padding: clamp(0.75rem, 1.4vw, 1rem);
 }
 
-:where(.de-prose) .de-diagram[data-zoomable='true'] > .de-diagram-inline-canvas > .de-diagram-inline-stage > .de-board {
-  /* Keep fitted content below the fixed-size inline toolbar at every embed width. */
-  padding-top: clamp(3.75rem, 5vw, 4.25rem);
-}
-
 .de-board {
   --de-board-canvas: #f7f8fa;
   position: relative;

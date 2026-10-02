@@ -7,6 +7,9 @@ export declare function supportsElkBoardLayout(kind: BoardDocument['diagramKind'
  * with separated lanes and inline label reservations. Returns undefined when
  * the engine is unavailable or the result is incomplete, so callers can fall
  * back to the built-in automatic layout.
+ * Set refineRoutes to false to inspect the raw ELK geometry and diagnostics.
  */
-export declare function computeElkBoardLayout(document: BoardDocument): Promise<BoardImportLayout | undefined>;
+export declare function computeElkBoardLayout(document: BoardDocument, options?: {
+    refineRoutes?: boolean;
+}): Promise<BoardImportLayout | undefined>;
 //# sourceMappingURL=BoardElkLayout.d.ts.map
