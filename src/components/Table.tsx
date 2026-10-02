@@ -4,7 +4,7 @@ import {joinClassNames} from '../classnames.js';
 export type TableProps = TableHTMLAttributes<HTMLTableElement>;
 
 /**
- * Docusaurus/MDX table adapter. oVita keeps its richer TableBlock wrapper,
+ * Docusaurus/MDX table adapter. A Next.js host may keep a richer table wrapper,
  * but both hosts share the same `de-table` visual contract.
  */
 export function Table({className, ...props}: TableProps) {

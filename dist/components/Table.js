@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { joinClassNames } from '../classnames.js';
 /**
- * Docusaurus/MDX table adapter. oVita keeps its richer TableBlock wrapper,
+ * Docusaurus/MDX table adapter. A Next.js host may keep a richer table wrapper,
  * but both hosts share the same `de-table` visual contract.
  */
 export function Table({ className, ...props }) {

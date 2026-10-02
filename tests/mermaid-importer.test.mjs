@@ -5,19 +5,19 @@ import {importMermaid} from '../dist/components/MermaidImporter.js';
 
 test('keeps authored flowchart labels and shapes when later edges use bare ids', async () => {
   const graph = await importMermaid(`flowchart LR
-    product([首批产品<br/>完成交付准备]) --> koc[7 名 KOC 测试<br/>真实家庭使用]
-    koc --> retention{7 日留存达标？}
-    retention -->|通过| early[约 70 名付费早鸟<br/>验证真实购买意愿]
+    product([首批产品<br/>完成交付准备]) --> koc[种子用户测试<br/>真实家庭使用]
+    koc --> retention{留存达标？}
+    retention -->|通过| early[小批付费早鸟<br/>验证真实购买意愿]
     early --> payment{付费信号成立？}
     payment -->|通过| kol[KOL 推广<br/>场景化内容]
     kol --> production([大货生产<br/>铺设销售渠道])`);
 
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   assert.equal(graph.diagramKind, 'flowchart');
-  assert.equal(nodes.get('koc')?.label, '7 名 KOC 测试\n真实家庭使用');
-  assert.equal(nodes.get('retention')?.label, '7 日留存达标？');
+  assert.equal(nodes.get('koc')?.label, '种子用户测试\n真实家庭使用');
+  assert.equal(nodes.get('retention')?.label, '留存达标？');
   assert.equal(nodes.get('retention')?.shape, 'diamond');
-  assert.equal(nodes.get('early')?.label, '约 70 名付费早鸟\n验证真实购买意愿');
+  assert.equal(nodes.get('early')?.label, '小批付费早鸟\n验证真实购买意愿');
   assert.equal(nodes.get('payment')?.label, '付费信号成立？');
   assert.equal(nodes.get('kol')?.label, 'KOL 推广\n场景化内容');
 });
@@ -180,28 +180,28 @@ test('preserves Mermaid subgraphs as native Board groups', async () => {
 test('keeps dashed sequence arrows out of actor ids', async () => {
   const graph = await importMermaid(`sequenceDiagram
     participant Child as 孩子
-    participant Lula as Lula 设备
+    participant Device as 陪伴设备
     participant Agent as Companion Agent
-    Child->>Lula: 说话
-    Lula->>Agent: 识别文本与上下文
-    Agent-->>Lula: 回复文本
-    Lula-->>Child: 播放语音`);
+    Child->>Device: 说话
+    Device->>Agent: 识别文本与上下文
+    Agent-->>Device: 回复文本
+    Device-->>Child: 播放语音`);
 
   assert.deepEqual(
     graph.nodes.map(({id, label}) => ({id, label})),
     [
       {id: 'actor:Child', label: '孩子'},
-      {id: 'actor:Lula', label: 'Lula 设备'},
+      {id: 'actor:Device', label: '陪伴设备'},
       {id: 'actor:Agent', label: 'Companion Agent'},
     ],
   );
   assert.deepEqual(
     graph.edges.map(({sourceId, stroke, targetId}) => ({sourceId, stroke, targetId})),
     [
-      {sourceId: 'actor:Child', stroke: 'normal', targetId: 'actor:Lula'},
-      {sourceId: 'actor:Lula', stroke: 'normal', targetId: 'actor:Agent'},
-      {sourceId: 'actor:Agent', stroke: 'dotted', targetId: 'actor:Lula'},
-      {sourceId: 'actor:Lula', stroke: 'dotted', targetId: 'actor:Child'},
+      {sourceId: 'actor:Child', stroke: 'normal', targetId: 'actor:Device'},
+      {sourceId: 'actor:Device', stroke: 'normal', targetId: 'actor:Agent'},
+      {sourceId: 'actor:Agent', stroke: 'dotted', targetId: 'actor:Device'},
+      {sourceId: 'actor:Device', stroke: 'dotted', targetId: 'actor:Child'},
     ],
   );
 });
@@ -284,8 +284,8 @@ test('normalizes every supported Mermaid syntax into the same Board graph model'
       kind: 'pie',
       source: `pie showData
         title 使用占比
-        "Lula" : 70
-        "oVita" : 30`,
+        "项目 A" : 70
+        "项目 B" : 30`,
     },
   ];
 

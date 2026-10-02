@@ -359,7 +359,7 @@ function parseSequence(source: string): ParsedDiagramGraph {
       actors.set(participant[1], participant[2]?.trim() ?? participant[1]);
       return;
     }
-    // Keep the actor token lazy. A greedy token would parse `Agent-->>Lula`
+    // Keep the actor token lazy. A greedy token would parse `Agent-->>Device`
     // as the non-existent actor `Agent-` followed by the shorter arrow `->>`.
     const message = line.match(/^([^\s]+?)\s*(--?>>|--?>|--?x)\s*([^\s]+)\s*:\s*(.+)$/u);
     if (!message) return;

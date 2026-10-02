@@ -41,12 +41,12 @@ const mermaidSource = `flowchart LR
 
 const sequenceMermaidSource = `sequenceDiagram
     participant Child as 孩子
-    participant Lula as Lula 设备
+    participant Device as 陪伴设备
     participant Agent as Companion Agent
-    Child->>Lula: 说话
-    Lula->>Agent: 识别文本与上下文
-    Agent-->>Lula: 回复文本
-    Lula-->>Child: 播放语音`;
+    Child->>Device: 说话
+    Device->>Agent: 识别文本与上下文
+    Agent-->>Device: 回复文本
+    Device-->>Child: 播放语音`;
 
 const urbanUberMermaidSource = `flowchart LR
     phone[智能手机普及] --> gps[GPS 普及]
@@ -80,9 +80,9 @@ const businessModelMermaidSource = `flowchart TD
     feedback --> n12[12 反馈环]`;
 
 const unifiedBoardMermaidSource = `flowchart LR
-    product([首批产品<br/>完成交付准备]) --> koc[7 名 KOC 测试<br/>真实家庭使用]
-    koc --> retention{7 日留存达标？}
-    retention -->|通过| early[约 70 名付费早鸟<br/>验证真实购买意愿]
+    product([首批产品<br/>完成交付准备]) --> koc[种子用户测试<br/>真实家庭使用]
+    koc --> retention{留存达标？}
+    retention -->|通过| early[小批付费早鸟<br/>验证真实购买意愿]
     retention -->|未达标| optimize[优化产品体验<br/>功能、内容或外观]
     early --> payment{付费信号成立？}
     payment -->|通过| kol[KOL 推广<br/>场景化内容]
@@ -232,7 +232,7 @@ export function Gallery() {
         <p className="showcase-eyebrow">@ooakloo/docs-engine</p>
         <h1>文档引擎样式总览</h1>
         <p>
-          本页直接调用共享仓库的 React 组件和 CSS，是 Lula 与 oVita 的视觉基准，不加载任何宿主项目样式。
+          本页直接调用共享仓库的 React 组件和 CSS，是所有依赖项目的视觉基准，不加载任何宿主项目样式。
         </p>
       </header>
 
@@ -416,12 +416,12 @@ export function Gallery() {
             <tbody>
               <tr>
                 <td>日志 / 记录入口</td>
-                <td><ResourceLink href="http://115.190.136.178:8080/logs" /></td>
+                <td><ResourceLink href="https://logs.example.com/runs" /></td>
                 <td>查看运行记录和交互记录</td>
               </tr>
               <tr>
                 <td>产品体验 / 前端入口</td>
-                <td><ResourceLink href="http://115.190.136.178:8081/" /></td>
+                <td><ResourceLink href="https://app.example.com/" /></td>
                 <td>体验当前产品页面</td>
               </tr>
             </tbody>
@@ -480,7 +480,7 @@ export function Gallery() {
           <p>输入是 <code>sequenceDiagram</code>，输出仍然是相同的可选中、可拖动、可编辑 Board 对象。</p>
           <Board
             importSource={{format: 'mermaid', source: sequenceMermaidSource}}
-            aria-label="孩子、Lula 设备和 Companion Agent 的时序交互图"
+            aria-label="孩子、陪伴设备和 Companion Agent 的时序交互图"
           />
           <h3>Urban / Uber 因果链路</h3>
           <p>保留原先的 Urban/Uber Demo，用于检查“GPS 普及”等中英文混排标签和连续因果链路。</p>

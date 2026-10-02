@@ -6,7 +6,7 @@ import {computeElkBoardLayout} from '../dist/components/BoardElkLayout.js';
 import {refineBoardRoutes} from '../dist/components/BoardRouteRefine.js';
 
 /**
- * Regression fixtures from the Lula production-service-topology document that
+ * Regression fixtures modelled on a production service topology document that
  * previously rendered with declaration-order group ranks, shared lanes and
  * detached fan-in trunks. Imports must now ship complete authored geometry
  * that passes the same validation an agent-authored board is held to.
@@ -14,27 +14,27 @@ import {refineBoardRoutes} from '../dist/components/BoardRouteRefine.js';
 
 const productPathSource = `flowchart LR
     subgraph Clients["产品客户端"]
-        device[哇布硬件]
+        device[硬件设备]
         app[家长客户端]
     end
 
-    dns[verboo.top DNS]
+    dns[example.com DNS]
 
-    subgraph AppEcs["火山 ECS · cn-beijing · 115.191.19.240"]
+    subgraph AppEcs["云主机 · region-a · 203.0.113.10"]
         nginx[Nginx<br/>TLS 与入口路由]
-        server[Product Server<br/>127.0.0.1:8080]
-        turn[Turn Detector<br/>127.0.0.1:8788]
+        server[Product Server<br/>127.0.0.1:9000]
+        turn[Turn Detector<br/>127.0.0.1:9100]
     end
 
     subgraph ManagedState["同 VPC 托管状态"]
-        postgres[PostgreSQL 16 HA<br/>lula_product]
+        postgres[PostgreSQL 16 HA<br/>app_product]
     end
 
     subgraph ExternalServices["外部实时能力"]
-        asr[火山 ASR]
-        llm[方舟 / 兼容 LLM]
-        tts[火山 TTS]
-        firmware[固件发布服务<br/>14.103.183.47:8010]
+        asr[云端 ASR]
+        llm[托管 / 兼容 LLM]
+        tts[云端 TTS]
+        firmware[固件发布服务<br/>203.0.113.20:9010]
     end
 
     device -->|OTA 与实时语音| dns
@@ -50,33 +50,33 @@ const productPathSource = `flowchart LR
 
 const managementPlaneSource = `flowchart LR
     staff[内部员工]
-    feishu[飞书企业 SSO]
-    cloudflare[Cloudflare Access]
+    sso[企业 IM SSO]
+    access[Zero Trust Access]
 
-    subgraph AppEcs["同一台火山 ECS · 管理面"]
+    subgraph AppEcs["同一台云主机 · 管理面"]
         nginx[Nginx<br/>内部域名入口]
-        portal[Internal Portal<br/>127.0.0.1:8084]
-        docs[Docs Origin<br/>127.0.0.1:8083 / 8085]
+        portal[Internal Portal<br/>127.0.0.1:9004]
+        docs[Docs Origin<br/>127.0.0.1:9003 / 9005]
         worker[Conversation Lab Worker<br/>无监听端口]
-        tunnel[cloudflared]
-        legacyOps[兼容 Ops<br/>127.0.0.1:8082]
-        server[Product Server<br/>127.0.0.1:8080]
+        tunnel[隧道客户端]
+        legacyOps[兼容 Ops<br/>127.0.0.1:9002]
+        server[Product Server<br/>127.0.0.1:9000]
     end
 
-    internalDb[PostgreSQL<br/>lula_internal]
+    internalDb[PostgreSQL<br/>app_internal]
     tos[私有 TOS]
 
-    staff -->|internal.verboo.top| nginx
+    staff -->|internal.example.com| nginx
     nginx -->|登录校验与业务请求| portal
-    portal -->|OAuth| feishu
+    portal -->|OAuth| sso
     nginx -->|受保护文档| docs
     portal -->|诊断与指标代理| server
     worker -->|领取与回报任务| portal
     portal -->|私网 TLS| internalDb
     worker -->|媒体上传| tos
 
-    staff -->|旧 Ops 入口| cloudflare
-    cloudflare -->|Tunnel| tunnel
+    staff -->|旧 Ops 入口| access
+    access -->|Tunnel| tunnel
     tunnel --> legacyOps
     legacyOps -->|受控诊断接口| server`;
 
@@ -91,7 +91,7 @@ for (const [name, source] of [
   ['产品热路径', productPathSource],
   ['内部管理面', managementPlaneSource],
 ]) {
-  test(`imports the Lula ${name} topology with authored ELK geometry`, async () => {
+  test(`imports the ${name} service topology with authored ELK geometry`, async () => {
     const {document, errors} = await importAndValidate(source);
 
     assert.ok(document.canvas, '导入结果必须携带 authored 画布尺寸');

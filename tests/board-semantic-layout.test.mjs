@@ -140,13 +140,13 @@ test('renders sequence participants on one header row and messages on distinct t
     autonumber
     participant App as 小程序
     participant WX as 微信
-    participant API as Lula Server
+    participant API as Product Server
     participant ESP as ESP32
     participant DB as Postgres Account Store
     App->>WX: wx.login 获取 code
     App->>API: POST /auth/wechat-login + code
     API->>DB: upsert user
-    API-->>App: Lula App JWT
+    API-->>App: App 会话 JWT
     App->>ESP: 写入设备凭证`);
   const markup = renderDocument(document);
   const actorPositions = [...markup.matchAll(
@@ -365,7 +365,7 @@ test('moves a collinear edge bundle to an outer lane instead of crossing sibling
 
 test('lets one edge connect a source fan-out bus to a target fan-in bus', async () => {
   const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
-    subgraph Lula[Lula]
+    subgraph Product[产品服务]
       server[Product Server]
       worker[Conversation Lab Worker]
     end
@@ -655,7 +655,7 @@ test('separates authored incoming and outgoing routes that share one node side',
   assert.match(outgoing, / 500(?: |$)/u);
 });
 
-test('bundles every eligible Lula fan-in around a single semantic target port', async () => {
+test('bundles every eligible fan-in around a single semantic target port', async () => {
   const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     subgraph facts[儿童事实]
         memory[(长期记忆与画像)]
@@ -853,7 +853,7 @@ test('lays out an unordered two-level tree without route crossings or overlaps',
   assert.deepEqual(conflicts, []);
 });
 
-test('routes structurally detected Lula feedback edges on distinct outer lanes', async () => {
+test('routes structurally detected feedback edges on distinct outer lanes', async () => {
   const document = withoutAuthoredGeometry(await importMermaid(`flowchart LR
     dialogue[收集并脱敏优秀对话] --> principle[提炼交流原则]
     principle --> cases[建立多轮评测集]

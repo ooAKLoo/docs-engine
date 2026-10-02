@@ -1,10 +1,10 @@
 # @ooakloo/docs-engine
 
-Lula 与 oVita 共用的文档视觉与语义内核。它只负责跨项目稳定的部分，不接管宿主框架、路由、文档目录或业务 API。
+多个依赖项目共用的文档视觉与语义内核。它只负责跨项目稳定的部分，不接管宿主框架、路由、文档目录或业务 API。
 
 ## 样式总览
 
-所有稳定组件与 Table 基准统一放在本仓库的 [`showcase/`](./showcase/) 中，不在 Lula 或 oVita 复制样例页面。
+所有稳定组件与 Table 基准统一放在本仓库的 [`showcase/`](./showcase/) 中，不在依赖项目复制样例页面。
 
 在线访问：<https://ooakloo.github.io/docs-engine/>
 
@@ -57,12 +57,12 @@ Docusaurus 主题在每篇文档标题旁提供“复制全文”。复制结果
 
 ### 文档创作 Skill
 
-`skills/author-technical-docs` 指导 Agent 在写作阶段选择正文、公式、表格、列表、代码、Callout、时间轴与原生图表。Skill 明确禁止依靠运行时文本特征猜测语义，并提供适用于 Lula、oVita 及其他依赖项目的结构决策、信息密度规则、MDX 写法和发布前检查清单。五项以上短字段、连续短列表和重复“分类 → 包含内容”结构必须先评估行内并列、紧凑定义行或两列表格，不能只靠缩小间距。软件架构内容还必须先选择读者视图：静态边界使用 C4 / Component / Deployment，跨参与者调用使用 Sequence，生命周期使用 State，数据结构使用 ER / Class；超过复杂度阈值时按视图拆图，不得把所有关系退化成一张 `flowchart`。
+`skills/author-technical-docs` 指导 Agent 在写作阶段选择正文、公式、表格、列表、代码、Callout、时间轴与原生图表。Skill 明确禁止依靠运行时文本特征猜测语义，并提供适用于各依赖项目的结构决策、信息密度规则、MDX 写法和发布前检查清单。五项以上短字段、连续短列表和重复“分类 → 包含内容”结构必须先评估行内并列、紧凑定义行或两列表格，不能只靠缩小间距。软件架构内容还必须先选择读者视图：静态边界使用 C4 / Component / Deployment，跨参与者调用使用 Sequence，生命周期使用 State，数据结构使用 ER / Class；超过复杂度阈值时按视图拆图，不得把所有关系退化成一张 `flowchart`。
 
 ## 宿主边界
 
-- Lula 保留 Docusaurus、目录数据与内容构建脚本；Docs Engine 拥有 Board、Mermaid 导入和 MDX 组件映射。Docusaurus 自带左右栏时不必改用 `DocumentFrame`。
-- oVita 保留 Next.js、文件发现、frontmatter、搜索，以及可编辑状态表、证据卡片等宿主业务；正文解析与渲染走 `parseDocumentMarkdown()` 和 `DocumentBlock`，左右栏目录走 `DocumentFrame`。
+- Docusaurus 宿主保留框架、目录数据与内容构建脚本；Docs Engine 拥有 Board、Mermaid 导入和 MDX 组件映射。Docusaurus 自带左右栏时不必改用 `DocumentFrame`。
+- Next.js 宿主保留框架、文件发现、frontmatter、搜索，以及可编辑状态表、证据卡片等宿主业务；正文解析与渲染走 `parseDocumentMarkdown()` 和 `DocumentBlock`，左右栏目录走 `DocumentFrame`。
 - 两端统一导入 `@ooakloo/docs-engine/styles.css`，并在文档正文根节点添加 `de-root de-prose`，不再复制共享样式。
 
 标准 Markdown 代码围栏在两类宿主中都归一为 Docs Engine 的 `CodeBlock`；目录树这类纯文本结构使用 `text` 语言即可，不需要依赖方增加目录图组件、Prism 包装器或代码块 CSS。

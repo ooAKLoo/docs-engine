@@ -64,9 +64,9 @@ test('reserves every direct-route endpoint and arrow clearance in rank spacing',
 
 test('assigns different lanes to forward and reverse messages', () => {
   const lanes = assignDiagramEdgeLanes([
-    {id: 'request', sourceId: 'Child', targetId: 'Lula'},
-    {id: 'response', sourceId: 'Lula', targetId: 'Child'},
-    {id: 'unrelated', sourceId: 'Lula', targetId: 'Agent'},
+    {id: 'request', sourceId: 'Child', targetId: 'Device'},
+    {id: 'response', sourceId: 'Device', targetId: 'Child'},
+    {id: 'unrelated', sourceId: 'Device', targetId: 'Agent'},
   ]);
 
   assert.equal(lanes.get('request'), -1);
