@@ -7,6 +7,20 @@ export type BoardViewportUpdate = BoardViewport | ((current: BoardViewport) => B
 type MutableViewportRef = {
     current: BoardViewport;
 };
+export declare const BOARD_PINCH_ZOOM_SENSITIVITY = 0.01;
+export declare const BOARD_WHEEL_ZOOM_SENSITIVITY = 0.0018;
+export type BoardWheelStream = {
+    lastTime: number;
+    continuous: boolean;
+};
+/**
+ * WheelEvent has no device identifier. Small/fractional pixel deltas are the
+ * first-event signal; <=40ms cadence and a 160ms latch also cover fast swipes
+ * and momentum with larger deltas. Line/page units always mean discrete input.
+ * ctrlKey alone cannot identify pinch: Ctrl+mouse-wheel uses it too.
+ */
+export declare function isContinuousBoardWheel(event: Pick<WheelEvent, 'deltaMode' | 'deltaX' | 'deltaY' | 'timeStamp'>, stream: BoardWheelStream): boolean;
+export declare function boardWheelZoomFactor(delta: number, pinch: boolean): number;
 /**
  * Resolve and publish a viewport update synchronously.
  *
@@ -23,7 +37,7 @@ export declare function advanceBoardViewport(viewportRef: MutableViewportRef, up
 export declare function normalizeBoardWheelDelta(delta: number, deltaMode: number, pageSize: number): number;
 /**
  * Move the displayed viewport toward its latest interaction target with a
- * frame-rate-independent, critically damped response. The exponential curve
+ * frame-rate-independent exponential response for discrete wheel input. The curve
  * never overshoots and does not restart when more wheel events arrive.
  */
 export declare function dampBoardViewport(current: BoardViewport, target: BoardViewport, elapsedMs: number, responseMs?: number): {

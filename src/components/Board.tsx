@@ -11,7 +11,6 @@ import {
   PenLine,
   Plus,
   RotateCcw,
-  Workflow,
   X,
 } from 'lucide-react';
 import {AnimatePresence, domMax, LazyMotion, m, useReducedMotion} from 'motion/react';
@@ -20,7 +19,6 @@ import type {
   HTMLAttributes,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
-  MutableRefObject,
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import {memo, useCallback, useEffect, useId, useRef, useState} from 'react';
@@ -47,21 +45,19 @@ import type {
 import {applyBoardOperation, serializeBoardDocument} from './BoardModel.js';
 import {importMermaid} from './MermaidImporter.js';
 import {
-  advanceBoardViewport,
-  boardViewportHasSettled,
-  dampBoardViewport,
-  type BoardViewport,
+  boardWheelZoomFactor,
+  isContinuousBoardWheel,
+  type BoardWheelStream,
   type BoardViewportUpdate,
   normalizeBoardWheelDelta,
 } from './BoardViewport.js';
+import {useBoardViewport} from './useBoardViewport.js';
 
 export type BoardMode = 'view' | 'edit';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_FACTOR = 1.2;
-const WHEEL_ZOOM_SENSITIVITY = 0.0018;
-const MAX_WHEEL_ZOOM_DELTA = 120;
 const BoardCanvas = memo(RawBoardCanvas);
 const QUICK_SHAPES: Array<{label: string; shape: BoardNodeShape}> = [
   {label: '圆角矩形', shape: 'round'},
@@ -198,18 +194,14 @@ export function Board({
   const stageRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const fullscreenTriggerRef = useRef<HTMLButtonElement>(null);
+  // The inline figure unmounts while the viewer is open, so remember which
+  // control opened it and focus that control's remounted twin on close.
+  const returnFocusRef = useRef<'entry' | 'fullscreen'>('entry');
   const editorInputRef = useRef<HTMLTextAreaElement>(null);
   const mediaItemRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<BoardViewport>({x: 0, y: 0, scale: 1});
-  const inlineViewportRef = useRef<BoardViewport>({x: 0, y: 0, scale: 1});
-  const displayedViewportRef = useRef<BoardViewport>(viewportRef.current);
-  const displayedInlineViewportRef = useRef<BoardViewport>(inlineViewportRef.current);
-  const viewportFrameRef = useRef<number | null>(null);
-  const inlineViewportFrameRef = useRef<number | null>(null);
-  const viewportPanFrameRef = useRef<number | null>(null);
-  const inlineViewportPanFrameRef = useRef<number | null>(null);
-  const viewportFrameTimeRef = useRef<number | null>(null);
-  const inlineViewportFrameTimeRef = useRef<number | null>(null);
+  const wheelStreamRef = useRef<BoardWheelStream>({lastTime: -Infinity, continuous: false});
+  const inlineWheelStreamRef = useRef<BoardWheelStream>({lastTime: -Infinity, continuous: false});
   const panSessionRef = useRef<PanSession | null>(null);
   const marqueeSessionRef = useRef<MarqueeSession | null>(null);
   const spacePressedRef = useRef(false);
@@ -226,8 +218,14 @@ export function Board({
   const [isPanning, setIsPanning] = useState(false);
   const [spacePressed, setSpacePressed] = useState(false);
   const [placeholderHeight, setPlaceholderHeight] = useState(0);
-  const [viewport, setViewport] = useState<BoardViewport>(viewportRef.current);
-  const [inlineViewport, setInlineViewport] = useState<BoardViewport>(inlineViewportRef.current);
+  const {
+    viewport, target: viewportRef, displayed: displayedViewportRef,
+    update: updateViewport, queue: queueFullViewport, damp: dampFullViewport,
+  } = useBoardViewport(stageRef, canvasRef, open, prefersReducedMotion, true);
+  const {
+    viewport: inlineViewport, target: inlineViewportRef,
+    update: updateInlineViewport, queue: queueInlineViewportUpdate, damp: dampInlineViewportUpdate,
+  } = useBoardViewport(inlineStageRef, inlineCanvasRef, !open, prefersReducedMotion);
   const [boardMode, setBoardMode] = useState<BoardMode>(
     canEdit && initialMode !== 'view' ? 'edit' : 'view',
   );
@@ -294,189 +292,15 @@ export function Board({
     [controlledDocument, onDocumentChange],
   );
 
-  // Promote the stage to a compositor layer only while a pan or zoom is in
-  // flight: the gesture animates on the GPU, and releasing the hint right
-  // after lets the browser re-rasterize the SVG crisply at the settled scale.
-  const stageWillChangeTimerRef = useRef<number | null>(null);
-  const inlineStageWillChangeTimerRef = useRef<number | null>(null);
-  const holdStageWillChange = useCallback((
-    stage: HTMLElement | null,
-    timerRef: MutableRefObject<number | null>,
-  ) => {
-    if (stage) stage.style.willChange = 'transform';
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      if (stage) stage.style.willChange = '';
-    }, 240);
-  }, []);
-  const releaseStageWillChange = useCallback((
-    stage: HTMLElement | null,
-    timerRef: MutableRefObject<number | null>,
-  ) => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (stage) stage.style.willChange = '';
-  }, []);
-
-  const updateViewport = useCallback(
-    (update: BoardViewportUpdate) => {
-      if (viewportFrameRef.current !== null) {
-        cancelAnimationFrame(viewportFrameRef.current);
-        viewportFrameRef.current = null;
-      }
-      if (viewportPanFrameRef.current !== null) {
-        cancelAnimationFrame(viewportPanFrameRef.current);
-        viewportPanFrameRef.current = null;
-      }
-      viewportFrameTimeRef.current = null;
-      releaseStageWillChange(stageRef.current, stageWillChangeTimerRef);
-      const next = advanceBoardViewport(viewportRef, update);
-      displayedViewportRef.current = next;
-      setViewport(next);
-    },
-    [releaseStageWillChange],
-  );
-
-  const updateInlineViewport = useCallback(
-    (update: BoardViewportUpdate) => {
-      if (inlineViewportFrameRef.current !== null) {
-        cancelAnimationFrame(inlineViewportFrameRef.current);
-        inlineViewportFrameRef.current = null;
-      }
-      if (inlineViewportPanFrameRef.current !== null) {
-        cancelAnimationFrame(inlineViewportPanFrameRef.current);
-        inlineViewportPanFrameRef.current = null;
-      }
-      inlineViewportFrameTimeRef.current = null;
-      releaseStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
-      const next = advanceBoardViewport(inlineViewportRef, update);
-      displayedInlineViewportRef.current = next;
-      setInlineViewport(next);
-    },
-    [releaseStageWillChange],
-  );
-
   const queueViewportUpdate = useCallback((update: BoardViewportUpdate) => {
-    // Only user gestures route through here, so the viewport leaves automatic
-    // fit-on-open control from now on.
     autoFitViewportRef.current = false;
-    holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
-    if (viewportFrameRef.current !== null) {
-      cancelAnimationFrame(viewportFrameRef.current);
-      viewportFrameRef.current = null;
-    }
-    viewportFrameTimeRef.current = null;
-    advanceBoardViewport(viewportRef, update);
-    if (viewportPanFrameRef.current !== null) return;
-    viewportPanFrameRef.current = requestAnimationFrame(() => {
-      viewportPanFrameRef.current = null;
-      displayedViewportRef.current = viewportRef.current;
-      setViewport(displayedViewportRef.current);
-    });
-  }, [holdStageWillChange]);
-
-  const queueInlineViewportUpdate = useCallback((update: BoardViewportUpdate) => {
-    holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
-    if (inlineViewportFrameRef.current !== null) {
-      cancelAnimationFrame(inlineViewportFrameRef.current);
-      inlineViewportFrameRef.current = null;
-    }
-    inlineViewportFrameTimeRef.current = null;
-    advanceBoardViewport(inlineViewportRef, update);
-    if (inlineViewportPanFrameRef.current !== null) return;
-    inlineViewportPanFrameRef.current = requestAnimationFrame(() => {
-      inlineViewportPanFrameRef.current = null;
-      displayedInlineViewportRef.current = inlineViewportRef.current;
-      setInlineViewport(displayedInlineViewportRef.current);
-    });
-  }, [holdStageWillChange]);
+    queueFullViewport(update);
+  }, [queueFullViewport]);
 
   const dampViewportUpdate = useCallback((update: BoardViewportUpdate) => {
     autoFitViewportRef.current = false;
-    advanceBoardViewport(viewportRef, update);
-    if (prefersReducedMotion) {
-      updateViewport(viewportRef.current);
-      return;
-    }
-    holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
-    if (viewportPanFrameRef.current !== null) {
-      cancelAnimationFrame(viewportPanFrameRef.current);
-      viewportPanFrameRef.current = null;
-    }
-    if (viewportFrameRef.current !== null) return;
-    const animate = (timestamp: number) => {
-      const previousTime = viewportFrameTimeRef.current;
-      viewportFrameTimeRef.current = timestamp;
-      const next = dampBoardViewport(
-        displayedViewportRef.current,
-        viewportRef.current,
-        previousTime === null ? 16 : Math.min(32, timestamp - previousTime),
-      );
-      if (boardViewportHasSettled(next, viewportRef.current)) {
-        displayedViewportRef.current = viewportRef.current;
-        viewportFrameRef.current = null;
-        viewportFrameTimeRef.current = null;
-        releaseStageWillChange(stageRef.current, stageWillChangeTimerRef);
-        setViewport(viewportRef.current);
-        return;
-      }
-      holdStageWillChange(stageRef.current, stageWillChangeTimerRef);
-      displayedViewportRef.current = next;
-      setViewport(next);
-      viewportFrameRef.current = requestAnimationFrame(animate);
-    };
-    viewportFrameRef.current = requestAnimationFrame(animate);
-  }, [holdStageWillChange, prefersReducedMotion, releaseStageWillChange, updateViewport]);
-
-  const dampInlineViewportUpdate = useCallback((update: BoardViewportUpdate) => {
-    advanceBoardViewport(inlineViewportRef, update);
-    if (prefersReducedMotion) {
-      updateInlineViewport(inlineViewportRef.current);
-      return;
-    }
-    holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
-    if (inlineViewportPanFrameRef.current !== null) {
-      cancelAnimationFrame(inlineViewportPanFrameRef.current);
-      inlineViewportPanFrameRef.current = null;
-    }
-    if (inlineViewportFrameRef.current !== null) return;
-    const animate = (timestamp: number) => {
-      const previousTime = inlineViewportFrameTimeRef.current;
-      inlineViewportFrameTimeRef.current = timestamp;
-      const next = dampBoardViewport(
-        displayedInlineViewportRef.current,
-        inlineViewportRef.current,
-        previousTime === null ? 16 : Math.min(32, timestamp - previousTime),
-      );
-      if (boardViewportHasSettled(next, inlineViewportRef.current)) {
-        displayedInlineViewportRef.current = inlineViewportRef.current;
-        inlineViewportFrameRef.current = null;
-        inlineViewportFrameTimeRef.current = null;
-        releaseStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
-        setInlineViewport(inlineViewportRef.current);
-        return;
-      }
-      holdStageWillChange(inlineStageRef.current, inlineStageWillChangeTimerRef);
-      displayedInlineViewportRef.current = next;
-      setInlineViewport(next);
-      inlineViewportFrameRef.current = requestAnimationFrame(animate);
-    };
-    inlineViewportFrameRef.current = requestAnimationFrame(animate);
-  }, [holdStageWillChange, prefersReducedMotion, releaseStageWillChange, updateInlineViewport]);
-
-  useEffect(() => () => {
-    if (viewportFrameRef.current !== null) cancelAnimationFrame(viewportFrameRef.current);
-    if (inlineViewportFrameRef.current !== null) {
-      cancelAnimationFrame(inlineViewportFrameRef.current);
-    }
-    if (viewportPanFrameRef.current !== null) cancelAnimationFrame(viewportPanFrameRef.current);
-    if (inlineViewportPanFrameRef.current !== null) {
-      cancelAnimationFrame(inlineViewportPanFrameRef.current);
-    }
-  }, []);
+    dampFullViewport(update);
+  }, [dampFullViewport]);
 
   const updateMediaTransform = useCallback(
     (update: MediaTransform | ((current: MediaTransform) => MediaTransform)) => {
@@ -626,7 +450,11 @@ export function Board({
     setZoomMenuOpen(false);
     setHelpOpen(false);
     setOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      const target = returnFocusRef.current === 'fullscreen' ? fullscreenTriggerRef.current : null;
+      (target ?? triggerRef.current)?.focus();
+      returnFocusRef.current = 'entry';
+    });
   }, []);
 
   const openViewer = useCallback(
@@ -975,19 +803,17 @@ export function Board({
 
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
-    setZoomMenuOpen(false);
+    if (zoomMenuOpen) setZoomMenuOpen(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
     const deltaX = normalizeBoardWheelDelta(event.deltaX, event.deltaMode, canvas.clientWidth);
     const deltaY = normalizeBoardWheelDelta(event.deltaY, event.deltaMode, canvas.clientHeight);
+    const continuous = isContinuousBoardWheel(event, wheelStreamRef.current);
+    const apply = continuous ? queueViewportUpdate : dampViewportUpdate;
     if (event.ctrlKey || event.metaKey) {
       const current = viewportRef.current;
       const scale = clamp(
-        current.scale *
-          Math.exp(
-            -clamp(deltaY, -MAX_WHEEL_ZOOM_DELTA, MAX_WHEEL_ZOOM_DELTA) *
-              WHEEL_ZOOM_SENSITIVITY,
-          ),
+        current.scale * boardWheelZoomFactor(deltaY, continuous && event.ctrlKey),
         MIN_ZOOM,
         MAX_ZOOM,
       );
@@ -996,19 +822,19 @@ export function Board({
       const pointY = event.clientY - rect.top;
       const contentX = (pointX - current.x) / current.scale;
       const contentY = (pointY - current.y) / current.scale;
-      dampViewportUpdate({
+      apply({
         x: pointX - contentX * scale,
         y: pointY - contentY * scale,
         scale,
       });
       return;
     }
-    queueViewportUpdate((current) => ({
+    apply((current) => ({
       ...current,
       x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
       y: current.y - (event.shiftKey ? 0 : deltaY),
     }));
-  }, [dampViewportUpdate, queueViewportUpdate]);
+  }, [dampViewportUpdate, queueViewportUpdate, zoomMenuOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -1026,30 +852,28 @@ export function Board({
       if (!canvas) return;
       const deltaX = normalizeBoardWheelDelta(event.deltaX, event.deltaMode, canvas.clientWidth);
       const deltaY = normalizeBoardWheelDelta(event.deltaY, event.deltaMode, canvas.clientHeight);
+      const continuous = isContinuousBoardWheel(event, inlineWheelStreamRef.current);
+      const apply = continuous ? queueInlineViewportUpdate : dampInlineViewportUpdate;
       if (event.ctrlKey || event.metaKey) {
         const current = inlineViewportRef.current;
         const rect = canvas.getBoundingClientRect();
         const pointX = event.clientX - rect.left;
         const pointY = event.clientY - rect.top;
         const scale = clamp(
-          current.scale *
-            Math.exp(
-              -clamp(deltaY, -MAX_WHEEL_ZOOM_DELTA, MAX_WHEEL_ZOOM_DELTA) *
-                WHEEL_ZOOM_SENSITIVITY,
-            ),
+          current.scale * boardWheelZoomFactor(deltaY, continuous && event.ctrlKey),
           MIN_ZOOM,
           MAX_ZOOM,
         );
         const contentX = (pointX - current.x) / current.scale;
         const contentY = (pointY - current.y) / current.scale;
-        dampInlineViewportUpdate({
+        apply({
           x: pointX - contentX * scale,
           y: pointY - contentY * scale,
           scale,
         });
         return;
       }
-      queueInlineViewportUpdate((current) => ({
+      apply((current) => ({
         ...current,
         x: current.x - (event.shiftKey && deltaX === 0 ? deltaY : deltaX),
         y: current.y - (event.shiftKey ? 0 : deltaY),
@@ -1316,11 +1140,13 @@ export function Board({
             <RotateCcw aria-hidden="true" size={18} strokeWidth={1.9} />
           </button>
           <button
+            ref={fullscreenTriggerRef}
             type="button"
             aria-label={`全屏打开画板：${accessibleTitle}`}
             title="全屏打开"
             onClick={(event) => {
               event.stopPropagation();
+              returnFocusRef.current = 'fullscreen';
               openViewer(canEdit ? 'edit' : 'view');
             }}
           >
@@ -1407,22 +1233,11 @@ export function Board({
                           <X aria-hidden="true" size={20} strokeWidth={1.9} />
                           <span>退出</span>
                         </button>
-                        <span className="de-diagram-board-divider" aria-hidden="true" />
-                        <span className="de-diagram-board-identity">
-                          <span className="de-diagram-board-mark" aria-hidden="true">
-                            <Workflow size={17} strokeWidth={2.1} />
-                          </span>
-                          <span>画板</span>
-                        </span>
                       </div>
 
-                      <div className="de-diagram-board-mode-wrap">
-                        <div className="de-diagram-board-mode de-diagram-board-float">
-                          <span className="de-diagram-board-title" title={accessibleTitle}>
-                            {accessibleTitle}
-                          </span>
-                          <span className="de-diagram-board-divider" aria-hidden="true" />
-                          {canEdit ? (
+                      {canEdit ? (
+                        <div className="de-diagram-board-mode-wrap">
+                          <div className="de-diagram-board-mode de-diagram-board-float">
                             <button
                               type="button"
                               aria-expanded={modeMenuOpen}
@@ -1437,67 +1252,63 @@ export function Board({
                               <span>{editModeActive ? '编辑' : '浏览'}</span>
                               <ChevronDown aria-hidden="true" size={15} strokeWidth={1.9} />
                             </button>
-                          ) : (
-                            <span className="de-diagram-board-readonly">
-                              <Eye aria-hidden="true" size={18} strokeWidth={1.9} />
-                              <span>浏览</span>
-                            </span>
-                          )}
+                          </div>
+                          <AnimatePresence>
+                            {modeMenuOpen ? (
+                              <m.div
+                                className="de-diagram-board-menu de-diagram-board-mode-menu"
+                                role="menu"
+                                initial={{opacity: 0, y: -4}}
+                                animate={{opacity: 1, y: 0}}
+                                exit={{opacity: 0, y: -4}}
+                                transition={{duration: prefersReducedMotion ? 0 : 0.12}}
+                              >
+                                <button
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={boardMode === 'edit'}
+                                  onClick={() => {
+                                    setBoardMode('edit');
+                                    setBoardTool('select');
+                                    setModeMenuOpen(false);
+                                  }}
+                                >
+                                  <PenLine aria-hidden="true" size={17} />
+                                  <span>
+                                    <strong>编辑</strong>
+                                    <small>
+                                      {boardDocument ? '拖动节点并修改文字' : '拖动并缩放图形'}
+                                    </small>
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={boardMode === 'view'}
+                                  onClick={() => {
+                                    setBoardMode('view');
+                                    setBoardTool('hand');
+                                    setModeMenuOpen(false);
+                                  }}
+                                >
+                                  <Eye aria-hidden="true" size={17} />
+                                  <span>
+                                    <strong>浏览</strong>
+                                    <small>仅缩放和平移画布</small>
+                                  </span>
+                                </button>
+                              </m.div>
+                            ) : null}
+                          </AnimatePresence>
                         </div>
-                        <AnimatePresence>
-                          {modeMenuOpen ? (
-                            <m.div
-                              className="de-diagram-board-menu de-diagram-board-mode-menu"
-                              role="menu"
-                              initial={{opacity: 0, y: -4}}
-                              animate={{opacity: 1, y: 0}}
-                              exit={{opacity: 0, y: -4}}
-                              transition={{duration: prefersReducedMotion ? 0 : 0.12}}
-                            >
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={boardMode === 'edit'}
-                                onClick={() => {
-                                  setBoardMode('edit');
-                                  setBoardTool('select');
-                                  setModeMenuOpen(false);
-                                }}
-                              >
-                                <PenLine aria-hidden="true" size={17} />
-                                <span>
-                                  <strong>编辑</strong>
-                                  <small>
-                                    {boardDocument ? '拖动节点并修改文字' : '拖动并缩放图形'}
-                                  </small>
-                                </span>
-                              </button>
-                              <button
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={boardMode === 'view'}
-                                onClick={() => {
-                                  setBoardMode('view');
-                                  setBoardTool('hand');
-                                  setModeMenuOpen(false);
-                                }}
-                              >
-                                <Eye aria-hidden="true" size={17} />
-                                <span>
-                                  <strong>浏览</strong>
-                                  <small>仅缩放和平移画布</small>
-                                </span>
-                              </button>
-                            </m.div>
-                          ) : null}
-                        </AnimatePresence>
-                      </div>
+                      ) : null}
 
-                      <nav
-                        className="de-diagram-board-tools de-diagram-board-float"
-                        aria-label="画板工具"
-                      >
-                        {editModeActive ? (
+                      {/* Tools only matter while editing; browsing always drags the canvas. */}
+                      {editModeActive ? (
+                        <nav
+                          className="de-diagram-board-tools de-diagram-board-float"
+                          aria-label="画板工具"
+                        >
                           <button
                             type="button"
                             aria-label="选择工具"
@@ -1507,18 +1318,18 @@ export function Board({
                           >
                             <MousePointer2 aria-hidden="true" size={20} strokeWidth={1.8} />
                           </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          aria-label="手型移动工具"
-                          aria-keyshortcuts="H"
-                          aria-pressed={boardTool === 'hand'}
-                          title="移动画布（H）"
-                          onClick={() => setBoardTool(boardTool === 'hand' ? 'select' : 'hand')}
-                        >
-                          <Hand aria-hidden="true" size={20} strokeWidth={1.8} />
-                        </button>
-                      </nav>
+                          <button
+                            type="button"
+                            aria-label="手型移动工具"
+                            aria-keyshortcuts="H"
+                            aria-pressed={boardTool === 'hand'}
+                            title="移动画布（H）"
+                            onClick={() => setBoardTool(boardTool === 'hand' ? 'select' : 'hand')}
+                          >
+                            <Hand aria-hidden="true" size={20} strokeWidth={1.8} />
+                          </button>
+                        </nav>
+                      ) : null}
 
                       <m.div
                         ref={canvasRef}
@@ -1706,7 +1517,7 @@ export function Board({
                               transition={{duration: prefersReducedMotion ? 0 : 0.12}}
                             >
                               <strong>移动与缩放</strong>
-                              <span>H 或手型工具：拖动画布</span>
+                              <span>浏览时直接拖动；编辑时按 H 或用手型工具拖动</span>
                               <span>Space + 左键拖动，或直接右键拖动</span>
                               <span>⌘ / Ctrl + 滚轮：以指针为中心缩放</span>
                             </m.div>
@@ -1748,17 +1559,6 @@ export function Board({
                           ) : null}
                         </AnimatePresence>
                         <div className="de-diagram-board-zoom de-diagram-board-float">
-                          <button
-                            type="button"
-                            aria-label="手型移动工具"
-                            aria-keyshortcuts="H"
-                            aria-pressed={boardTool === 'hand'}
-                            title="移动画布（H）"
-                            onClick={() => setBoardTool(boardTool === 'hand' ? 'select' : 'hand')}
-                          >
-                            <Hand aria-hidden="true" size={20} strokeWidth={1.8} />
-                          </button>
-                          <span className="de-diagram-board-divider" aria-hidden="true" />
                           <button
                             type="button"
                             aria-label="缩小画板"

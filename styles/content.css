@@ -2337,9 +2337,7 @@
 }
 
 .de-diagram-board-brand > button,
-.de-diagram-board-mode button,
-.de-diagram-board-readonly,
-.de-diagram-board-identity {
+.de-diagram-board-mode button {
   display: inline-flex;
   height: 38px;
   align-items: center;
@@ -2362,21 +2360,6 @@
   background: #f2f3f5;
 }
 
-.de-diagram-board-identity {
-  padding-right: 10px;
-  font-weight: 600;
-}
-
-.de-diagram-board-mark {
-  display: inline-grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 6px;
-  background: #34a853;
-  color: white;
-}
-
 .de-diagram-board-mode-wrap {
   position: absolute;
   z-index: 32;
@@ -2392,24 +2375,9 @@
   padding: 0 7px;
 }
 
-.de-diagram-board-title {
-  min-width: 0;
-  max-width: 230px;
-  overflow: hidden;
-  padding: 0 9px;
-  color: #646a73;
-  font: 400 14px/1 var(--de-font-sans);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .de-diagram-board-mode button {
   flex: 0 0 auto;
   cursor: pointer;
-}
-
-.de-diagram-board-readonly {
-  color: #646a73;
 }
 
 .de-diagram-board-tools {
@@ -2820,12 +2788,6 @@
 
   .de-diagram-board-mode-wrap {
     right: 12px;
-  }
-
-  .de-diagram-board-title,
-  .de-diagram-board-brand .de-diagram-board-identity > span:last-child,
-  .de-diagram-board-mode > .de-diagram-board-divider {
-    display: none;
   }
 
   .de-diagram-board-mode {

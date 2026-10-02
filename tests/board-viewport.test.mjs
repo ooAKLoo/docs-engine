@@ -5,7 +5,32 @@ import {
   boardViewportHasSettled,
   dampBoardViewport,
   normalizeBoardWheelDelta,
+  isContinuousBoardWheel,
+  boardWheelZoomFactor,
 } from '../dist/components/BoardViewport.js';
+
+test('recognizes pixel streams immediately and keeps coarse low-frequency wheel input discrete', () => {
+  const stream = {lastTime: -Infinity, continuous: false};
+  const wheel = (deltaY, timeStamp, deltaMode = 0) => isContinuousBoardWheel(
+    {deltaX: 0, deltaY, deltaMode, timeStamp}, stream,
+  );
+  assert.equal(wheel(120, 0), false);
+  assert.equal(wheel(120, 180), false);
+  assert.equal(wheel(2, 400), true);
+  assert.equal(wheel(150, 416), true);
+  assert.equal(wheel(90, 500), true);
+  assert.equal(wheel(120, 800), false);
+  assert.equal(wheel(120, 816), true);
+  assert.equal(wheel(3, 832, 1), false);
+  assert.equal(wheel(1, 848, 2), false);
+});
+
+test('pinch exponential gain composes without event-size clipping; wheel gain retains its notch cap', () => {
+  assert.ok(Math.abs(boardWheelZoomFactor(-2, true) ** 60 - Math.exp(1.2)) < 1e-12);
+  assert.equal(boardWheelZoomFactor(-120, false), Math.exp(120 * 0.0018));
+  assert.equal(boardWheelZoomFactor(-1200, false), boardWheelZoomFactor(-120, false));
+  assert.ok(Math.abs(boardWheelZoomFactor(2, true) * boardWheelZoomFactor(-2, true) - 1) < 1e-12);
+});
 
 test('publishes every viewport update synchronously for continuous gestures', () => {
   const viewportRef = {current: {x: 0, y: 0, scale: 1}};

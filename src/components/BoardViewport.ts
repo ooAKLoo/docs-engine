@@ -12,7 +12,41 @@ type MutableViewportRef = {
   current: BoardViewport;
 };
 
-const DEFAULT_VIEWPORT_RESPONSE_MS = 55;
+const DEFAULT_VIEWPORT_RESPONSE_MS = 32;
+
+// Native trackpad pinch emits small ctrl+pixel deltas: -100px maps to exp(1).
+// Mouse modifier-wheel keeps the previous, gentler notch gain.
+export const BOARD_PINCH_ZOOM_SENSITIVITY = 0.01;
+export const BOARD_WHEEL_ZOOM_SENSITIVITY = 0.0018;
+
+export type BoardWheelStream = {lastTime: number; continuous: boolean};
+
+/**
+ * WheelEvent has no device identifier. Small/fractional pixel deltas are the
+ * first-event signal; <=40ms cadence and a 160ms latch also cover fast swipes
+ * and momentum with larger deltas. Line/page units always mean discrete input.
+ * ctrlKey alone cannot identify pinch: Ctrl+mouse-wheel uses it too.
+ */
+export function isContinuousBoardWheel(
+  event: Pick<WheelEvent, 'deltaMode' | 'deltaX' | 'deltaY' | 'timeStamp'>,
+  stream: BoardWheelStream,
+) {
+  const gap = event.timeStamp - stream.lastTime;
+  const magnitude = Math.max(Math.abs(event.deltaX), Math.abs(event.deltaY));
+  const continuous = event.deltaMode === 0 && (
+    magnitude <= 40 ||
+    (magnitude < 80 && (!Number.isInteger(event.deltaX) || !Number.isInteger(event.deltaY))) ||
+    (gap >= 0 && (gap <= 40 || (stream.continuous && gap <= 160)))
+  );
+  stream.lastTime = event.timeStamp;
+  stream.continuous = continuous;
+  return continuous;
+}
+
+export function boardWheelZoomFactor(delta: number, pinch: boolean) {
+  const distance = pinch ? delta : Math.max(-120, Math.min(120, delta));
+  return Math.exp(-distance * (pinch ? BOARD_PINCH_ZOOM_SENSITIVITY : BOARD_WHEEL_ZOOM_SENSITIVITY));
+}
 
 /**
  * Resolve and publish a viewport update synchronously.
@@ -50,7 +84,7 @@ export function normalizeBoardWheelDelta(
 
 /**
  * Move the displayed viewport toward its latest interaction target with a
- * frame-rate-independent, critically damped response. The exponential curve
+ * frame-rate-independent exponential response for discrete wheel input. The curve
  * never overshoots and does not restart when more wheel events arrive.
  */
 export function dampBoardViewport(
