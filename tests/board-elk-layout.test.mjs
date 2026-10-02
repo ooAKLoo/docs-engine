@@ -648,3 +648,118 @@ test('treats the measured group title as an obstacle even for its own edges', ()
   }
   assertRouteBounds(applyBoardLayout(document, refined), layout);
 });
+
+function smallOffsetCount(edges) {
+  return edges.reduce((count, edge) => {
+    // Raw ELK sections may contain duplicate or collinear points.
+    const points = [];
+    const near = (a, b) => Math.abs(a - b) < 0.01;
+    for (const point of edge.points) {
+      if (points.length && segmentLength([points.at(-1), point]) < 0.01) continue;
+      while (points.length >= 2) {
+        const [a, b] = points.slice(-2);
+        if (!(near(a.x, b.x) && near(b.x, point.x))
+          && !(near(a.y, b.y) && near(b.y, point.y))) break;
+        points.pop();
+      }
+      points.push(point);
+    }
+    for (let index = 0; index + 3 < points.length; index++) {
+      const [a, b, c, d] = points.slice(index, index + 4);
+      const sameDirection = (b.x - a.x) * (d.x - c.x) > 0.01
+        || (b.y - a.y) * (d.y - c.y) > 0.01;
+      if (sameDirection && segmentLength([b, c]) < 32 - 0.01) count++;
+    }
+    return count;
+  }, 0);
+}
+
+const offsetSources = {
+  LR: `flowchart LR
+    a[Alpha]
+    b[Beta<br/>Details]
+    c[Gamma records]
+    d[Delta<br/>Processing]
+    a --> b
+    b --> c
+    c --> d
+    a --> c
+    d --> b`,
+  TB: `flowchart TB
+    a[Alpha]
+    b[Beta<br/>Details]
+    c[Gamma records]
+    d[Delta<br/>Processing]
+    a --> b
+    b --> c
+    c --> d
+    a --> c
+    d --> c
+    a --> d`,
+};
+
+for (const direction of ['LR', 'TB']) {
+  test(`clears small offsets in an ELK ${direction} flow`, async () => {
+    const document = await importMermaid(offsetSources[direction]);
+    const raw = await computeElkBoardLayout(document, {refineRoutes: false});
+    assert.ok(smallOffsetCount(raw.edges) > 0, 'raw ELK must exercise a Z offset below 32px');
+    assert.equal(smallOffsetCount(document.edges), 0);
+    assertRouteBounds(document, raw);
+    assertClearEndpoints(document.edges);
+    const errorKeys = (doc) => validateBoardLayout(doc)
+      .filter(({severity}) => severity === 'error')
+      .map(({code, edgeIds, nodeIds}) => JSON.stringify([code, edgeIds?.slice().sort(), nodeIds?.slice().sort()]));
+    const originalErrors = new Set(errorKeys(applyBoardLayout(document, raw)));
+    assert.ok(errorKeys(document).every((key) => originalErrors.has(key)));
+    const repeated = await computeElkBoardLayout(document);
+    const reordered = await computeElkBoardLayout({...document, edges: [...document.edges].reverse()});
+    const byId = (edges) => Object.fromEntries(edges.map((edge) => [edge.id, edge]));
+    assert.deepEqual(byId(repeated.edges), byId(reordered.edges));
+    assert.deepEqual(byId(repeated.edges), byId((await computeElkBoardLayout(document)).edges));
+  });
+}
+
+test('aligns a small offset by sliding both terminal ports within their corner margins', () => {
+  const {document, layout} = refinementFixture();
+  layout.nodes.b.position.y = 130;
+  layout.edges[0].points = [
+    {x: 120, y: 100}, {x: 240, y: 100}, {x: 240, y: 125}, {x: 360, y: 125},
+  ];
+  const refined = refineBoardRoutes(document, layout);
+  assert.equal(refined.edges[0].points.length, 2);
+  const y = refined.edges[0].points[0].y;
+  assert.ok(y >= 112 && y <= 118, 'both ports must move into the shared usable interval');
+  assertRouteBounds(applyBoardLayout(document, refined), layout);
+  assert.deepEqual(validateBoardLayout(applyBoardLayout(document, refined)), []);
+});
+
+for (const direction of ['LR', 'TB']) {
+  test(`extends a ${direction} offset when terminal intervals cannot align`, () => {
+    const {document, layout} = refinementFixture();
+    // For TB this deliberately exercises left/right sides perpendicular to
+    // the main flow axis; local repair must support both segment orientations.
+    document.direction = direction;
+    layout.nodes.b.position.y = 144;
+    layout.edges[0].points = [
+      {x: 120, y: 118}, {x: 240, y: 118}, {x: 240, y: 138}, {x: 360, y: 138},
+    ];
+    const refined = refineBoardRoutes(document, layout);
+    assert.equal(smallOffsetCount(layout.edges), 1);
+    assert.equal(smallOffsetCount(refined.edges), 0);
+    assert.equal(totalBends(refined.edges), 2, 'violation reduction may retain the bend count');
+    assert.ok(segmentLength(segments(refined.edges[0].points)[1]) >= 32 - 0.01);
+    assertClearEndpoints(applyBoardLayout(document, refined).edges);
+    assertRouteBounds(applyBoardLayout(document, refined), layout);
+    assert.deepEqual(validateBoardLayout(applyBoardLayout(document, refined)), []);
+  });
+}
+
+test('retains an offset already at the minimum when no bend can be removed', () => {
+  const {document, layout} = refinementFixture();
+  layout.nodes.b.position.y = 144;
+  layout.edges[0].points = [
+    {x: 120, y: 110}, {x: 240, y: 110}, {x: 240, y: 142}, {x: 360, y: 142},
+  ];
+  assert.equal(smallOffsetCount(layout.edges), 0);
+  assert.deepEqual(refineBoardRoutes(document, layout).edges, layout.edges);
+});

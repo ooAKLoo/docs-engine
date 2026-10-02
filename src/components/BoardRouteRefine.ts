@@ -54,6 +54,7 @@ type RouteContext = {
 };
 type RouteQuality = {
   endpointViolations: number;
+  smallOffsets: number;
   bends: number;
   crossings: number;
   groupPadding: number;
@@ -63,6 +64,8 @@ type RouteQuality = {
 const EPSILON = 0.01;
 const LANE_GAP = 8;
 const PORT_GAP = 10;
+// Two 10px corner radii plus a visible 12px straight section.
+const MIN_OFFSET = 32;
 const SOURCE_STUB = 16;
 const ARROW_STUB = 24;
 const ENDPOINT_CLEARANCE = 24;
@@ -166,7 +169,8 @@ function allocateGapChannels(
     } : route);
     const before = gapQuality(visible, affected, geometry);
     const after = gapQuality(replacements, affected, geometry);
-    if (compareKeys(after, before) >= 0 || after[2] > before[2]) continue;
+    if (after[2] > before[2] || !(after[0] < before[0]
+      || (after[0] === before[0] && after[1] < before[1]))) continue;
     let safe = true;
     const affectedRoutes = replacements.filter((entry) => affected.has(entry.id));
     affectedRoutes.sort((a, b) => compareRoutes(a, b, geometry));
@@ -330,7 +334,11 @@ function assignGapPorts(gap: Gap, geometry: Geometry, visible: Route[]): GapPort
   }
   // Align overlapping endpoint slots to eliminate avoidable Z routes. Adjacent
   // slots remain at least PORT_GAP apart throughout this deterministic pass.
-  for (const entry of entries) {
+  const alignmentOrder = [...entries].sort((a, b) =>
+    Number(Math.abs(a.start.v - a.end.v) >= MIN_OFFSET)
+      - Number(Math.abs(b.start.v - b.end.v) >= MIN_OFFSET)
+      || compareRoutes(a.route, b.route, geometry));
+  for (const entry of alignmentOrder) {
     const bounds = (point: Point): [number, number] => {
       const slots = [...sideSlots.values()].find((list) => list.some((slot) => slot.point === point))!;
       const index = slots.findIndex((slot) => slot.point === point);
@@ -344,10 +352,29 @@ function assignGapPorts(gap: Gap, geometry: Geometry, visible: Route[]): GapPort
     const [t0, t1] = bounds(entry.end);
     const low = Math.max(s0, t0);
     const high = Math.min(s1, t1);
-    if (low > high) continue;
-    const v = clamp((entry.start.v + entry.end.v) / 2, low, high);
-    entry.start.v = v;
-    entry.end.v = v;
+    if (low <= high) {
+      const v = clamp((entry.start.v + entry.end.v) / 2, low, high);
+      entry.start.v = v;
+      entry.end.v = v;
+    } else if (Math.abs(entry.start.v - entry.end.v) < MIN_OFFSET) {
+      // When the available slots cannot overlap, spread the bend while
+      // retaining the order and clearance of neighbouring ports.
+      const pairs = [-1, 1].flatMap((sign) => {
+        const low = Math.max(s0, t0 - sign * MIN_OFFSET);
+        const high = Math.min(s1, t1 - sign * MIN_OFFSET);
+        if (low > high) return [];
+        const start = clamp((entry.start.v + entry.end.v - sign * MIN_OFFSET) / 2, low, high);
+        return [{start, end: start + sign * MIN_OFFSET}];
+      });
+      pairs.sort((a, b) =>
+        (Math.abs(a.start - entry.start.v) + Math.abs(a.end - entry.end.v))
+          - (Math.abs(b.start - entry.start.v) + Math.abs(b.end - entry.end.v))
+          || a.start - b.start);
+      if (pairs[0]) {
+        entry.start.v = pairs[0].start;
+        entry.end.v = pairs[0].end;
+      }
+    }
   }
   // Edges outside this gap retain their ports and remain hard obstacles.
   const included = new Set(entries.map(({route}) => route.id));
@@ -429,7 +456,8 @@ function gapQuality(routes: Route[], affected: Set<string>, geometry: Geometry):
   let crossings = 0;
   routes.forEach((route, index) => {
     if (!affected.has(route.id)) return;
-    violations += shortEndpointCount(geometry.edges.get(route.id)!, points[index]);
+    violations += shortEndpointCount(geometry.edges.get(route.id)!, points[index])
+      + smallOffsetIndices(points[index]).length;
     bends += points[index].length - 2;
   });
   for (let first = 0; first < routes.length; first++) {
@@ -446,13 +474,6 @@ function gapQuality(routes: Route[], affected: Set<string>, geometry: Geometry):
     }
   }
   return [violations, bends, crossings];
-}
-
-function compareKeys(first: number[], second: number[]) {
-  for (let index = 0; index < first.length; index++) {
-    if (first[index] !== second[index]) return first[index] - second[index];
-  }
-  return 0;
 }
 
 function createAxis(direction: BoardDocument['direction']): Axis {
@@ -604,6 +625,14 @@ function generateCandidates(context: RouteContext): Point[][] {
   // Moving a terminal channel can repair a short arrow stub without removing
   // bends. It also preserves detours that a full Z route cannot safely replace.
   candidates.push(...endpointChannelCandidates(context));
+  for (const points of smallOffsetCandidates(context)) {
+    candidates.push(points);
+    // ELK can combine a small offset with a short terminal stub. Repair them
+    // together so the candidate still clears the unchanged endpoint checks.
+    if (shortEndpointCount(context.edge, points)) {
+      candidates.push(...endpointChannelCandidates({...context, original: points}));
+    }
+  }
   candidates.push(...terminalShortcutCandidates(context));
   return candidates;
 }
@@ -716,6 +745,58 @@ function reversalCandidates(points: Point[]): Point[][] {
   return candidates;
 }
 
+/** A Z has two turns and its outer segments travel in the same direction. */
+function smallOffsetIndices(points: Point[]): number[] {
+  const indices: number[] = [];
+  for (let index = 0; index + 3 < points.length; index++) {
+    const [a, b, c, d] = points.slice(index, index + 4);
+    const sameDirection = (b.u - a.u) * (d.u - c.u) > EPSILON
+      || (b.v - a.v) * (d.v - c.v) > EPSILON;
+    if (sameDirection && distance(b, c) < MIN_OFFSET - EPSILON) indices.push(index);
+  }
+  return indices;
+}
+
+function smallOffsetCandidates(context: RouteContext): Point[][] {
+  const {original, geometry} = context;
+  const candidates: Point[][] = [];
+  for (const index of smallOffsetIndices(original)) {
+    const [a, , , d] = original.slice(index, index + 4);
+    const coordinate = near(a.v, original[index + 1].v) ? 'v' : 'u';
+    const first = a[coordinate];
+    const last = d[coordinate];
+    const values = [first, last, (first + last) / 2,
+      first - MIN_OFFSET, first + MIN_OFFSET, last - MIN_OFFSET, last + MIN_OFFSET];
+    const choices = (source: boolean) => {
+      const terminal = source ? index === 0 : index + 3 === original.length - 1;
+      if (!terminal) return unique(values);
+      const box = source ? context.source : context.target;
+      const ports = source ? context.sourcePorts : context.targetPorts;
+      const [low, high] = portRange(coordinate === 'v' ? box : {
+        u0: box.v0, u1: box.v1, v0: box.u0, v1: box.u1,
+      });
+      return unique([
+        ...values.map((value) => clamp(value, low, high)),
+        ...portValues(low, high, source ? first : last,
+          ports.map((point) => ({u: 0, v: point[coordinate]}))),
+      ]);
+    };
+    // Move either or both adjoining segments. Interior segment moves preserve
+    // their perpendicular neighbours; terminal moves slide along the same side.
+    for (const start of choices(true)) {
+      for (const end of choices(false)) {
+        if (!near(start, end) && Math.abs(start - end) < MIN_OFFSET - EPSILON) continue;
+        const points = original.map((point) => ({...point}));
+        points[index][coordinate] = points[index + 1][coordinate] = start;
+        points[index + 2][coordinate] = points[index + 3][coordinate] = end;
+        if (points.some(({u, v}) => u < 0 || v < 0 || u > geometry.maxU || v > geometry.maxV)) continue;
+        candidates.push(points);
+      }
+    }
+  }
+  return candidates;
+}
+
 function reversalCount(points: Point[]) {
   let count = 0;
   for (let index = 0; index + 3 < points.length; index++) {
@@ -777,6 +858,7 @@ function routeQuality(context: RouteContext, points: Point[]): RouteQuality {
   }
   return {
     endpointViolations,
+    smallOffsets: smallOffsetIndices(points).length,
     bends: points.length - 2,
     crossings,
     groupPadding: groupPaddingPenalty(context, parts),
@@ -815,7 +897,7 @@ function groupPaddingPenalty(context: RouteContext, parts: Segment[]) {
 
 function qualityKey(quality: RouteQuality): number[] {
   return [
-    quality.endpointViolations,
+    quality.endpointViolations + quality.smallOffsets,
     quality.bends,
     quality.crossings,
     quality.groupPadding,
@@ -835,8 +917,9 @@ function compareQuality(first: RouteQuality, second: RouteQuality) {
 
 function improvesQuality(candidate: RouteQuality, original: RouteQuality) {
   if (candidate.crossings > original.crossings) return false;
-  return candidate.endpointViolations < original.endpointViolations
-    || (candidate.endpointViolations === original.endpointViolations && candidate.bends < original.bends);
+  const violations = candidate.endpointViolations + candidate.smallOffsets;
+  const previous = original.endpointViolations + original.smallOffsets;
+  return violations < previous || (violations === previous && candidate.bends < original.bends);
 }
 
 function isCandidateSafe(context: RouteContext, points: Point[]) {
