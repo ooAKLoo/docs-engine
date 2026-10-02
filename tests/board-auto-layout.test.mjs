@@ -244,6 +244,23 @@ test('breaks a single long machine token instead of overflowing its node', () =>
   assert.equal(lines.join(''), 'CompanionAgentWithoutSpaces');
 });
 
+test('breaks long identifiers between words instead of inside them', () => {
+  const cases = [
+    ['VoiceInputApplicationAdapter', ['VoiceInputApplication', 'Adapter']],
+    ['HTTPServerConfigurationManagerFactory', ['HTTPServerConfiguration', 'ManagerFactory']],
+    ['analytics_subject_identifier_value', ['analytics_subject_', 'identifier_value']],
+    ['https://example.com/very/long/path/segment', ['https://example.com/very/', 'long/path/segment']],
+  ];
+  for (const [value, expected] of cases) {
+    assert.deepEqual(wrapDiagramText(value, 202), expected);
+  }
+  // A single word wider than the line still falls back to character breaks.
+  const word = 'a'.repeat(40);
+  const lines = wrapDiagramText(word, 202);
+  assert.ok(lines.length > 1);
+  assert.equal(lines.join(''), word);
+});
+
 function labelRectangle(edge, placement) {
   const naturalMetrics = measureDiagramEdgeLabel(edge.label, edge.bare, placement.maximumTextWidth);
   const metrics = placement.mode === 'floating'

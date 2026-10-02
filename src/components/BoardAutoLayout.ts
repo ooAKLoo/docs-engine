@@ -279,13 +279,32 @@ function wrapDiagramLine(value: string, maximumWidth: number, scale: number) {
       current = normalizedToken;
       return;
     }
-    [...normalizedToken].forEach((character) => {
-      if (current && measureDiagramTextWidth(current + character, scale) > maximumWidth) commit();
-      current += character;
+    // An identifier wider than the line breaks between its words, so
+    // `VoiceInputApplicationAdapter` never ends with an orphaned `r`.
+    splitLongToken(normalizedToken).forEach((part) => {
+      if (current && measureDiagramTextWidth(current + part, scale) > maximumWidth) commit();
+      if (measureDiagramTextWidth(current + part, scale) <= maximumWidth) {
+        current += part;
+        return;
+      }
+      [...part].forEach((character) => {
+        if (current && measureDiagramTextWidth(current + character, scale) > maximumWidth) commit();
+        current += character;
+      });
     });
   });
   if (current || lines.length === 0) commit();
   return lines;
+}
+
+/**
+ * Split an identifier at camelCase, acronym and digit boundaries and after
+ * `_ . / : + -`, keeping each separator with the word before it.
+ */
+function splitLongToken(token: string) {
+  return token.match(
+    /[A-Z]+(?![a-z])[0-9]*[_./:+-]*|[A-Z]?[a-z]+[0-9]*[_./:+-]*|[0-9]+[_./:+-]*|[_./:+-]+/g,
+  ) ?? [token];
 }
 
 type DiagramRectangle = {
