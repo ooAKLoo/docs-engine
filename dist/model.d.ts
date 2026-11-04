@@ -60,6 +60,16 @@ export type DocBlock = {
     text: string;
     label?: string;
 } | {
+    type: 'icons';
+    layout: 'list' | 'columns';
+    title?: string;
+    items: Array<{
+        icon: string;
+        title: string;
+        description?: string;
+        note?: string;
+    }>;
+} | {
     type: 'callout';
     variant: CalloutVariant;
     title: string;

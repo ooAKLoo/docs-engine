@@ -119,6 +119,9 @@ function serializeBlockNode(node) {
     }
     if (shouldSkipElement(element))
         return '';
+    if (element.matches('.de-icons')) {
+        return element.getAttribute('data-de-icons-markdown') ?? '';
+    }
     if (element.matches('.de-code-block'))
         return serializeCodeBlock(element);
     const tag = element.tagName.toLowerCase();

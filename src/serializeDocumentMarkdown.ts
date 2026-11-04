@@ -29,6 +29,16 @@ export function serializeDocBlock(block: DocBlock): string[] {
       ];
     case 'callout':
       return ['', ...[block.title, ...block.body].filter(Boolean).map((line) => `> ${line}`)];
+    case 'icons':
+      return [
+        '',
+        `> [!icons${block.layout === 'columns' ? ':columns' : ''}]${block.title ? ` ${block.title}` : ''}`,
+        ...block.items.flatMap((item) => [
+          `> - ${item.icon} | ${item.title}`,
+          ...(item.description || item.note ? [`> ${item.description ?? ''}`] : []),
+          ...(item.note ? item.note.split(/\r?\n/).map((line) => `> ${line}`) : []),
+        ]),
+      ];
     case 'table':
       return [
         '',

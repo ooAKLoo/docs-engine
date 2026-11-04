@@ -55,6 +55,8 @@ export {DocumentContent, type DocumentContentProps} from './components/DocumentC
 export {DocumentFrame, type DocumentFrameProps} from './components/DocumentFrame.js';
 export {DocumentOutline, type DocumentOutlineProps} from './components/DocumentOutline.js';
 export {Formula, type FormulaProps} from './components/Formula.js';
+export {Icons, type IconsProps} from './components/Icons.js';
+export {knownIconNames, type KnownIconName} from './iconNames.js';
 export {MarkdownInline} from './components/MarkdownInline.js';
 export {Priority, type PriorityLevel, type PriorityProps} from './components/Priority.js';
 export {ResourceLink, type ResourceLinkProps} from './components/ResourceLink.js';

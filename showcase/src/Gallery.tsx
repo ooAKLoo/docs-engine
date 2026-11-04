@@ -6,9 +6,11 @@ import {
   CodeBlock,
   DocumentCatalog,
   DocumentContent,
+  DocumentBlock,
   DocumentFrame,
   DocumentOutline,
   Formula,
+  parseDocumentMarkdown,
   Priority,
   ResourceLink,
   RiskGrid,
@@ -28,6 +30,27 @@ import {
   TransitionLabel,
   TransitionTitle,
 } from '../../src/index.js';
+
+const iconExamples = parseDocumentMarkdown(`
+> [!icons] 三个购买假设
+> - camera | A · 让拍摄不再依赖电脑
+> 外拍摄影师购买的是**可靠、低负担**的现场备份工作流。
+> 已有一定真实使用证据，优先开展原型验证。
+> - backpack | B · 轻装出行也能保存素材
+> 旅行摄影爱好者购买的是少带设备、少折腾的体验。
+> 需要验证旅行途中整理素材的频率。
+> - smartphone | C · 随时整理手机里的回忆
+> 手机摄影用户希望在熟悉的设备上保存与回看素材。
+
+> [!icons:columns] 素材工作流
+> - hard-drive | Storage
+> 用本地存储保留原始素材。
+> 支持离线工作。
+> - search | Discovery
+> 按时间与主题快速找到内容。
+> - cloud | Delivery
+> 通过[资源链接](#table)交付精选内容。
+`).blocks;
 
 const mermaidSource = `flowchart LR
     child([孩子说话]) -->|音频| asr[ASR<br/>语音转文字]
@@ -248,6 +271,7 @@ export function Gallery() {
         <a href="#timeline">交互时间轴</a>
         <a href="#diagram">图表</a>
         <a href="#document-nav">目录导航</a>
+        <a href="#icons">图标列表</a>
       </nav>
 
       <main>
@@ -515,6 +539,12 @@ export function Gallery() {
           <div className="showcase-document-nav">
             <DocumentNavPlayground />
           </div>
+        </section>
+
+        <section className="showcase-section" id="icons">
+          <h2>图标列表（Icons）</h2>
+          <p>图标承载条目的分类语义；纵向列表区分说明与备注，横向栏在窄屏自动堆叠。</p>
+          {iconExamples.map((block, index) => <DocumentBlock block={block} key={index} />)}
         </section>
       </main>
     </DocumentContent>

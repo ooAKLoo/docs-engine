@@ -158,6 +158,9 @@ function serializeBlockNode(node: Node): string {
     return element.querySelector('[data-de-board-semantic]')?.textContent?.trim() ?? '';
   }
   if (shouldSkipElement(element)) return '';
+  if (element.matches('.de-icons')) {
+    return element.getAttribute('data-de-icons-markdown') ?? '';
+  }
   if (element.matches('.de-code-block')) return serializeCodeBlock(element);
   const tag = element.tagName.toLowerCase();
   if (/^h[1-6]$/u.test(tag)) {

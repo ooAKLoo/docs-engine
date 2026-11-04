@@ -8,6 +8,7 @@
 export { detectMermaidDiagramKind, importMermaid } from './components/MermaidImporter.js';
 export { parseDocumentMarkdown } from './parseDocumentMarkdown.js';
 export { serializeDocBlock } from './serializeDocumentMarkdown.js';
+export { knownIconNames } from './iconNames.js';
 export { collectHeadings, slugifyHeading } from './collectHeadings.js';
 export { applyBoardLayout, assertBoardLayout, validateBoardLayout, } from './components/BoardLayout.js';
 export { serializeBoardDocument } from './components/BoardModel.js';

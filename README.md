@@ -17,7 +17,7 @@ pnpm showcase
 ## 单一真源
 
 - `styles/tokens.css`：颜色、排版与组件 token。画板标题、工具栏与菜单使用 `--de-font-sans`，宿主可覆盖为自己的字体。
-- `styles/content.css`：Annotation、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Annotation 可带 `label` 把维度名和判断写在同一条里；Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
+- `styles/content.css`：Annotation、Icons、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Annotation 可带 `label` 把维度名和判断写在同一条里；Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board、DocumentBlock 与导入器）。
 - `parseDocumentMarkdown()` / `DocumentBlock`：Markdown 子集的解析与渲染；依赖方不要复制解析器或正文样式。
@@ -54,6 +54,33 @@ Docusaurus 主题在每篇文档标题旁提供“复制全文”。复制结果
 ```
 
 `>` 只表示来源原话或必须保留原始措辞的引用，不承担公式、提示或卡片的视觉语义。
+
+### 图标列表（0.14.15）
+
+图标承载分类语义、需要分别解释的 3–6 个并列条目使用 `icons`；不要为了装饰添加图标，存在多个重复字段时使用表格。作者必须显式标记，解析器不从文字猜测：
+
+```markdown
+> [!icons] 三个购买假设
+> - camera | A · 让拍摄不再依赖电脑
+> 外拍摄影师购买的是**可靠、低负担**的现场备份工作流。
+> 已有一定真实使用证据，优先开展原型验证。
+> - backpack | B · 轻装出行也能保存素材
+> 旅行摄影爱好者购买的是少带设备、少折腾的体验。
+> - smartphone | C · 随时整理回忆
+> 手机摄影用户希望随时保存与回看素材。
+
+> [!icons:columns] 素材工作流
+> - hard-drive | Storage
+> 保留原始素材。
+> - search | Discovery
+> 快速找到内容。
+> - cloud | Delivery
+> 交付精选内容。
+```
+
+`[!icons]` 为纵向列表；`[!icons:columns]` 用于 2–4 项居中等分栏，屏宽小于 640px 时纵向堆叠。标记后的块标题可省略。每行 `- lucide-kebab-case | 标题` 开始一个条目，之后第一行是可选说明，其余行以空格合并为弱化备注；只有备注时保留一行空的 `>` 作为说明占位。标题、说明与备注复用 `MarkdownInline`，支持粗体、行内代码和链接。没有合法条目时保留既有引用型 callout 行为。
+
+React 宿主也可直接使用 `<Icons layout="list" items={items} title="购买假设" />`。图标通过显式白名单按需导入；未知名称保留对齐占位，在开发环境按名称警告一次。主入口和无 React 的 `@ooakloo/docs-engine/agent` 均导出 `knownIconNames` 与 `KnownIconName`，供宿主和 Agent 检查。`serializeDocBlock()` 和“复制全文”均保留显式语法及图标名称。
 
 ### 文档创作 Skill
 
@@ -209,7 +236,7 @@ const [items, setItems] = useState<TimelineItem[]>([
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.6.1"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.14.15"
   }
 }
 ```

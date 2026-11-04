@@ -35,6 +35,12 @@ export type DocBlock =
   | {type: 'video'; src: string; title: string; poster?: string}
   | {type: 'diagram'; syntax: 'mermaid'; source: string; title: string}
   | {type: 'annotation'; text: string; label?: string}
+  | {
+      type: 'icons';
+      layout: 'list' | 'columns';
+      title?: string;
+      items: Array<{icon: string; title: string; description?: string; note?: string}>;
+    }
   | {type: 'callout'; variant: CalloutVariant; title: string; body: string[]}
   | {type: 'table'; headers: string[]; rows: string[][]; statusOptions?: string[]}
   | {

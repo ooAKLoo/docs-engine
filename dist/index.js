@@ -12,6 +12,8 @@ export { DocumentContent } from './components/DocumentContent.js';
 export { DocumentFrame } from './components/DocumentFrame.js';
 export { DocumentOutline } from './components/DocumentOutline.js';
 export { Formula } from './components/Formula.js';
+export { Icons } from './components/Icons.js';
+export { knownIconNames } from './iconNames.js';
 export { MarkdownInline } from './components/MarkdownInline.js';
 export { Priority } from './components/Priority.js';
 export { ResourceLink } from './components/ResourceLink.js';

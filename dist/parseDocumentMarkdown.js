@@ -138,13 +138,23 @@ export function parseDocumentMarkdown(markdown) {
         if (stripped.startsWith('>')) {
             flushAll();
             const quoteLines = [];
+            // Icons can use an empty description before a note; legacy quotes still filter blanks.
+            const rawQuoteLines = [];
             while (cursor < lines.length && lines[cursor].trim().startsWith('>')) {
                 const quote = lines[cursor].trim().slice(1).trim();
+                rawQuoteLines.push(quote);
                 if (quote)
                     quoteLines.push(quote);
                 cursor += 1;
             }
             if (quoteLines.length > 0) {
+                const icons = parseIconsQuote(rawQuoteLines);
+                if (icons) {
+                    blocks.push(icons);
+                    if (!summary)
+                        summary = icons.title || icons.items[0].title;
+                    continue;
+                }
                 const annotation = parseAnnotationQuote(quoteLines);
                 if (annotation) {
                     blocks.push(annotation);
@@ -282,6 +292,45 @@ function parseAnnotationQuote(quoteLines) {
     if (!rest)
         return null;
     return { type: 'annotation', text: rest };
+}
+function parseIconsQuote(quoteLines) {
+    const mark = quoteLines[0]?.match(/^\[!icons(:columns)?\]\s*(.*)$/i);
+    if (!mark)
+        return null;
+    const items = [];
+    let following = [];
+    function flushItem() {
+        const item = items.at(-1);
+        if (!item)
+            return;
+        const description = cleanInline(following[0] ?? '');
+        const note = cleanInline(following.slice(1).join(' '));
+        if (description)
+            item.description = description;
+        if (note)
+            item.note = note;
+        following = [];
+    }
+    for (const line of quoteLines.slice(1)) {
+        const entry = line.match(/^-\s+([a-z][a-z0-9]*(?:-[a-z0-9]+)*)\s*\|\s*(\S.*)$/);
+        if (entry) {
+            flushItem();
+            items.push({ icon: entry[1], title: cleanInline(entry[2]) });
+        }
+        else if (items.length > 0) {
+            following.push(line);
+        }
+    }
+    flushItem();
+    if (items.length === 0)
+        return null;
+    const title = cleanInline(mark[2]);
+    return {
+        type: 'icons',
+        layout: mark[1] ? 'columns' : 'list',
+        ...(title ? { title } : {}),
+        items,
+    };
 }
 function parseFormula(lines, index) {
     const latexLines = [];

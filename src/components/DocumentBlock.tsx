@@ -7,6 +7,7 @@ import {Board} from './Board.js';
 import {Callout} from './Callout.js';
 import {CodeBlock} from './CodeBlock.js';
 import {Formula} from './Formula.js';
+import {Icons} from './Icons.js';
 import {MarkdownInline} from './MarkdownInline.js';
 import {Table} from './Table.js';
 import {Video} from './Video.js';
@@ -102,6 +103,8 @@ function renderStandardBlock(
       );
     case 'annotation':
       return <Annotation label={block.label}>{renderInline(block.text)}</Annotation>;
+    case 'icons':
+      return <Icons {...block} renderInline={renderInline} />;
     case 'callout':
       if (block.variant === 'annotation') {
         const lines = [block.title, ...block.body].filter(Boolean);

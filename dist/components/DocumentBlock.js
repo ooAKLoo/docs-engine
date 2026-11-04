@@ -5,6 +5,7 @@ import { Board } from './Board.js';
 import { Callout } from './Callout.js';
 import { CodeBlock } from './CodeBlock.js';
 import { Formula } from './Formula.js';
+import { Icons } from './Icons.js';
 import { MarkdownInline } from './MarkdownInline.js';
 import { Table } from './Table.js';
 import { Video } from './Video.js';
@@ -39,6 +40,8 @@ function renderStandardBlock(block, headingId, renderInline) {
             return (_jsx(Board, { "aria-label": block.title, importSource: { format: 'mermaid', source: block.source }, viewerTitle: block.title }));
         case 'annotation':
             return _jsx(Annotation, { label: block.label, children: renderInline(block.text) });
+        case 'icons':
+            return _jsx(Icons, { ...block, renderInline: renderInline });
         case 'callout':
             if (block.variant === 'annotation') {
                 const lines = [block.title, ...block.body].filter(Boolean);
