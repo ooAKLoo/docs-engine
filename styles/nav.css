@@ -208,20 +208,40 @@
 }
 
 .de-document-outline__list li[data-level='1'] + li[data-level='1'] {
-  margin-top: 0.7rem;
+  margin-top: 0.3rem;
 }
 
 .de-document-outline__list li[data-level='2'] + li[data-level='1'],
 .de-document-outline__list li[data-level='3'] + li[data-level='1'] {
-  margin-top: 0.85rem;
+  margin-top: 0.45rem;
 }
 
 .de-document-outline__link {
-  padding: 0.28rem 0.15rem;
+  padding: 0.24rem 0.15rem;
+}
+
+/* 编号单独成列，折行时第二行对齐标题而不是编号。 */
+.de-document-outline__link:has(> .de-document-outline__index) {
+  display: flex;
+  gap: 0.4em;
+}
+
+.de-document-outline__index {
+  flex: none;
+  color: var(--de-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.de-document-outline__title {
+  min-width: 0;
+}
+
+.de-document-outline__link[aria-current='location'] .de-document-outline__index {
+  color: inherit;
 }
 
 .de-document-outline__list li[data-level='2'] .de-document-outline__link {
-  padding-left: 0.75rem;
+  padding-left: 0.85rem;
   color: var(--de-muted);
   font-size: 0.75rem;
   font-weight: 480;

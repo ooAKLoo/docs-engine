@@ -63,13 +63,32 @@ export function DocumentOutline({
                 href={`#${heading.id}`}
                 aria-current={heading.id === activeId ? 'location' : undefined}
               >
-                {heading.text}
+                <OutlineLinkText text={heading.text} />
               </a>
             </li>
           ))}
         </ol>
       )}
     </nav>
+  );
+}
+
+const outlineIndexPattern = /^(\d+(?:\.\d+)*)[.、)]?\s+(\S[\s\S]*)$/;
+
+/** Splits a leading section number ("1 ", "2.3 ", "4. ") so wrapped lines hang under the title, not the number. */
+export function splitOutlineIndex(text: string): {index?: string; title: string} {
+  const match = outlineIndexPattern.exec(text);
+  return match ? {index: match[1], title: match[2]} : {title: text};
+}
+
+function OutlineLinkText({text}: {text: string}) {
+  const {index, title} = splitOutlineIndex(text);
+  if (!index) return <>{text}</>;
+  return (
+    <>
+      <span className="de-document-outline__index">{index} </span>
+      <span className="de-document-outline__title">{title}</span>
+    </>
   );
 }
 
