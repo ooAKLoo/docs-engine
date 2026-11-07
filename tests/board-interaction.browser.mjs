@@ -128,7 +128,12 @@ for (const mode of ['inline', 'fullscreen']) {
       const read = () => new DOMMatrixReadOnly(getComputedStyle(stage).transform);
       const before = read();
       window.__boardMetrics.commits = window.__boardMetrics.canvasCommits = 0;
-      const point = {x: rect.width * 0.7, y: rect.height * 0.3};
+      // Chrome truncates synthetic MouseEvent client coordinates to integers;
+      // derive the anchor from whole client pixels so a fractional canvas
+      // offset elsewhere on the page cannot skew the zoom anchor.
+      const clientX = Math.round(rect.left + rect.width * 0.7);
+      const clientY = Math.round(rect.top + rect.height * 0.3);
+      const point = {x: clientX - rect.left, y: clientY - rect.top};
       let writes = 0;
       const observer = new MutationObserver((mutations) => { writes += mutations.length; });
       // Count style writes after promotion; only the rAF should write transform.
@@ -140,7 +145,7 @@ for (const mode of ['inline', 'fullscreen']) {
       observer.disconnect();
       const panned = read();
       canvas.dispatchEvent(new WheelEvent('wheel', {
-        ctrlKey: true, deltaY: -2, clientX: rect.left + point.x, clientY: rect.top + point.y,
+        ctrlKey: true, deltaY: -2, clientX, clientY,
       }));
       await new Promise(requestAnimationFrame);
       const zoomed = read();

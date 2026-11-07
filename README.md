@@ -16,7 +16,7 @@ pnpm showcase
 
 ## 单一真源
 
-- `styles/tokens.css`：颜色、排版与组件 token。画板标题、工具栏与菜单使用 `--de-font-sans`，宿主可覆盖为自己的字体。
+- `styles/tokens.css`：颜色、排版与组件 token。画板标题、工具栏与菜单使用 `--de-font-sans`，宿主可覆盖为自己的字体。正文画板预览尺寸由 `--de-board-inline-max-scale`（默认 `1`）、`--de-board-inline-min-scale`（默认 `0.8`）与 `--de-board-inline-max-height`（默认 `70vh`）控制。
 - `styles/content.css`：Annotation、Icons、Callout、Table、Status、Priority、RiskGrid、转换比较与图表容器。Annotation 可带 `label` 把维度名和判断写在同一条里；Callout 同时承载页面级摘要，与 Status、Priority 共用一套等明度语义色。
 - `ResourceLink`：带浅灰色 Link2 图标的资源入口，图标与地址固定同行，窄屏由表格容器横向滚动。
 - `src/components`：框架无关、SSR 安全的 React 语义组件（包含 Formula、CodeBlock、Board、DocumentBlock 与导入器）。
@@ -112,7 +112,7 @@ themes: ['@ooakloo/docs-engine/adapters/docusaurus-theme'],
 
 ### 画板查看、编辑与持久化
 
-`Board` 默认提供接近飞书画板的正文与全屏交互。正文预览按节点、完整路线、箭头和标签的实际渲染边界执行内容级取景，四周留白相等，悬停工具栏浮在内容之上而不额外占位；全屏保留文档中的作者画布与有意留白。正文内可滚轮平移，`⌘ / Ctrl + 滚轮` 以指针为中心缩放；触控板捏合与双指平移即时跟手，手势期间不触发 React 重渲染，离散鼠标滚轮保留约 160ms 的短平滑；右上角“回到原位”图标可随时恢复初始位置与缩放，并停止尚未结束的视图动画。正文与全屏浮动工具栏统一采用无边框样式。全屏只保留退出、编辑／浏览切换（仅可编辑时显示）、编辑模式下的选择与手型工具，以及缩放和帮助；分组标题会避开穿过它的连线，并带底色描边保证可读。全屏支持 `Space + 左键`、右键拖动或手型工具平移、全览、恢复 100%、`Esc` 退出和键盘焦点约束。
+`Board` 默认提供接近飞书画板的正文与全屏交互。正文预览按节点、完整路线、箭头和标签的实际渲染边界执行内容级取景，四周留白相等，悬停工具栏浮在内容之上而不额外占位。预览最多按原始尺寸显示、不会为撑满栏宽而放大；较高的图会缩小到约 70% 视口高度以便一屏看全，但不低于 0.8 倍以保证文字可读，且始终不超过栏宽，未占满栏宽时水平居中；全屏保留文档中的作者画布与有意留白。正文内可滚轮平移，`⌘ / Ctrl + 滚轮` 以指针为中心缩放；触控板捏合与双指平移即时跟手，手势期间不触发 React 重渲染，离散鼠标滚轮保留约 160ms 的短平滑；右上角“回到原位”图标可随时恢复初始位置与缩放，并停止尚未结束的视图动画。正文与全屏浮动工具栏统一采用无边框样式。全屏只保留退出、编辑／浏览切换（仅可编辑时显示）、编辑模式下的选择与手型工具，以及缩放和帮助；分组标题会避开穿过它的连线，并带底色描边保证可读。全屏支持 `Space + 左键`、右键拖动或手型工具平移、全览、恢复 100%、`Esc` 退出和键盘焦点约束。
 
 传入 `document`、`defaultDocument` 或 `importSource` 后默认启用编辑。节点支持拖动、对齐、框选、成组移动和双击原地编辑；连接点支持建立关系和创建新图形；连线控制点支持调整圆角正交路径。只有显式设置 `editable={false}` 才进入只读画板。
 
@@ -236,7 +236,7 @@ const [items, setItems] = useState<TimelineItem[]>([
 ```json
 {
   "dependencies": {
-    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.14.16"
+    "@ooakloo/docs-engine": "https://codeload.github.com/ooAKLoo/docs-engine/tar.gz/v0.14.17"
   }
 }
 ```

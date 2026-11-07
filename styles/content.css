@@ -1983,6 +1983,26 @@
   overflow: visible;
 }
 
+/* Inline preview: natural size at most, shrunk toward the height cap but not
+ * below the minimum legible scale, and never wider than the column. */
+.de-board[data-fit='content'] > .de-board__svg {
+  --de-board-natural-width: calc(var(--de-board-content-width) * 1px);
+  width: min(
+    100%,
+    max(
+      calc(var(--de-board-natural-width) * var(--de-board-inline-min-scale, 0.8)),
+      min(
+        calc(var(--de-board-natural-width) * var(--de-board-inline-max-scale, 1)),
+        calc(
+          var(--de-board-inline-max-height, 70vh) * var(--de-board-content-width) /
+            var(--de-board-content-height)
+        )
+      )
+    )
+  );
+  margin-inline: auto;
+}
+
 .de-board__groups,
 .de-board__lifelines {
   pointer-events: none;

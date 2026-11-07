@@ -4,6 +4,12 @@
 :where(:root) {
   --de-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  /* Inline Board preview sizing. The diagram never grows past its natural
+   * size, shrinks to fit the height cap, and stops shrinking at the minimum
+   * scale; the column width always wins. */
+  --de-board-inline-max-scale: 1;
+  --de-board-inline-min-scale: 0.8;
+  --de-board-inline-max-height: 70vh;
 }
 
 :where(.de-root) {

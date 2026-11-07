@@ -1,6 +1,6 @@
 'use client';
 
-import type {PointerEvent as ReactPointerEvent} from 'react';
+import type {CSSProperties, PointerEvent as ReactPointerEvent} from 'react';
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
   assignDiagramEdgeLanes,
@@ -688,11 +688,21 @@ export function BoardCanvas({
       ? routeDraftConnection(draftSource, draftTarget, connectionDraft, layout.nodes)
       : null;
   const guideBounds = getLayoutBounds(layout.nodes, 34, layout.groups);
+  // The inline preview sizes the SVG from its natural extent in CSS, so a
+  // small or tall diagram is not stretched to the full column width.
+  const fitStyle = fitContent
+    ? ({
+        '--de-board-content-width': format(renderedDisplayBounds.width),
+        '--de-board-content-height': format(renderedDisplayBounds.height),
+      } as CSSProperties)
+    : undefined;
 
   return (
     <div
       className="de-board"
       data-authored-layout={boardLayout ? 'true' : undefined}
+      data-fit={fitContent ? 'content' : undefined}
+      style={fitStyle}
       role="img"
       aria-label={accessibleLabel}
     >
